@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+message Entry {
+	repeated Value Values = 1;
+}
+
+message Value {
+  string value = 1;
+  bytes cid = 2;
+}
