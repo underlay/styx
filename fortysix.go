@@ -62,7 +62,7 @@ func splitQuad(quad Quad, p []int) ([]byte, Value) {
 	b := quad.triple[p[1]]
 	key := append([]byte(a), []byte(b)...)
 	label, _ := base58.Decode(quad.cid)
-	value := Value{Value: quad.triple[p[2]], Label: label}
+	value := Value{Value: quad.triple[p[2]], Cid: label}
 	return key, value
 }
 

@@ -1,4 +1,4 @@
-package forty_six
+package fortysix
 
 import (
 	"fmt"
