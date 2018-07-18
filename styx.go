@@ -25,13 +25,22 @@ But when we fix a length (three) we can just look for patterns manually.
 In this case, we notice that the base-3 value of the first two elements of the permutation
 *almost* make an incrementing sequence (it skips 4 because 4 = 11 in base 3).
 But this is a constant-time fix, so it's good enough.
-p  permutation  r
+-----------------
+i            p  r
 0    [0, 1, 2]  1 <- this number is r.
 1    [0, 2, 1]  2    r % 3 = b.
 2    [1, 0, 2]  3    r = a + (3 * b)
 3    [1, 2, 0]  5
 4    [2, 0, 1]  6
 5    [2, 1, 0]  7
+
+map for db indices:
+---------------
+j  i          p
+0  3  [1, 2, 0]
+1  4  [2, 0, 1]
+2  0  [0, 1, 2]
+so i = (j + 3) % 5
 */
 
 // Here p []int is any permutation of {0, 1, 2}.
@@ -90,9 +99,10 @@ func Insert(quad Quad, store Store) {
 	}
 }
 
-func indexTriple(i int, a string, b string, store Store) []Quad {
+func indexTriple(j int, a string, b string, store Store) []Quad {
 	key := Key{A: a, B: b}
 	bytes, _ := proto.Marshal(&key)
+	i := (j + 3) % 5
 	has, _ := store[i].Has(bytes, nil)
 	if has {
 		result, _ := store[i].Get(bytes, nil)
@@ -100,14 +110,14 @@ func indexTriple(i int, a string, b string, store Store) []Quad {
 		_ = proto.Unmarshal(result, &entry)
 		length := len(entry.Values)
 		results := make([]Quad, length)
-		for j := 0; j < length; j++ {
-			cid := base58.Encode(entry.Values[j].Cid)
-			value := entry.Values[j].Value
+		for v := 0; v < length; v++ {
+			cid := base58.Encode(entry.Values[v].Cid)
+			value := entry.Values[v].Value
 			triple := Triple{}
-			triple[i] = value
-			triple[(i+1)%3] = a
-			triple[(i+2)%3] = b
-			results[j] = Quad{triple, cid}
+			triple[j] = value
+			triple[(j+1)%3] = a
+			triple[(j+2)%3] = b
+			results[v] = Quad{triple, cid}
 		}
 		return results
 	}
@@ -177,6 +187,7 @@ func indexTriple(i int, a string, b string, store Store) []Quad {
 
 var dbNames = [6]string{"spo", "sop", "pso", "pos", "osp", "ops"}
 
+// OpenStore of LevelDB databases, creating them if necessary
 func OpenStore(path string) Store {
 	store := Store{}
 	for i := 0; i < 6; i++ {
