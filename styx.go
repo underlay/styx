@@ -127,6 +127,33 @@ func minorIndex(j int, A string, B string, store Store) []Quad {
 	return results
 }
 
+/*
+    a < p
+    ^   ∨
+x > y > z
+    ^
+    b
+*/
+
+// IndexTriple takes a triple with *exactly one empty-string element*. I'm not responsible for its behaviour otherwise :-/
+func IndexTriple(triple Triple, store Store) []Quad {
+	var j int
+	if triple[0] == "" {
+		j = 1
+	} else if triple[1] == "" {
+		j = 0
+	} else if triple[2] == "" {
+		j = 2
+	} else {
+		// Look for exact match?
+		// no.
+	}
+	a, b, _ := index(1, j)
+	A := triple[a]
+	B := triple[b]
+	return minorIndex(j, A, B, store)
+}
+
 var dbNames = [6]string{"smajor", "pmajor", "omajor", "sminor", "pminor", "bminor"}
 
 // OpenStore of LevelDB databases, creating them if necessary
