@@ -1,4 +1,3 @@
-compile.sh
 leveldb/
 # Binaries for programs and plugins
 *.exe
