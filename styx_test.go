@@ -11,10 +11,10 @@ func TestThing(t *testing.T) {
 
 	triple := Triple{"joel", "likes", "pizza"}
 	cid := "QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM"
-	quad := Quad{triple, cid}
+	quad := Quad{Triple: triple, Cid: cid}
 	Insert(quad, store)
 	// yay! now query
-	fmt.Println(indexTriple(0, "likes", "pizza", store))
-	fmt.Println(indexTriple(1, "pizza", "joel", store))
-	fmt.Println(indexTriple(2, "joel", "likes", store))
+	fmt.Println(minorIndex(0, "pizza", "joel", store))
+	fmt.Println(minorIndex(1, "likes", "pizza", store))
+	fmt.Println(minorIndex(2, "joel", "likes", store))
 }

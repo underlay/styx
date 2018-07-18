@@ -1,15 +1,25 @@
 syntax = "proto3";
 
-message Entry {
-	repeated Value Values = 1;
+// Just use raw bytes for major key.
+// message MajorKey {
+//   string A = 1;
+// }
+
+message MajorValue {
+  repeated string B = 1;
+  repeated string C = 2;
 }
 
-message Value {
-  string value = 1;
-  bytes cid = 2;
-}
-
-message Key {
+message MinorKey {
   string A = 1;
   string B = 2;
+}
+
+message MinorValue {
+  repeated MinorEntry Entries = 1;
+}
+
+message MinorEntry {
+  string C = 1;
+  bytes Cid = 2;
 }

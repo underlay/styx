@@ -18,91 +18,53 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
-type Entry struct {
-	Values               []*Value `protobuf:"bytes,1,rep,name=Values,proto3" json:"Values,omitempty"`
+type MajorValue struct {
+	B                    []string `protobuf:"bytes,1,rep,name=B,proto3" json:"B,omitempty"`
+	C                    []string `protobuf:"bytes,2,rep,name=C,proto3" json:"C,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *Entry) Reset()         { *m = Entry{} }
-func (m *Entry) String() string { return proto.CompactTextString(m) }
-func (*Entry) ProtoMessage()    {}
-func (*Entry) Descriptor() ([]byte, []int) {
-	return fileDescriptor_styx_969010df6723bcbf, []int{0}
+func (m *MajorValue) Reset()         { *m = MajorValue{} }
+func (m *MajorValue) String() string { return proto.CompactTextString(m) }
+func (*MajorValue) ProtoMessage()    {}
+func (*MajorValue) Descriptor() ([]byte, []int) {
+	return fileDescriptor_styx_93acbfd5fa444639, []int{0}
 }
-func (m *Entry) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Entry.Unmarshal(m, b)
+func (m *MajorValue) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_MajorValue.Unmarshal(m, b)
 }
-func (m *Entry) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Entry.Marshal(b, m, deterministic)
+func (m *MajorValue) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_MajorValue.Marshal(b, m, deterministic)
 }
-func (dst *Entry) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Entry.Merge(dst, src)
+func (dst *MajorValue) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MajorValue.Merge(dst, src)
 }
-func (m *Entry) XXX_Size() int {
-	return xxx_messageInfo_Entry.Size(m)
+func (m *MajorValue) XXX_Size() int {
+	return xxx_messageInfo_MajorValue.Size(m)
 }
-func (m *Entry) XXX_DiscardUnknown() {
-	xxx_messageInfo_Entry.DiscardUnknown(m)
+func (m *MajorValue) XXX_DiscardUnknown() {
+	xxx_messageInfo_MajorValue.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_Entry proto.InternalMessageInfo
+var xxx_messageInfo_MajorValue proto.InternalMessageInfo
 
-func (m *Entry) GetValues() []*Value {
+func (m *MajorValue) GetB() []string {
 	if m != nil {
-		return m.Values
+		return m.B
 	}
 	return nil
 }
 
-type Value struct {
-	Value                string   `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
-	Cid                  []byte   `protobuf:"bytes,2,opt,name=cid,proto3" json:"cid,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *Value) Reset()         { *m = Value{} }
-func (m *Value) String() string { return proto.CompactTextString(m) }
-func (*Value) ProtoMessage()    {}
-func (*Value) Descriptor() ([]byte, []int) {
-	return fileDescriptor_styx_969010df6723bcbf, []int{1}
-}
-func (m *Value) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Value.Unmarshal(m, b)
-}
-func (m *Value) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Value.Marshal(b, m, deterministic)
-}
-func (dst *Value) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Value.Merge(dst, src)
-}
-func (m *Value) XXX_Size() int {
-	return xxx_messageInfo_Value.Size(m)
-}
-func (m *Value) XXX_DiscardUnknown() {
-	xxx_messageInfo_Value.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Value proto.InternalMessageInfo
-
-func (m *Value) GetValue() string {
+func (m *MajorValue) GetC() []string {
 	if m != nil {
-		return m.Value
-	}
-	return ""
-}
-
-func (m *Value) GetCid() []byte {
-	if m != nil {
-		return m.Cid
+		return m.C
 	}
 	return nil
 }
 
-type Key struct {
+type MinorKey struct {
 	A                    string   `protobuf:"bytes,1,opt,name=A,proto3" json:"A,omitempty"`
 	B                    string   `protobuf:"bytes,2,opt,name=B,proto3" json:"B,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -110,61 +72,147 @@ type Key struct {
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *Key) Reset()         { *m = Key{} }
-func (m *Key) String() string { return proto.CompactTextString(m) }
-func (*Key) ProtoMessage()    {}
-func (*Key) Descriptor() ([]byte, []int) {
-	return fileDescriptor_styx_969010df6723bcbf, []int{2}
+func (m *MinorKey) Reset()         { *m = MinorKey{} }
+func (m *MinorKey) String() string { return proto.CompactTextString(m) }
+func (*MinorKey) ProtoMessage()    {}
+func (*MinorKey) Descriptor() ([]byte, []int) {
+	return fileDescriptor_styx_93acbfd5fa444639, []int{1}
 }
-func (m *Key) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Key.Unmarshal(m, b)
+func (m *MinorKey) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_MinorKey.Unmarshal(m, b)
 }
-func (m *Key) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Key.Marshal(b, m, deterministic)
+func (m *MinorKey) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_MinorKey.Marshal(b, m, deterministic)
 }
-func (dst *Key) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Key.Merge(dst, src)
+func (dst *MinorKey) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MinorKey.Merge(dst, src)
 }
-func (m *Key) XXX_Size() int {
-	return xxx_messageInfo_Key.Size(m)
+func (m *MinorKey) XXX_Size() int {
+	return xxx_messageInfo_MinorKey.Size(m)
 }
-func (m *Key) XXX_DiscardUnknown() {
-	xxx_messageInfo_Key.DiscardUnknown(m)
+func (m *MinorKey) XXX_DiscardUnknown() {
+	xxx_messageInfo_MinorKey.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_Key proto.InternalMessageInfo
+var xxx_messageInfo_MinorKey proto.InternalMessageInfo
 
-func (m *Key) GetA() string {
+func (m *MinorKey) GetA() string {
 	if m != nil {
 		return m.A
 	}
 	return ""
 }
 
-func (m *Key) GetB() string {
+func (m *MinorKey) GetB() string {
 	if m != nil {
 		return m.B
 	}
 	return ""
 }
 
-func init() {
-	proto.RegisterType((*Entry)(nil), "Entry")
-	proto.RegisterType((*Value)(nil), "Value")
-	proto.RegisterType((*Key)(nil), "Key")
+type MinorValue struct {
+	Entries              []*MinorEntry `protobuf:"bytes,1,rep,name=Entries,proto3" json:"Entries,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}      `json:"-"`
+	XXX_unrecognized     []byte        `json:"-"`
+	XXX_sizecache        int32         `json:"-"`
 }
 
-func init() { proto.RegisterFile("styx.proto", fileDescriptor_styx_969010df6723bcbf) }
+func (m *MinorValue) Reset()         { *m = MinorValue{} }
+func (m *MinorValue) String() string { return proto.CompactTextString(m) }
+func (*MinorValue) ProtoMessage()    {}
+func (*MinorValue) Descriptor() ([]byte, []int) {
+	return fileDescriptor_styx_93acbfd5fa444639, []int{2}
+}
+func (m *MinorValue) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_MinorValue.Unmarshal(m, b)
+}
+func (m *MinorValue) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_MinorValue.Marshal(b, m, deterministic)
+}
+func (dst *MinorValue) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MinorValue.Merge(dst, src)
+}
+func (m *MinorValue) XXX_Size() int {
+	return xxx_messageInfo_MinorValue.Size(m)
+}
+func (m *MinorValue) XXX_DiscardUnknown() {
+	xxx_messageInfo_MinorValue.DiscardUnknown(m)
+}
 
-var fileDescriptor_styx_969010df6723bcbf = []byte{
-	// 136 bytes of a gzipped FileDescriptorProto
+var xxx_messageInfo_MinorValue proto.InternalMessageInfo
+
+func (m *MinorValue) GetEntries() []*MinorEntry {
+	if m != nil {
+		return m.Entries
+	}
+	return nil
+}
+
+type MinorEntry struct {
+	C                    string   `protobuf:"bytes,1,opt,name=C,proto3" json:"C,omitempty"`
+	Cid                  []byte   `protobuf:"bytes,2,opt,name=Cid,proto3" json:"Cid,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *MinorEntry) Reset()         { *m = MinorEntry{} }
+func (m *MinorEntry) String() string { return proto.CompactTextString(m) }
+func (*MinorEntry) ProtoMessage()    {}
+func (*MinorEntry) Descriptor() ([]byte, []int) {
+	return fileDescriptor_styx_93acbfd5fa444639, []int{3}
+}
+func (m *MinorEntry) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_MinorEntry.Unmarshal(m, b)
+}
+func (m *MinorEntry) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_MinorEntry.Marshal(b, m, deterministic)
+}
+func (dst *MinorEntry) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MinorEntry.Merge(dst, src)
+}
+func (m *MinorEntry) XXX_Size() int {
+	return xxx_messageInfo_MinorEntry.Size(m)
+}
+func (m *MinorEntry) XXX_DiscardUnknown() {
+	xxx_messageInfo_MinorEntry.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MinorEntry proto.InternalMessageInfo
+
+func (m *MinorEntry) GetC() string {
+	if m != nil {
+		return m.C
+	}
+	return ""
+}
+
+func (m *MinorEntry) GetCid() []byte {
+	if m != nil {
+		return m.Cid
+	}
+	return nil
+}
+
+func init() {
+	proto.RegisterType((*MajorValue)(nil), "MajorValue")
+	proto.RegisterType((*MinorKey)(nil), "MinorKey")
+	proto.RegisterType((*MinorValue)(nil), "MinorValue")
+	proto.RegisterType((*MinorEntry)(nil), "MinorEntry")
+}
+
+func init() { proto.RegisterFile("styx.proto", fileDescriptor_styx_93acbfd5fa444639) }
+
+var fileDescriptor_styx_93acbfd5fa444639 = []byte{
+	// 160 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x2a, 0x2e, 0xa9, 0xac,
-	0xd0, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x57, 0x52, 0xe7, 0x62, 0x75, 0xcd, 0x2b, 0x29, 0xaa, 0x14,
-	0x92, 0xe3, 0x62, 0x0b, 0x4b, 0xcc, 0x29, 0x4d, 0x2d, 0x96, 0x60, 0x54, 0x60, 0xd6, 0xe0, 0x36,
-	0x62, 0xd3, 0x03, 0x73, 0x83, 0xa0, 0xa2, 0x4a, 0xfa, 0x5c, 0xac, 0x60, 0x96, 0x90, 0x08, 0x17,
-	0x6b, 0x19, 0x88, 0x21, 0xc1, 0xa8, 0xc0, 0xa8, 0xc1, 0x19, 0x04, 0xe1, 0x08, 0x09, 0x70, 0x31,
-	0x27, 0x67, 0xa6, 0x48, 0x30, 0x29, 0x30, 0x6a, 0xf0, 0x04, 0x81, 0x98, 0x4a, 0x8a, 0x5c, 0xcc,
-	0xde, 0xa9, 0x95, 0x42, 0x3c, 0x5c, 0x8c, 0x8e, 0x50, 0xa5, 0x8c, 0x8e, 0x20, 0x9e, 0x13, 0x58,
-	0x11, 0x67, 0x10, 0xa3, 0x53, 0x12, 0x1b, 0xd8, 0x0d, 0xc6, 0x80, 0x00, 0x00, 0x00, 0xff, 0xff,
-	0x24, 0x49, 0xd4, 0x54, 0x91, 0x00, 0x00, 0x00,
+	0xd0, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x57, 0xd2, 0xe0, 0xe2, 0xf2, 0x4d, 0xcc, 0xca, 0x2f, 0x0a,
+	0x4b, 0xcc, 0x29, 0x4d, 0x15, 0xe2, 0xe1, 0x62, 0x74, 0x92, 0x60, 0x54, 0x60, 0xd6, 0xe0, 0x0c,
+	0x62, 0x74, 0x02, 0xf1, 0x9c, 0x25, 0x98, 0x20, 0x3c, 0x67, 0x25, 0x35, 0x2e, 0x0e, 0xdf, 0xcc,
+	0xbc, 0xfc, 0x22, 0xef, 0xd4, 0x4a, 0x90, 0x8c, 0xa3, 0x04, 0xa3, 0x02, 0x23, 0x48, 0xc6, 0x11,
+	0xa2, 0x8b, 0x09, 0xc2, 0x73, 0x52, 0x32, 0xe6, 0xe2, 0x02, 0xab, 0x83, 0x98, 0xa8, 0xca, 0xc5,
+	0xee, 0x9a, 0x57, 0x52, 0x94, 0x99, 0x5a, 0x0c, 0x36, 0x97, 0xdb, 0x88, 0x5b, 0x0f, 0x2c, 0x0b,
+	0x12, 0xac, 0x0c, 0x82, 0xc9, 0x29, 0xe9, 0x40, 0x35, 0x81, 0x85, 0x21, 0x16, 0x43, 0x8d, 0x77,
+	0x16, 0x12, 0xe0, 0x62, 0x76, 0xce, 0x4c, 0x01, 0x5b, 0xc0, 0x13, 0x04, 0x62, 0x26, 0xb1, 0x81,
+	0xdd, 0x6e, 0x0c, 0x08, 0x00, 0x00, 0xff, 0xff, 0x27, 0x0f, 0x35, 0x24, 0xc9, 0x00, 0x00, 0x00,
 }

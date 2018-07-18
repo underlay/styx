@@ -2,20 +2,20 @@ package styx
 
 import (
 	proto "github.com/golang/protobuf/proto"
-	base58 "github.com/mr-tron/base58/base58"
+	"github.com/mr-tron/base58/base58"
 	leveldb "github.com/syndtr/goleveldb/leveldb"
 )
 
-// Store is a length-six array of LevelDB database structs.
-type Store [6]*leveldb.DB
+// Store is a six-element table of LevelDB database structs.
+type Store [2][3]*leveldb.DB
 
 // Triple is your regular RDF subject-predicate-object triple.
 type Triple [3]string
 
 // Quad is an RDF triple tagged with the base58-encoded CID of its source assertion
 type Quad struct {
-	triple Triple
-	cid    string
+	Triple Triple
+	Cid    string
 }
 
 /*
@@ -34,164 +34,110 @@ i            p  r
 4    [2, 0, 1]  6
 5    [2, 1, 0]  7
 
-map for db indices:
----------------
-j  i          p
-0  3  [1, 2, 0]
-1  4  [2, 0, 1]
-2  0  [0, 1, 2]
-so i = (j + 3) % 5
+We could also index permutations by rotation & flip (the generators of S_3)
+This is more algebraically natural: let i range from 0 to 1 and j from 0 to 2:
+ij
+00   [0 1 2] a = (3 - i - j) % 3
+01   [2 0 1] b = (a + 1) % 3
+02   [1 2 0] c = (a + 2) % 3
+10   [2 1 0] ...
+11   [0 2 1]
+12   [1 0 2]
+-----------------
 */
 
-// Here p []int is any permutation of {0, 1, 2}.
-// So (p = 0) == [0, 1, 2] corresponds to "SPO"-indexing, etc.
-func deindex(p []int) int {
-	a := p[0]
-	b := p[1]
-	r := a + (3 * b)
-	if r > 4 {
-		r = r - 1
-	}
-	return r - 1
+func index(i int, j int) (int, int, int) {
+	a := (3 - i - j) % 3
+	b := (a + 1) % 3
+	c := (a + 2) % 3
+	return a, b, c
 }
 
-func index(i int) []int {
-	a := int(i / 2)
-	if i < 3 {
-		i = i + 1
+func insertMajor(j int, quad Quad, db *leveldb.DB) {
+	// Major key
+	a, b, c := index(0, j)
+	key := []byte(quad.Triple[a])
+	has, _ := db.Has(key, nil)
+	majorValue := MajorValue{}
+	if has {
+		value, _ := db.Get(key, nil)
+		_ = proto.Unmarshal(value, &majorValue)
+		majorValue.B = append(majorValue.B, quad.Triple[b])
+		majorValue.C = append(majorValue.C, quad.Triple[c])
 	} else {
-		i = i + 2
+		B := []string{quad.Triple[b]}
+		C := []string{quad.Triple[c]}
+		majorValue = MajorValue{B: B, C: C}
 	}
-	b := i - (3 * a)
-	c := 3 - (a + b)
-	return []int{a, b, c}
+	bytes, _ := proto.Marshal(&majorValue)
+	_ = db.Put(key, bytes, nil)
 }
 
-func splitQuad(quad Quad, p []int) ([]byte, Value) {
-	a := quad.triple[p[0]]
-	b := quad.triple[p[1]]
-	key := Key{A: a, B: b}
-	label, _ := base58.Decode(quad.cid)
-	value := Value{Value: quad.triple[p[2]], Cid: label}
-	bytes, _ := proto.Marshal(&key)
-	return bytes, value
+func insertMinor(j int, quad Quad, db *leveldb.DB) {
+	// Minor key
+	a, b, c := index(1, j)
+	minorKey := MinorKey{A: quad.Triple[a], B: quad.Triple[b]}
+	key, _ := proto.Marshal(&minorKey)
+	has, _ := db.Has(key, nil)
+	cid, _ := base58.Decode(quad.Cid)
+	entry := MinorEntry{C: quad.Triple[c], Cid: cid}
+	minorValue := MinorValue{}
+	if has {
+		value, _ := db.Get(key, nil)
+		_ = proto.Unmarshal(value, &minorValue)
+		minorValue.Entries = append(minorValue.Entries, &entry)
+	} else {
+		entries := []*MinorEntry{&entry}
+		minorValue = MinorValue{Entries: entries}
+	}
+	bytes, _ := proto.Marshal(&minorValue)
+	_ = db.Put(key, bytes, nil)
 }
 
 // Insert a quad into the store
 func Insert(quad Quad, store Store) {
-	for i := 0; i < 6; i++ {
-		p := index(i)
-		db := store[i]
-		key, value := splitQuad(quad, p)
-		has, _ := db.Has(key, nil)
-		if has {
-			old, _ := db.Get(key, nil)
-			entry := Entry{}
-			_ = proto.Unmarshal(old, &entry)
-			entry.Values = append(entry.Values, &value) // TODO: sort entries
-			bytes, _ := proto.Marshal(&entry)
-			db.Put(key, bytes, nil)
-		} else {
-			entry := Entry{Values: []*Value{&value}}
-			bytes, _ := proto.Marshal(&entry)
-			db.Put(key, bytes, nil)
-		}
+	for j := 0; j < 3; j++ {
+		insertMajor(j, quad, store[0][j])
+		insertMinor(j, quad, store[1][j])
 	}
 }
 
-func indexTriple(j int, a string, b string, store Store) []Quad {
-	key := Key{A: a, B: b}
-	bytes, _ := proto.Marshal(&key)
-	i := (j + 3) % 5
-	has, _ := store[i].Has(bytes, nil)
+func minorIndex(j int, A string, B string, store Store) []Quad {
+	a, b, c := index(1, j)
+	minorKey := MinorKey{A: A, B: B}
+	key, _ := proto.Marshal(&minorKey)
+	has, _ := store[1][j].Has(key, nil)
+	results := []Quad{}
 	if has {
-		result, _ := store[i].Get(bytes, nil)
-		var entry Entry
-		_ = proto.Unmarshal(result, &entry)
-		length := len(entry.Values)
-		results := make([]Quad, length)
-		for v := 0; v < length; v++ {
-			cid := base58.Encode(entry.Values[v].Cid)
-			value := entry.Values[v].Value
+		value, _ := store[1][j].Get(key, nil)
+		minorValue := MinorValue{}
+		proto.Unmarshal(value, &minorValue)
+		length := len(minorValue.Entries)
+		results = make([]Quad, length)
+		for k := 0; k < length; k++ {
+			entry := minorValue.Entries[k]
 			triple := Triple{}
-			triple[j] = value
-			triple[(j+1)%3] = a
-			triple[(j+2)%3] = b
-			results[v] = Quad{triple, cid}
+			triple[a] = A
+			triple[b] = B
+			triple[c] = entry.C
+			cid := base58.Encode(entry.Cid)
+			results[k] = Quad{Triple: triple, Cid: cid}
 		}
-		return results
 	}
-	return []Quad{}
+	return results
 }
 
-// Index a simple query into matching quads
-// func IndexTriple(triple Triple, store Store) []Quad {
-// 	// An empty query deserves an empty response
-// 	if len(triple[0]+triple[1]+triple[2]) == 0 {
-// 		return []Quad{}
-// 	}
-
-// 	if triple[0] == "" {
-// 		i = 3
-// 	} else if triple[1] == "" {
-// 		i = 4
-// 	} else if triple[2] == "" {
-// 		i = 0
-// 	} else {
-// 		// Panic!
-// 		log.Fatalln("Invalid triple index")
-// 	}
-// 	p := index(i)
-// 	return []Quad{}
-// }
-
-// func parseEntry(entry []byte, db DB) []Value {
-// 	unit := length + hashLength
-// 	count := len(entry) / unit
-// 	values := make([]Value, count)
-// 	for i := 0; i < count; i++ {
-// 		start := i * unit
-// 		middle := start + length
-// 		end := start + unit
-// 		id := entry[start:middle]
-// 		value, _ := getRef(id, db)
-// 		label := string(entry[middle:end])
-// 		values[i] = Value{value, label}
-// 	}
-// 	return values
-// }
-
-// func queryEntry(index []string, db DB) []Value {
-// 	var p int
-// 	var key []byte
-// 	for a := 0; a < 3; a++ {
-// 		if index[a] == "?" {
-// 			if a == 0 {
-// 				p = 3
-// 			} else if a == 1 {
-// 				p = 4
-// 			} else if a == 2 {
-// 				p = 0
-// 			}
-// 			b := (a + 1) % 3
-// 			c := (a + 2) % 3
-// 			bs, _ := getID(index[b], db)
-// 			cs, _ := getID(index[c], db)
-// 			key = append(bs, cs...)
-// 			break
-// 		}
-// 	}
-// 	val, _ := db.p[p].Get(key, nil)
-// 	return parseEntry(val, db)
-// }
-
-var dbNames = [6]string{"spo", "sop", "pso", "pos", "osp", "ops"}
+var dbNames = [6]string{"smajor", "pmajor", "omajor", "sminor", "pminor", "bminor"}
 
 // OpenStore of LevelDB databases, creating them if necessary
 func OpenStore(path string) Store {
 	store := Store{}
-	for i := 0; i < 6; i++ {
-		store[i], _ = leveldb.OpenFile(path+"/"+dbNames[i], nil)
+	for k := 0; k < 6; k++ {
+		i := k / 3
+		j := k % 3
+		name := path + "/" + dbNames[k]
+		db, _ := leveldb.OpenFile(name, nil)
+		store[i][j] = db
 	}
 	return store
 }
