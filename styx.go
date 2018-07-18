@@ -1,4 +1,4 @@
-package fortysix
+package styx
 
 import (
 	proto "github.com/golang/protobuf/proto"
@@ -6,16 +6,15 @@ import (
 	leveldb "github.com/syndtr/goleveldb/leveldb"
 )
 
-const path = "/Users/joel/Documents/Projects/fortysix/leveldb"
-const length = 8
-const hashLength = 49
+// Store is a length-six array of LevelDB database structs.
+type Store [6]*leveldb.DB
 
-// DB is a length-six slice of LevelDB database structs.
-type DB []*leveldb.DB
+// Triple is your regular RDF subject-predicate-object triple.
+type Triple [3]string
 
 // Quad is an RDF triple tagged with the base58-encoded CID of its source assertion
 type Quad struct {
-	triple []string
+	triple Triple
 	cid    string
 }
 
@@ -26,15 +25,17 @@ But when we fix a length (three) we can just look for patterns manually.
 In this case, we notice that the base-3 value of the first two elements of the permutation
 *almost* make an incrementing sequence (it skips 4 because 4 = 11 in base 3).
 But this is a constant-time fix, so it's good enough.
-index  permutation  r
-    0    [0, 1, 2]  1 <- this number is r.
-    1    [0, 2, 1]  2    r % 3 = b.
-    2    [1, 0, 2]  3    r = a + (3 * b)
-    3    [1, 2, 0]  5
-    4    [2, 0, 1]  6
-    5    [2, 1, 0]  7
+p  permutation  r
+0    [0, 1, 2]  1 <- this number is r.
+1    [0, 2, 1]  2    r % 3 = b.
+2    [1, 0, 2]  3    r = a + (3 * b)
+3    [1, 2, 0]  5
+4    [2, 0, 1]  6
+5    [2, 1, 0]  7
 */
 
+// Here p []int is any permutation of {0, 1, 2}.
+// So (p = 0) == [0, 1, 2] corresponds to "SPO"-indexing, etc.
 func deindex(p []int) int {
 	a := p[0]
 	b := p[1]
@@ -60,34 +61,79 @@ func index(i int) []int {
 func splitQuad(quad Quad, p []int) ([]byte, Value) {
 	a := quad.triple[p[0]]
 	b := quad.triple[p[1]]
-	key := append([]byte(a), []byte(b)...)
+	key := Key{A: a, B: b}
 	label, _ := base58.Decode(quad.cid)
 	value := Value{Value: quad.triple[p[2]], Cid: label}
-	return key, value
+	bytes, _ := proto.Marshal(&key)
+	return bytes, value
 }
 
-// here p []int is any permutation of [0, 1, 2].
-// [0, 1, 2] corresponds to "SPO"-indexing, etc.
-func insert(quad Quad, db DB) {
+// Insert a quad into the store
+func Insert(quad Quad, store Store) {
 	for i := 0; i < 6; i++ {
 		p := index(i)
-		d := db[i]
+		db := store[i]
 		key, value := splitQuad(quad, p)
-		has, _ := d.Has(key, nil)
+		has, _ := db.Has(key, nil)
 		if has {
-			old, _ := d.Get(key, nil)
+			old, _ := db.Get(key, nil)
 			entry := Entry{}
 			_ = proto.Unmarshal(old, &entry)
 			entry.Values = append(entry.Values, &value) // TODO: sort entries
 			bytes, _ := proto.Marshal(&entry)
-			d.Put(key, bytes, nil)
+			db.Put(key, bytes, nil)
 		} else {
 			entry := Entry{Values: []*Value{&value}}
 			bytes, _ := proto.Marshal(&entry)
-			d.Put(key, bytes, nil)
+			db.Put(key, bytes, nil)
 		}
 	}
 }
+
+func indexTriple(i int, a string, b string, store Store) []Quad {
+	key := Key{A: a, B: b}
+	bytes, _ := proto.Marshal(&key)
+	has, _ := store[i].Has(bytes, nil)
+	if has {
+		result, _ := store[i].Get(bytes, nil)
+		var entry Entry
+		_ = proto.Unmarshal(result, &entry)
+		length := len(entry.Values)
+		results := make([]Quad, length)
+		for j := 0; j < length; j++ {
+			cid := base58.Encode(entry.Values[j].Cid)
+			value := entry.Values[j].Value
+			triple := Triple{}
+			triple[i] = value
+			triple[(i+1)%3] = a
+			triple[(i+2)%3] = b
+			results[j] = Quad{triple, cid}
+		}
+		return results
+	}
+	return []Quad{}
+}
+
+// Index a simple query into matching quads
+// func IndexTriple(triple Triple, store Store) []Quad {
+// 	// An empty query deserves an empty response
+// 	if len(triple[0]+triple[1]+triple[2]) == 0 {
+// 		return []Quad{}
+// 	}
+
+// 	if triple[0] == "" {
+// 		i = 3
+// 	} else if triple[1] == "" {
+// 		i = 4
+// 	} else if triple[2] == "" {
+// 		i = 0
+// 	} else {
+// 		// Panic!
+// 		log.Fatalln("Invalid triple index")
+// 	}
+// 	p := index(i)
+// 	return []Quad{}
+// }
 
 // func parseEntry(entry []byte, db DB) []Value {
 // 	unit := length + hashLength
@@ -128,3 +174,13 @@ func insert(quad Quad, db DB) {
 // 	val, _ := db.p[p].Get(key, nil)
 // 	return parseEntry(val, db)
 // }
+
+var dbNames = [6]string{"spo", "sop", "pso", "pos", "osp", "ops"}
+
+func OpenStore(path string) Store {
+	store := Store{}
+	for i := 0; i < 6; i++ {
+		store[i], _ = leveldb.OpenFile(path+"/"+dbNames[i], nil)
+	}
+	return store
+}

@@ -8,3 +8,8 @@ message Value {
   string value = 1;
   bytes cid = 2;
 }
+
+message Key {
+  string A = 1;
+  string B = 2;
+}
