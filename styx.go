@@ -2,7 +2,7 @@ package styx
 
 import (
 	proto "github.com/golang/protobuf/proto"
-	"github.com/mr-tron/base58/base58"
+	base58 "github.com/mr-tron/base58/base58"
 	leveldb "github.com/syndtr/goleveldb/leveldb"
 )
 
