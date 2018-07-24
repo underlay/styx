@@ -7,8 +7,6 @@ import (
 	ld "github.com/piprate/json-gold/ld"
 )
 
-const variable = "http://underlay.mit.edu/query#"
-
 // The Frame is a map of stuff
 type Frame map[string]Value
 
@@ -46,7 +44,7 @@ func isBlankNode(value string) bool {
 }
 
 func isVariable(value string) bool {
-	return len(value) > len(variable) && value[:len(variable)] == variable
+	return len(value) > len(Variable) && value[:len(Variable)] == Variable
 }
 
 func scoreTriple(triple Triple, pivot string, frame Frame) Score {
@@ -305,6 +303,6 @@ func (store Store) ResolvePath(root map[string]interface{}, path []string) (Bran
 		}
 		pointer = newPointer
 	}
-	pointer["@id"] = variable + "result"
+	pointer["@id"] = Variable + "result"
 	return store.ResolveQuery(root)
 }

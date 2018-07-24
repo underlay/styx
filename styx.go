@@ -1,13 +1,13 @@
 package styx
 
 import (
-	fmt "fmt"
-
 	proto "github.com/golang/protobuf/proto"
 	base58 "github.com/mr-tron/base58/base58"
 	ld "github.com/piprate/json-gold/ld"
 	leveldb "github.com/syndtr/goleveldb/leveldb"
 )
+
+const Variable = "http://underlay.mit.edu/query#"
 
 // Store is a six-element table of LevelDB database structs.
 type Store [2][3]*leveldb.DB
@@ -109,7 +109,6 @@ func (store Store) Ingest(doc interface{}, cid string) {
 				}
 			}
 			quad := Quad{triple, cid}
-			fmt.Println("inserting triple", triple)
 			store.Insert(quad)
 		}
 	}

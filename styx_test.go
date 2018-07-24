@@ -33,7 +33,7 @@ var assertion = map[string]interface{}{
 var query = map[string]interface{}{
 	"@context": map[string]interface{}{
 		"@vocab": "http://schema.org/",
-		"$":      variable,
+		"$":      Variable,
 	},
 	"@type": "Movie",
 	"name":  "Vertigo",
@@ -46,25 +46,37 @@ var query = map[string]interface{}{
 	},
 }
 
-var query0 = map[string]interface{}{
-	"@context": map[string]interface{}{
-		"@vocab": "http://schema.org/",
-		"$":      variable,
-	},
-	"likes": map[string]interface{}{
-		"@id": "$:foo",
-	},
+func TestPath(t *testing.T) {
+	store := OpenStore(path)
+	store.Ingest(assertion, "QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM")
+
+	root := map[string]interface{}{
+		"@context": map[string]interface{}{
+			"@vocab": "http://schema.org/",
+		},
+		"name": "Vertigo",
+	}
+	path := []string{"director", "hometown", "population"}
+	branch, _ := store.ResolvePath(root, path)
+	for variable, value := range branch.frame {
+		if isVariable(variable) {
+			name := variable[len(Variable):]
+			fmt.Println(name, "is", value.Value)
+		}
+	}
 }
 
 func TestQuery(t *testing.T) {
 	store := OpenStore(path)
 	store.Ingest(assertion, "QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM")
-	fmt.Println("Ingested assertion!")
+
 	branch, _ := store.ResolveQuery(query)
 	for variable, value := range branch.frame {
-		fmt.Println(variable, "is", value.Value)
+		if isVariable(variable) {
+			name := variable[len(Variable):]
+			fmt.Println(name, "is", value.Value)
+		}
 	}
-	// fmt.Println(branch.frame, err)
 }
 
 func TestIndex(t *testing.T) {
