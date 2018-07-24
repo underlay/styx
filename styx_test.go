@@ -7,7 +7,26 @@ import (
 
 const path = "./leveldb"
 
-func TestThing(t *testing.T) {
+var query = map[string]interface{}{
+	"@context": map[string]interface{}{
+		"@vocab": "http://schema.org/",
+		"$":      "http://underlay.mit.edu/query#",
+	},
+	"@type": "Movie",
+	"name":  "Vertigo",
+	"director": map[string]interface{}{
+		"hometown": map[string]interface{}{
+			"population": map[string]interface{}{"@id": "$:population"},
+			"name":       map[string]interface{}{"@id": "$:name"},
+		},
+	},
+}
+
+// func TestQuery(t *testing.T) {
+// 	ResolveQuery(query)
+// }
+
+func TestIndex(t *testing.T) {
 
 	store := OpenStore(path)
 
@@ -16,13 +35,13 @@ func TestThing(t *testing.T) {
 	quad := Quad{Triple: triple, Cid: cid}
 
 	// insert!
-	Insert(quad, store)
+	store.Insert(quad)
 
 	// yay! now query.
-	fmt.Println(IndexTriple(Triple{"alice", "likes", ""}, store))
+	fmt.Println(store.IndexTriple(Triple{"alice", "likes", ""}))
 	// [{[alice likes pizza] QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM}]
-	fmt.Println(IndexTriple(Triple{"alice", "", "pizza"}, store))
+	fmt.Println(store.IndexTriple(Triple{"alice", "", "pizza"}))
 	// [{[alice likes pizza] QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM}]
-	fmt.Println(IndexTriple(Triple{"", "likes", "pizza"}, store))
+	fmt.Println(store.IndexTriple(Triple{"", "likes", "pizza"}))
 	// [{[alice likes pizza] QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM}]
 }

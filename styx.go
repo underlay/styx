@@ -1,8 +1,11 @@
 package styx
 
 import (
+	fmt "fmt"
+
 	proto "github.com/golang/protobuf/proto"
 	base58 "github.com/mr-tron/base58/base58"
+	ld "github.com/piprate/json-gold/ld"
 	leveldb "github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -18,44 +21,27 @@ type Quad struct {
 	Cid    string
 }
 
-/*
-How to index permutations lexicographically?
-In general, this is hard, although there are linear-time algorithms to do it.
-But when we fix a length (three) we can just look for patterns manually.
-In this case, we notice that the base-3 value of the first two elements of the permutation
-*almost* make an incrementing sequence (it skips 4 because 4 = 11 in base 3).
-But this is a constant-time fix, so it's good enough.
------------------
-i            p  r
-0    [0, 1, 2]  1 <- this number is r.
-1    [0, 2, 1]  2    r % 3 = b.
-2    [1, 0, 2]  3    r = a + (3 * b)
-3    [1, 2, 0]  5
-4    [2, 0, 1]  6
-5    [2, 1, 0]  7
-
-We could also index permutations by rotation & flip (the generators of S_3)
-This is more algebraically natural: let i range from 0 to 1 and j from 0 to 2:
-ij
-00   [0 1 2] a = (3 - i - j) % 3
-01   [2 0 1] b = (a + 1) % 3
-02   [1 2 0] c = (a + 2) % 3
-10   [2 1 0] ...
-11   [0 2 1]
-12   [1 0 2]
------------------
-*/
-
-func index(i int, j int) (int, int, int) {
-	a := (3 - i - j) % 3
+func index(p int) (int, int, int) {
+	a := p
 	b := (a + 1) % 3
 	c := (a + 2) % 3
 	return a, b, c
 }
 
-func insertMajor(j int, quad Quad, db *leveldb.DB) {
+func focus(i int) (p int) {
+	return (i + 1) % 3
+}
+
+// Major indices are indexed by a single element of a triple,
+// and map the single element to two arrays, one for each of
+// the other two elements.
+// So there are three major indices:
+// p = 0 maps <subject> keys to a {predicate[] object[]} value
+// p = 1 maps <predicate> keys to a {object[] subject[]} value
+// p = 2 maps <object> keys to a {subject[] predicate[]} value
+func insertMajor(p int, quad Quad, db *leveldb.DB) {
 	// Major key
-	a, b, c := index(0, j)
+	a, b, c := index(p)
 	key := []byte(quad.Triple[a])
 	has, _ := db.Has(key, nil)
 	majorValue := MajorValue{}
@@ -73,10 +59,17 @@ func insertMajor(j int, quad Quad, db *leveldb.DB) {
 	_ = db.Put(key, bytes, nil)
 }
 
-func insertMinor(j int, quad Quad, db *leveldb.DB) {
+// Minor indices are indexed by two elements of a triple.
+// There are three minor indices; one for every rotation of [0 1 2].
+// So  p = 0 maps <subject|predicate> keys to {object label}[] values,
+//     p = 1 maps <predicate|object> keys to {subject label}[] values,
+// and p = 2 maps <object|subject> keys to {predicate label}[] values.
+func insertMinor(p int, quad Quad, db *leveldb.DB) {
 	// Minor key
-	a, b, c := index(1, j)
+	a, b, c := index(p)
+	fmt.Println("from index", p, "got", a, b, c)
 	minorKey := MinorKey{A: quad.Triple[a], B: quad.Triple[b]}
+	fmt.Println("inserting minor key:", quad.Triple[a], quad.Triple[b])
 	key, _ := proto.Marshal(&minorKey)
 	has, _ := db.Has(key, nil)
 	cid, _ := base58.Decode(quad.Cid)
@@ -95,21 +88,43 @@ func insertMinor(j int, quad Quad, db *leveldb.DB) {
 }
 
 // Insert a quad into the store
-func Insert(quad Quad, store Store) {
+func (store Store) Insert(quad Quad) {
 	for j := 0; j < 3; j++ {
 		insertMajor(j, quad, store[0][j])
 		insertMinor(j, quad, store[1][j])
 	}
 }
 
-func minorIndex(j int, A string, B string, store Store) []Quad {
-	a, b, c := index(1, j)
+// Ingest a JSON-LD document
+func (store Store) Ingest(doc interface{}, cid string) {
+	processor := ld.NewJsonLdProcessor()
+	options := ld.NewJsonLdOptions("")
+	api := ld.NewJsonLdApi()
+	expanded, _ := processor.Expand(doc, options)
+	dataset, _ := api.ToRDF(expanded, options)
+	for _, quads := range dataset.Graphs {
+		for _, quad := range quads {
+			triple := parseQuad(quad)
+			for i, value := range triple {
+				if len(value) > 2 && value[:2] == "_:" {
+					triple[i] = cid + value[1:]
+				}
+				quad := Quad{triple, cid}
+				store.Insert(quad)
+			}
+		}
+	}
+}
+
+func (store Store) minorIndex(p int, A string, B string) []Quad {
+	a, b, c := index(p)
+	fmt.Println("from p", p, "got a", a, "and b", b)
 	minorKey := MinorKey{A: A, B: B}
 	key, _ := proto.Marshal(&minorKey)
-	has, _ := store[1][j].Has(key, nil)
+	has, _ := store[1][p].Has(key, nil)
 	results := []Quad{}
 	if has {
-		value, _ := store[1][j].Get(key, nil)
+		value, _ := store[1][p].Get(key, nil)
 		minorValue := MinorValue{}
 		proto.Unmarshal(value, &minorValue)
 		length := len(minorValue.Entries)
@@ -127,44 +142,37 @@ func minorIndex(j int, A string, B string, store Store) []Quad {
 	return results
 }
 
-/*
-    a < p
-    ^   ∨
-x > y > z
-    ^
-    b
-*/
-
-// IndexTriple takes a triple with *exactly one empty-string element*. I'm not responsible for its behaviour otherwise :-/
-func IndexTriple(triple Triple, store Store) []Quad {
-	var j int
-	if triple[0] == "" {
-		j = 1
-	} else if triple[1] == "" {
-		j = 0
-	} else if triple[2] == "" {
-		j = 2
-	} else {
-		// Look for exact match?
-		// no.
-	}
-	a, b, _ := index(1, j)
-	A := triple[a]
-	B := triple[b]
-	return minorIndex(j, A, B, store)
+func isEmpty(value string) bool {
+	// The empty string OR blank node IDs
+	return value == "" || (len(value) > 2 && value[:2] == "_:")
 }
 
-var dbNames = [6]string{"smajor", "pmajor", "omajor", "sminor", "pminor", "bminor"}
+// IndexTriple takes a triple with *exactly one empty-string element*.
+// I'm not responsible for its behaviour otherwise :-/
+func (store Store) IndexTriple(triple Triple) []Quad {
+	var p int
+	if isEmpty(triple[0]) {
+		p = 1
+	} else if isEmpty(triple[1]) {
+		p = 2
+	} else if isEmpty(triple[2]) {
+		p = 0
+	}
+	a, b, _ := index(p)
+	A := triple[a]
+	B := triple[b]
+	return store.minorIndex(p, A, B)
+}
+
+var dbNames = [6]string{"s-major", "p-major", "o-major", "s-minor", "p-minor", "o-minor"}
 
 // OpenStore of LevelDB databases, creating them if necessary
 func OpenStore(path string) Store {
 	store := Store{}
 	for k := 0; k < 6; k++ {
-		i := k / 3
-		j := k % 3
 		name := path + "/" + dbNames[k]
 		db, _ := leveldb.OpenFile(name, nil)
-		store[i][j] = db
+		store[k/3][k%3] = db
 	}
 	return store
 }
