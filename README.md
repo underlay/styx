@@ -24,8 +24,10 @@ store.Insert(quad)
 // "blank nodes" begin with "_:"
 store.IndexTriple(Triple{"alice", "likes", "_:foo"})
 // [{[alice likes pizza] QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM}]
+
 store.IndexTriple(Triple{"alice", "_:bar", "pizza"})
 // [{[alice likes pizza] QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM}]
+
 store.IndexTriple(Triple{"_:baz", "likes", "pizza"})
 // [{[alice likes pizza] QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM}]
 ```
@@ -53,6 +55,7 @@ var doc = map[string]interface{}{
 		},
 	},
 }
+
 // You have to supply a b58-encoded "label" for every document.
 // This should the document's CID, but we can fake one if we need to.
 store.Ingest(assertion, "QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM")
@@ -79,6 +82,7 @@ var query = map[string]interface{}{
 }
 
 branch, _ := store.ResolveQuery(query)
+
 for variable, value := range branch.frame {
   if isVariable(variable) {
     // value.Value is the string value
@@ -101,8 +105,11 @@ root := map[string]interface{}{
 	},
 	"name": "Vertigo",
 }
+
 path := []string{"director", "hometown", "population"}
+
 branch, _ := store.ResolvePath(root, path)
+
 for variable, value := range branch.frame {
 	if isVariable(variable) {
 		name := variable[len(Variable):]
