@@ -2,7 +2,7 @@ package styx
 
 import (
 	"errors"
-	"fmt"
+	"log"
 
 	ld "github.com/piprate/json-gold/ld"
 )
@@ -25,6 +25,7 @@ type Score struct {
 	constant []int
 }
 
+// Branch is the intermediate value
 type Branch struct {
 	parent *Branch
 	values []Value
@@ -54,7 +55,12 @@ func scoreTriple(triple Triple, pivot string, frame Frame) Score {
 		if element == pivot {
 			score.pivot = append(score.pivot, i)
 		} else if isBlankNode(element) || isVariable(element) {
-			score.variable = append(score.variable, i)
+			_, has := frame[element]
+			if has {
+				score.constant = append(score.constant, i)
+			} else {
+				score.variable = append(score.variable, i)
+			}
 		} else {
 			score.constant = append(score.constant, i)
 		}
@@ -76,6 +82,7 @@ func (store Store) dissolve(triples []Triple, pivot string, frame Frame) map[str
 	result := map[string][]Quad{}
 	diads := []int{}
 	triads := false
+	j := 0
 	for i, triple := range triples {
 		score := scoreTriple(triple, pivot, frame)
 		scores[i] = score
@@ -84,21 +91,35 @@ func (store Store) dissolve(triples []Triple, pivot string, frame Frame) map[str
 			keys := map[string]bool{}
 			p := focus(score.pivot[0])
 			a, b, c := index(p)
-			quads := store.minorIndex(p, triple[a], triple[b])
+			var A, B string
+			val, has := frame[triple[a]]
+			if has {
+				A = val.Value
+			} else {
+				A = triple[a]
+			}
+			val, has = frame[triple[b]]
+			if has {
+				B = val.Value
+			} else {
+				B = triple[b]
+			}
+			quads := store.minorIndex(p, A, B)
 			for _, quad := range quads {
 				value := quad.Triple[c]
 				array, has := result[value]
 				if has {
 					result[value] = append(array, quad)
 					keys[value] = true
-				} else if i == 0 {
+				} else if j == 0 {
 					result[value] = []Quad{quad}
 				}
 			}
 			// Remove values that weren't intersected
-			if i > 0 {
+			if j > 0 {
 				deleteIntersect(result, keys)
 			}
+			j++
 		} else if len(score.pivot) == 2 && len(score.constant) == 1 {
 			diads = append(diads, i)
 		} else if len(score.pivot) == 3 {
@@ -111,10 +132,17 @@ func (store Store) dissolve(triples []Triple, pivot string, frame Frame) map[str
 		p := focus(score.constant[0])
 		_, _, c := index(p) // triple[a] == triple[b] == pivot
 		keys := map[string]bool{}
+		var C string
+		val, has := frame[triple[c]]
+		if has {
+			C = val.Value
+		} else {
+			C = triple[c]
+		}
 		for value := range result {
 			quads := store.minorIndex(p, value, value)
 			for _, quad := range quads {
-				if quad.Triple[c] == triple[c] {
+				if quad.Triple[c] == C {
 					result[value] = append(result[value], quad)
 					keys[value] = true
 				}
@@ -170,12 +198,12 @@ func (store Store) search(triples []Triple, stack []string, branch Branch) (Bran
 		return store.search(triples, stack[1:], next)
 	}
 	// backtrack until you find a resumable branch
-	stack = append([]string{branch.pivot}, stack...)
-	branch = *branch.parent
 	if branch.parent == nil {
 		return Branch{}, errors.New("Search failed")
 	}
-	for branch.index+1 == len(branch.values) {
+	stack = append([]string{branch.pivot}, stack...)
+	branch = *branch.parent
+	for branch.index+1 >= len(branch.values) {
 		if branch.parent == nil {
 			return Branch{}, errors.New("Search failed")
 		}
@@ -187,49 +215,96 @@ func (store Store) search(triples []Triple, stack []string, branch Branch) (Bran
 	return store.search(triples, stack, branch)
 }
 
+func getStack(variables map[string][]Triple, frame Frame) ([]string, error) {
+	primaries := Frame{}
+	for variable, triples := range variables {
+		for _, triple := range triples {
+			score := scoreTriple(triple, "", frame)
+			if len(score.constant) == 2 && len(score.variable) == 1 {
+				primaries[variable] = Value{}
+				delete(variables, variable)
+			}
+		}
+	}
+	stack := make([]string, len(primaries))
+	i := 0
+	for variable, value := range primaries {
+		stack[i] = variable
+		frame[variable] = value
+		i++
+	}
+	if len(variables) == 0 {
+		return stack, nil
+	}
+	if len(primaries) > 0 {
+		quotient, err := getStack(variables, frame)
+		return append(stack, quotient...), err
+	}
+
+	return []string{}, errors.New("Could not serialize search path")
+}
+
 // ResolveQuery takes the parsed interface{} of any JSON-LD query document
-func (store Store) ResolveQuery(doc interface{}) {
+func (store Store) ResolveQuery(doc interface{}) (Branch, error) {
 	processor := ld.NewJsonLdProcessor()
 	options := ld.NewJsonLdOptions("")
 	api := ld.NewJsonLdApi()
 	expanded, _ := processor.Expand(doc, options)
 	dataset, _ := api.ToRDF(expanded, options)
 	triples := []Triple{}
-	variables := map[string]int{}
+	variables := map[string][]Triple{}
 	for _, quads := range dataset.Graphs {
 		for _, quad := range quads {
 			triple := parseQuad(quad)
-			score := scoreTriple(triple, "", Frame{})
-			if len(score.constant) == 2 && len(score.variable) == 1 {
-				variable := triple[score.variable[0]]
-				count, has := variables[variable]
-				if has {
-					variables[variable] = count + 1
-				} else {
-					variables[variable] = 1
-				}
-			} else if len(score.variable) > 0 {
-				for _, i := range score.variable {
-					variable := triple[i]
-					_, has := variables[variable]
-					if !has {
-						variables[variable] = 0
+			for j := 0; j < 3; j++ {
+				variable := triple[j]
+				if isBlankNode(variable) || isVariable(variable) {
+					a, has := variables[variable]
+					if has {
+						variables[variable] = append(a, triple)
+					} else {
+						variables[variable] = []Triple{triple}
 					}
 				}
 			}
 			triples = append(triples, triple)
 		}
 	}
-	stack := []string{"foo"}
-	pivot := stack[0]
-	stack = stack[1:]
+
+	stack, err := getStack(variables, Frame{})
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	branch := Branch{
 		parent: nil,
 		values: []Value{},
 		index:  0,
 		frame:  Frame{},
-		pivot:  pivot,
+		pivot:  "",
 	}
-	branch, err := store.search(triples, stack, branch)
-	fmt.Println(branch, err)
+	return store.search(triples, stack, branch)
+}
+
+func (store Store) ResolvePath(root map[string]interface{}, path []string) (Branch, error) {
+	pointer := root
+	for _, element := range path {
+		value, has := pointer[element]
+		newPointer := map[string]interface{}{}
+		if has {
+			switch value := value.(type) {
+			case map[string]interface{}:
+				newPointer = value
+			case []interface{}:
+				pointer[element] = append(value, newPointer)
+			default:
+				pointer[element] = []interface{}{value, newPointer}
+			}
+		} else {
+			pointer[element] = newPointer
+		}
+		pointer = newPointer
+	}
+	pointer["@id"] = variable + "result"
+	return store.ResolveQuery(root)
 }

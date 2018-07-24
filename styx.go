@@ -67,9 +67,7 @@ func insertMajor(p int, quad Quad, db *leveldb.DB) {
 func insertMinor(p int, quad Quad, db *leveldb.DB) {
 	// Minor key
 	a, b, c := index(p)
-	fmt.Println("from index", p, "got", a, b, c)
 	minorKey := MinorKey{A: quad.Triple[a], B: quad.Triple[b]}
-	fmt.Println("inserting minor key:", quad.Triple[a], quad.Triple[b])
 	key, _ := proto.Marshal(&minorKey)
 	has, _ := db.Has(key, nil)
 	cid, _ := base58.Decode(quad.Cid)
@@ -106,19 +104,19 @@ func (store Store) Ingest(doc interface{}, cid string) {
 		for _, quad := range quads {
 			triple := parseQuad(quad)
 			for i, value := range triple {
-				if len(value) > 2 && value[:2] == "_:" {
-					triple[i] = cid + value[1:]
+				if isBlankNode(value) {
+					triple[i] = "_:" + cid + "/" + value[2:]
 				}
-				quad := Quad{triple, cid}
-				store.Insert(quad)
 			}
+			quad := Quad{triple, cid}
+			fmt.Println("inserting triple", triple)
+			store.Insert(quad)
 		}
 	}
 }
 
 func (store Store) minorIndex(p int, A string, B string) []Quad {
 	a, b, c := index(p)
-	fmt.Println("from p", p, "got a", a, "and b", b)
 	minorKey := MinorKey{A: A, B: B}
 	key, _ := proto.Marshal(&minorKey)
 	has, _ := store[1][p].Has(key, nil)
