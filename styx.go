@@ -141,7 +141,7 @@ func (store Store) minorIndex(p int, A string, B string) []Quad {
 
 func isEmpty(value string) bool {
 	// The empty string OR blank node IDs
-	return value == "" || (len(value) > 2 && value[:2] == "_:")
+	return value == "" || isBlankNode(value)
 }
 
 // IndexTriple takes a triple with *exactly one empty-string element*.
