@@ -40,7 +40,7 @@ var doc = map[string]interface{}{
 	},
 	"@graph": []interface{}{
 		map[string]interface{}{
-			"@type":    "http://schema.org/Movie",
+			"@type":    "Movie",
 			"name":     "Vertigo",
 			"director": map[string]interface{}{"@id": "_:n0"},
 		},
