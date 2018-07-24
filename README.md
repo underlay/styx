@@ -58,14 +58,14 @@ var doc = map[string]interface{}{
 
 // You have to supply a b58-encoded "label" for every document.
 // This should the document's CID, but we can fake one if we need to.
-store.Ingest(assertion, "QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM")
+store.Ingest(doc, "QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM")
 ```
 
 ### Query with JSON-LD
 ```go
 // `Variable` == "http://underlay.mit.edu/query#"
 // It's a special namespace to label variables.
-var query = map[string]interface{}{
+query := map[string]interface{}{
 	"@context": map[string]interface{}{
 		"@vocab": "http://schema.org/",
 		"$":      Variable,
