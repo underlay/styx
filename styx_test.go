@@ -2,98 +2,68 @@ package styx
 
 import (
 	fmt "fmt"
+	"log"
 	"testing"
+
+	"github.com/dgraph-io/badger"
+	ipfs "github.com/ipfs/go-ipfs-api"
+	"github.com/piprate/json-gold/ld"
 )
 
-const path = "./leveldb"
+func TestLoader(t *testing.T) {
+	u := "dweb:/ipld/zdpuAmz1n5w7REfwt5f7uCheRr6Rz5ujXwqMte6vo4Z44QMCv"
 
-var assertion = map[string]interface{}{
-	"@context": map[string]interface{}{
-		"@vocab": "http://schema.org/",
-		"$":      "http://underlay.mit.edu/query#",
-	},
-	"@graph": []interface{}{
-		map[string]interface{}{
-			"@type":    "http://schema.org/Movie",
-			"name":     "Vertigo",
-			"director": map[string]interface{}{"@id": "_:n0"},
-		},
-		map[string]interface{}{
-			"@id":   "_:n0",
-			"@type": "Person",
-			"name":  "Alfred Hitchcock",
-			"hometown": map[string]interface{}{
-				"population": "12879",
-				"name":       "Leytonstone",
-			},
-		},
-	},
+	proc := ld.NewJsonLdProcessor()
+	options := ld.NewJsonLdOptions("")
+	options.DocumentLoader = NewIPFSDocumentLoader(nil)
+	res, err := proc.Expand(u, options)
+	fmt.Println(res, err)
 }
 
-var query = map[string]interface{}{
-	"@context": map[string]interface{}{
-		"@vocab": "http://schema.org/",
-		"$":      Variable,
-	},
-	"@type": "Movie",
-	"name":  "Vertigo",
-	"director": map[string]interface{}{
-		"name": map[string]interface{}{"@id": "$:director"},
-		"hometown": map[string]interface{}{
-			"population": map[string]interface{}{"@id": "$:population"},
-			"name":       map[string]interface{}{"@id": "$:city"},
-		},
-	},
-}
+func TestIngest(t *testing.T) {
+	u := "ipfs://QmZUjboQkj5xyrrv1ty8zb8QvXDzAh6yE3D9KUXZpKh3S9"
 
-func TestPath(t *testing.T) {
-	store := OpenStore(path)
-	store.Ingest(assertion, "QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM")
+	// Create shell
+	sh := ipfs.NewShell("localhost:5001")
 
-	root := map[string]interface{}{
-		"@context": map[string]interface{}{
-			"@vocab": "http://schema.org/",
-		},
-		"name": "Vertigo",
+	// Create DB
+	opts := badger.DefaultOptions
+	opts.Dir = "/tmp/badger"
+	opts.ValueDir = "/tmp/badger"
+	db, err := badger.Open(opts)
+	if err != nil {
+		log.Fatal(err)
 	}
-	path := []string{"director", "hometown", "population"}
-	branch, _ := store.ResolvePath(root, path)
-	for variable, value := range branch.frame {
-		if isVariable(variable) {
-			name := variable[len(Variable):]
-			fmt.Println(name, "is", value.Value)
+	defer db.Close()
+
+	ingest(u, db, sh)
+}
+
+func TestKey(t *testing.T) {
+	// Create key
+	k := "a\tQmVDZbsPNWcNTDBbrmvbog1KiHCSnVpz6Cxb2je1CqiDnD:c14n0\t<http://schema.org/age>"
+	key := []byte(k)
+
+	// Create DB
+	opts := badger.DefaultOptions
+	opts.Dir = "/tmp/badger"
+	opts.ValueDir = "/tmp/badger"
+	db, err := badger.Open(opts)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	// Check the value
+	db.View(func(txn *badger.Txn) error {
+		item, err := txn.Get(key)
+		if err != nil {
+			return err
 		}
-	}
-}
-
-func TestQuery(t *testing.T) {
-	store := OpenStore(path)
-	store.Ingest(assertion, "QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM")
-
-	branch, _ := store.ResolveQuery(query)
-	for variable, value := range branch.frame {
-		if isVariable(variable) {
-			name := variable[len(Variable):]
-			fmt.Println(name, "is", value.Value)
-		}
-	}
-}
-
-func TestIndex(t *testing.T) {
-	store := OpenStore(path)
-
-	triple := Triple{"http://schema.org/alice", "http://schema.org/likes", "http://schema.org/pizza"}
-	cid := "QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM"
-	quad := Quad{Triple: triple, Cid: cid}
-
-	// insert!
-	store.Insert(quad)
-
-	// yay! now query.
-	fmt.Println(store.IndexTriple(Triple{"http://schema.org/alice", "http://schema.org/likes", ""}))
-	// [{[alice likes pizza] QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM}]
-	fmt.Println(store.IndexTriple(Triple{"http://schema.org/alice", "", "http://schema.org/pizza"}))
-	// [{[alice likes pizza] QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM}]
-	fmt.Println(store.IndexTriple(Triple{"", "http://schema.org/likes", "http://schema.org/pizza"}))
-	// [{[alice likes pizza] QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM}]
+		fmt.Println(item.String())
+		return item.Value(func(val []byte) error {
+			fmt.Println(string(val))
+			return nil
+		})
+	})
 }
