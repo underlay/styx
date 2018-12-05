@@ -1,6 +1,7 @@
 package styx
 
 import (
+	"encoding/binary"
 	"fmt"
 	"log"
 	"strings"
@@ -18,8 +19,15 @@ const algorithm = "URDNA2015"
 const format = "application/nquads"
 
 // These are explained later
-var permutations = [6]string{"a", "b", "c", "x", "y", "z"}
-var newline = []byte("\n")[0]
+var permutations = [6]byte{'a', 'b', 'c', 'x', 'y', 'z'}
+var tab = byte('\t')
+const INITIAL_COUNTER uint64 = 1
+
+func incrementFlag(flag []byte) []byte {
+	i := binary.BigEndian.Uint64(flag)
+	binary.BigEndian.PutUint64(flag, i+1)
+	return flag
+}
 
 func ingest(doc interface{}, db *badger.DB, shell *ipfs.Shell) error {
 	proc := ld.NewJsonLdProcessor()
@@ -38,6 +46,7 @@ func ingest(doc interface{}, db *badger.DB, shell *ipfs.Shell) error {
 	options.Algorithm = algorithm
 	api := ld.NewJsonLdApi()
 	normalized, err := api.Normalize(dataset, options)
+	fmt.Println("normalizedd")
 	fmt.Println(normalized)
 	if err != nil {
 		return err
@@ -48,39 +57,106 @@ func ingest(doc interface{}, db *badger.DB, shell *ipfs.Shell) error {
 		return err
 	}
 	return db.Update(func(txn *badger.Txn) error {
-		for _, graph := range dataset.Graphs {
-			for _, quad := range graph {
-				s, p, o, g := marshallQuad(quad, cid)
-				for _, permutation := range permutations {
-					key, val := compile(permutation, s, p, o, g)
-					meta := byte(permutation[0])
-					item, err := txn.Get(key)
-					if err == nil {
-						if item.UserMeta() != meta {
-							log.Fatal("Conflicting meta tag in badger db")
-						}
-						dst, err := item.ValueCopy(nil)
-						if err != nil {
-							return err
-						}
-						err = txn.SetWithMeta(key, append(dst, val...), meta)
-						if err != nil {
-							return err
-						}
-					} else if err == badger.ErrKeyNotFound {
-						err = txn.SetWithMeta(key, val, meta)
-						if err != nil {
-							return err
-						}
-					} else {
+		return insert(cid, dataset, txn)
+	})
+}
+
+func insert(cid string, dataset *ld.RDFDataset, txn *badger.Txn) error {
+	counter := make([]byte, 8)
+	for _, graph := range dataset.Graphs {
+		for i, quad := range graph {
+			s, p, o, g := marshallQuad(quad, cid, i)
+			for _, permutation := range permutations {
+				prefix, a, b, c := permute(permutation, s, p, o)
+				value := append([]byte(g), []byte(string(i))...)
+				rootKey := append(prefix, []byte(a)...)
+				rootLen := len(rootKey)
+				indexKey := append(append(rootKey, '\n'), []byte(b)...)
+				indexItem, err := txn.Get(indexKey)
+				if err == badger.ErrKeyNotFound {
+					binary.BigEndian.PutUint64(counter, INITIAL_COUNTER)
+					err = txn.SetWithMeta(indexKey, counter, permutation)
+					if err != nil {
 						return err
 					}
+					indexKey[rootLen] = '\t'
+					valueKey := append(append(indexKey, '\t'), counter...)
+					err = txn.SetWithMeta(valueKey, value, permutation)
+					if err != nil {
+						return err
+					}
+					continue
+				} else if err != nil {
+					return err
+				} else if indexItem.UserMeta() != permutation {
+					log.Fatalln("Mismatching meta tag in index item")
 				}
-				fmt.Println(s, p, o, g)
+
+				counter, err = indexItem.ValueCopy(counter)
+				if err != nil {
+					return err
+				}
+
+				i := binary.BigEndian.Uint64(counter)
+				binary.BigEndian.PutUint64(counter, i+1)
+
+				valueKey := 
+
+				// indexKey :=
+				key, val := compile(permutation, s, p, o, i, g)
+				fmt.Println("key!", string(key))
+				flag, err := txn.Get(key)
+				if err == nil {
+					if flag.UserMeta() != permutation {
+						log.Fatal("Bad meta tag in badger db")
+					}
+					nextFlag, err := flag.ValueCopy(nil)
+					if err != nil {
+						return err
+					}
+					nextFlag = incrementFlag(nextFlag)
+					err = txn.SetWithMeta(key, nextFlag, permutation)
+					if err != nil {
+						return err
+					}
+					realKey := append(append(key, byte('\t')), nextFlag...)
+					return txn.SetWithMeta(realKey, val, permutation)
+				} else if err == badger.ErrKeyNotFound {
+					nextFlag := make([]byte, 8)
+					binary.BigEndian.PutUint64(nextFlag, 0)
+					err = txn.SetWithMeta(key, nextFlag, permutation)
+					if err != nil {
+						return err
+					}
+					realKey := append(append(key, byte('\t')), nextFlag...)
+					return txn.SetWithMeta(realKey, val, permutation)
+				} else {
+					return err
+				}
 			}
+			fmt.Println(s, p, o, g)
 		}
-		return nil
-	})
+	}
+	return nil
+}
+
+func permute(permutation byte, s string, p string, o string) ([]byte, string, string, string) {
+	prefix := []byte{permutation, tab}
+	if permutation == 'a' {
+		return prefix, s, p, o
+	} else if permutation == 'b' {
+		return prefix, p, o, s
+	} else if permutation == 'c' {
+		return prefix, o, s, p
+	} else if permutation == 'x' {
+		return prefix, s, o, p
+	} else if permutation == 'y' {
+		return prefix, p, s, o
+	} else if permutation == 'z' {
+		return prefix, o, p, s
+	}
+	log.Fatal("invalid permutation")
+	return nil, "", "", ""
 }
 
 // Indexing permutations is surprisingly tricky.
@@ -88,32 +164,33 @@ func ingest(doc interface{}, db *badger.DB, shell *ipfs.Shell) error {
 // a, b, and c are the three _rotations_ of spo that preserve s->p->o->s->p->... order.
 // x, y, and z are the reverse rotations that follow s<-p<-o<-s<-p<-... order.
 // In all cases, the graph label stays fixed as the fourth element.
-func compile(permutation string, s string, p string, o string, g string) ([]byte, []byte) {
-	if permutation == "a" {
+func compile(permutation byte, s string, p string, o string, i int, g string) ([]byte, []byte) {
+	k := g + "\t" + string(i) + "\t"
+	if permutation == 'a' {
 		// a: sp:og
-		return []byte("a\t" + s + "\t" + p), []byte(o + "\t" + g + "\n")
-	} else if permutation == "b" {
+		return []byte("a\t" + s + "\t" + p), []byte(k + o)
+	} else if permutation == 'b' {
 		// b: po:sg
-		return []byte("b\t" + p + "\t" + o), []byte(s + "\t" + g + "\n")
-	} else if permutation == "c" {
+		return []byte("b\t" + p + "\t" + o), []byte(k + s)
+	} else if permutation == 'c' {
 		// c: os:pg
-		return []byte("c\t" + o + "\t" + s), []byte(p + "\t" + g + "\n")
-	} else if permutation == "x" {
+		return []byte("c\t" + o + "\t" + s), []byte(k + p)
+	} else if permutation == 'x' {
 		// x: so:pg
-		return []byte("x\t" + s + "\t" + o), []byte(p + "\t" + g + "\n")
-	} else if permutation == "y" {
+		return []byte("x\t" + s + "\t" + o), []byte(k + p)
+	} else if permutation == 'y' {
 		// y: ps:og
-		return []byte("y\t" + p + "\t" + s), []byte(o + "\t" + g + "\n")
-	} else if permutation == "z" {
+		return []byte("y\t" + p + "\t" + s), []byte(k + o)
+	} else if permutation == 'z' {
 		// z: op:sg
-		return []byte("z\t" + o + "\t" + p), []byte(s + "\t" + g + "\n")
+		return []byte("z\t" + o + "\t" + p), []byte(k + s)
 	}
 	log.Fatal("invalid permutation index", permutation)
 	return nil, nil
 }
 
 // Mostly copied from https://github.com/piprate/json-gold/blob/master/ld/serialize_nquads.go
-func marshallQuad(quad *ld.Quad, cid string) (string, string, string, string) {
+func marshallQuad(quad *ld.Quad, cid string, index int) (string, string, string, string) {
 	s := quad.Subject
 	p := quad.Predicate
 	o := quad.Object
@@ -157,12 +234,14 @@ func marshallQuad(quad *ld.Quad, cid string) (string, string, string, string) {
 
 	// graph is either an IRI or blank node
 	if g == nil {
-		graph = cid
+		graph = cid + "\t" + string(index) + "\t"
 	} else if ld.IsIRI(g) {
-		graph = cid + "#" + g.GetValue()
-	} else {
+		graph = cid + "#" + g.GetValue() + "\t" + string(index) + "\t"
+	} else if blankNode, isBlank := g.(ld.BlankNode); isBlank {
 		// Prefix blank nodes with the CID root
-		graph = cid + g.GetValue()[1:]
+		graph = cid + blankNode.Attribute[1:] + "\t" + string(index) + "\t"
+	} else {
+		log.Fatalln("Unexpected graph node")
 	}
 
 	return subject, predicate, object, graph
