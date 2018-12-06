@@ -75,17 +75,6 @@ func TestIPLD(t *testing.T) {
 	fmt.Println(res, err)
 }
 
-func TestIncrement(t *testing.T) {
-	zero := []byte{byte(0)}
-	var i int
-	for i < 600 {
-		i++
-		zero = incrementFlag(zero)
-		fmt.Println(zero)
-	}
-	fmt.Println("zero", zero)
-}
-
 func TestIngest(t *testing.T) {
 	u := "ipfs://QmZUjboQkj5xyrrv1ty8zb8QvXDzAh6yE3D9KUXZpKh3S9"
 
@@ -265,5 +254,37 @@ func TestPromote(t *testing.T) {
 	}
 
 	as := getAssignmentStack(dataset)
+	printAssignmentStack(as)
+}
+
+func TestConstrain(t *testing.T) {
+	data := map[string]interface{}{
+		"@context": map[string]interface{}{
+			"@vocab": "http://schema.org/",
+		},
+		"name": "Joel",
+		"friend": map[string]interface{}{
+			"name": "Kevin",
+		},
+	}
+	proc := ld.NewJsonLdProcessor()
+	options := ld.NewJsonLdOptions("")
+	rdf, err := proc.ToRDF(data, options)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	dataset := rdf.(*ld.RDFDataset)
+
+	for _, quad := range dataset.Graphs["@default"] {
+		fmt.Println(quad.Subject.GetValue(), quad.Predicate.GetValue(), quad.Object.GetValue())
+	}
+
+	codex := getCodex(dataset)
+	as := AssignmentStack{maps: []AssignmentMap{}, deps: map[string]int{}}
+	printCodex(codex)
+	printAssignmentStack(as)
+	as, codex = haveDinner(as, codex)
+	printCodex(codex)
 	printAssignmentStack(as)
 }

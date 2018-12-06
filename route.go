@@ -74,7 +74,7 @@ type AssignmentStack struct {
 type Reference struct {
 	Graph string
 	Index int
-	Place int // this is {1, 2, 3}, or 0 for no place at all
+	Place uint8 // this is {0, 1, 2}, or 4 for no place at all
 	P     string
 	Q     string
 	Count uint64
@@ -140,17 +140,17 @@ func getCodex(dataset *ld.RDFDataset) Codex {
 				c = blankC.Attribute
 			}
 			if !A && !B && !C {
-				ref := Reference{graph, index, 0, "", ""}
+				ref := Reference{graph, index, 4, "", "", 0}
 				codex.Constant = append(codex.Constant, ref)
 			} else if (A && !B && !C) || (!A && B && !C) || (!A && !B && C) {
-				place := 1
+				var place uint8
 				if b != "" {
 					place = 2
 				} else if c != "" {
 					place = 3
 				}
 				pivot := a + b + c
-				ref := Reference{graph, index, place, "", ""}
+				ref := Reference{graph, index, place, "", "", 0}
 				refs, has := codex.Single[pivot]
 				if has {
 					codex.Single[pivot] = append(refs, ref)
@@ -158,24 +158,24 @@ func getCodex(dataset *ld.RDFDataset) Codex {
 					codex.Single[pivot] = []Reference{ref}
 				}
 			} else if A && B && !C {
-				refA := Reference{graph, index, 1, b, ""}
-				refB := Reference{graph, index, 2, "", a}
+				refA := Reference{graph, index, 1, b, "", 0}
+				refB := Reference{graph, index, 2, "", a, 0}
 				insertDouble(a, b, refA, codex)
 				insertDouble(b, a, refB, codex)
 			} else if A && !B && C {
-				refA := Reference{graph, index, 1, c, ""}
-				refC := Reference{graph, index, 3, "", a}
+				refA := Reference{graph, index, 1, c, "", 0}
+				refC := Reference{graph, index, 3, "", a, 0}
 				insertDouble(a, c, refA, codex)
 				insertDouble(c, a, refC, codex)
 			} else if !A && B && C {
-				refB := Reference{graph, index, 2, c, ""}
-				refC := Reference{graph, index, 3, "", b}
+				refB := Reference{graph, index, 2, c, "", 0}
+				refC := Reference{graph, index, 3, "", b, 0}
 				insertDouble(b, c, refB, codex)
 				insertDouble(c, b, refC, codex)
 			} else if A && B && C {
-				refA := Reference{graph, index, 1, b, c}
-				refB := Reference{graph, index, 2, c, a}
-				refC := Reference{graph, index, 3, a, b}
+				refA := Reference{graph, index, 1, b, c, 0}
+				refB := Reference{graph, index, 2, c, a, 0}
+				refC := Reference{graph, index, 3, a, b, 0}
 				insertTriple(a, b, c, refA, codex)
 				insertTriple(a, c, b, refA, codex)
 				insertTriple(b, a, c, refB, codex)
@@ -188,6 +188,7 @@ func getCodex(dataset *ld.RDFDataset) Codex {
 	return codex
 }
 
+// Let's have dinner
 func haveDinner(as AssignmentStack, codex Codex) (AssignmentStack, Codex) {
 	am := AssignmentMap{}
 	index := len(as.maps)
@@ -213,14 +214,26 @@ func haveDinner(as AssignmentStack, codex Codex) (AssignmentStack, Codex) {
 
 	// for a := range as.deps { // <-- I think this was a typo but will leave for posterity
 	for a := range am {
+
 		// We're checking for entries of a:b:* NOT because we care about them (they get deleted),
-		// but because we know that they mirror entries of some b:a:* and b:*:a.
+		// but because we know that they mirror entries of b:a:*.
 		if mapA, has := codex.Double[a]; has {
 			delete(codex.Double, a) // `a` was promoted, we delete its entries
 			for b := range mapA {
 				if refs, has := codex.Double[b][a]; has {
 					delete(codex.Double[b], a)
-					if refsB, has := codex.Single[b]; has {
+					if assignment, has := am[b]; has {
+						if assignment.Constraints == nil {
+							assignment.Constraints = refs
+						} else {
+							assignment.Constraints = append(assignment.Constraints, refs...)
+						}
+						if am[a].Constraints == nil {
+							am[a].Constraints = mapA[b]
+						} else {
+							am[a].Constraints = append(am[a].Constraints, mapA[b]...)
+						}
+					} else if refsB, has := codex.Single[b]; has {
 						codex.Single[b] = append(refsB, refs...)
 					} else {
 						codex.Single[b] = refs
@@ -229,19 +242,49 @@ func haveDinner(as AssignmentStack, codex Codex) (AssignmentStack, Codex) {
 			}
 		}
 
+		// Again, we're looking up a:b:c so that we can promote { b:a:c, b:c:a, c:a:b, c:b:a }
+		// a:b:c and a:c:b get deleted.
 		if mapA, has := codex.Triple[a]; has {
 			delete(codex.Triple, a)
 			for b, mapB := range mapA {
-				_, hasB := as.deps[b]
+				_, hasB := am[b]
 				delete(mapA, b)
 				for c, refs := range mapB {
 					if _, has := mapA[c]; has || b == c {
+						/*
+							# Diagonal iteration over double-nested map keys {u, v, w, x, y, z...}
+							This and "delete(mapA, b)" are a hack to iterate "diagonally" over an unsorted map.
+							Right now we have a double nested map iterator. We know that the key sets are the same
+							(that for every (b, c) key pair down here there's also a (c, b) key pair in either
+							the past or the future). BUT we don't want to double-insert the references that we find.
+
+							So to consolidate the redundancy that we introduced when we called insertDouble() *twice*
+							for each quad (and insertTriple() three times!), we delete the keys of the outer loop
+							as we iterate, and break from the inner loop if we haven't deleted `c` from the outer loop yet.
+							That way we get a unique iteration for every order-agnostic choice of pairs.
+							As a special case, we want to also iterate when b == c.
+
+							Here 'o' is "the inner loop code executes" and 'x' is "this break statement skips the iteration"
+								u v w x y z ...
+							u o x x x x x
+							v o o x x x x
+							w o o o x x x
+							x o o o o x x
+							y o o o o o x
+							z o o o o o o
+							...
+						*/
 						break
 					}
-					_, hasC := as.deps[c]
+					// Phew okay
+					_, hasC := am[c]
 					if hasB && hasC {
 						// B and C are both assigned.
-						am[a].References = append(am[a].References, refs...)
+						if am[a].Constraints == nil {
+							am[a].Constraints = refs
+						} else {
+							am[a].Constraints = append(am[a].Constraints, refs...)
+						}
 					} else if hasB {
 						// Only B has been assigned; C is now a single.
 						if refs, has := codex.Triple[c][a][b]; has {
