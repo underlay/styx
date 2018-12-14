@@ -264,7 +264,7 @@ func TestConstrain(t *testing.T) {
 		},
 		"name": "Joel",
 		"friend": map[string]interface{}{
-			"name": "Kevin",
+			"name": "Joel 2",
 		},
 	}
 	proc := ld.NewJsonLdProcessor()
@@ -287,4 +287,46 @@ func TestConstrain(t *testing.T) {
 	as, codex = haveDinner(as, codex)
 	printCodex(codex)
 	printAssignmentStack(as)
+}
+
+func TestSolve(t *testing.T) {
+	data := "ipfs://QmVcYFaWU6co4TUnc6bvRsKwcjnK4GVHbMA29sA7egCHhd"
+
+	proc := ld.NewJsonLdProcessor()
+	options := ld.NewJsonLdOptions("")
+
+	// Create DB
+	opts := badger.DefaultOptions
+	opts.Dir = "/tmp/badger"
+	opts.ValueDir = "/tmp/badger"
+	db, err := badger.Open(opts)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	fmt.Println("about to do the thing")
+	ingest(data, db, nil)
+
+	fmt.Println("we did the freaking thing")
+
+	// Okay now the data has been ingested
+	// We want to construct a query
+	q := map[string]interface{}{
+		"@context": map[string]interface{}{
+			"@vocab": "http://schema.org/",
+		},
+		"name":   "Joel",
+		"friend": map[string]interface{}{},
+	}
+
+	queryRDF, err := proc.ToRDF(q, options)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	queryDataset := queryRDF.(*ld.RDFDataset)
+	err = query(queryDataset, db, func(as AssignmentStack) error {
+		fmt.Println(as)
+		return nil
+	})
 }

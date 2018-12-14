@@ -54,8 +54,8 @@ in the query to be resolved with the same value
 type Assignment struct {
 	Constraints  []Reference    // constraints on layer siblings
 	References   []Reference    // slice of references that force this assignment's value
-	Value        string         // initialized to the empty string; filled in during actual search
-	Iterator     string         // pointer for backtracking. similarly initialized
+	Value        []byte         // initialized to nil; filled in during actual search
+	Iterator     []byte         // pointer for backtracking. similarly initialized
 	Sources      []string       // CID+graph+index (hopefully multiple for one value)
 	Dependencies map[string]int // Indices of previous assignments. Could merge with refs?
 	Count        uint64         // The sum of References.Count

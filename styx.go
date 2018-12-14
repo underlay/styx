@@ -16,7 +16,9 @@ const algorithm = "URDNA2015"
 // format has to be application/nquads
 const format = "application/nquads"
 
-const initialCounter uint64 = 1
+// InitialCounter is the first uint64 value we start counting from.
+// Let's set it to 1 just in case we want to ever use 0 for something special.
+const InitialCounter uint64 = 1
 
 func ingest(doc interface{}, db *badger.DB, shell *ipfs.Shell) error {
 	proc := ld.NewJsonLdProcessor()
@@ -35,11 +37,12 @@ func ingest(doc interface{}, db *badger.DB, shell *ipfs.Shell) error {
 	options.Algorithm = algorithm
 	api := ld.NewJsonLdApi()
 	normalized, err := api.Normalize(dataset, options)
-	fmt.Println("normalizedd")
+	fmt.Println("normalized")
 	fmt.Println(normalized)
 	if err != nil {
 		return err
 	}
+
 	reader := strings.NewReader(normalized.(string))
 	cid, err := shell.Add(reader)
 	if err != nil {
@@ -49,3 +52,7 @@ func ingest(doc interface{}, db *badger.DB, shell *ipfs.Shell) error {
 		return insert(cid, dataset, txn)
 	})
 }
+
+/*
+???
+*/

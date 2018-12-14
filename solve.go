@@ -8,27 +8,29 @@ import (
 	"github.com/piprate/json-gold/ld"
 )
 
-func indexElement(place uint8, quad *ld.Quad) string {
+func indexElement(place uint8, quad *ld.Quad) []byte {
+	var element string
 	if place == 0 {
-		return quad.Subject.GetValue()
+		element = quad.Subject.GetValue()
 	} else if place == 1 {
-		return quad.Predicate.GetValue()
+		element = quad.Predicate.GetValue()
 	} else if place == 2 {
-		return quad.Object.GetValue()
+		element = quad.Object.GetValue()
 	} else {
-		return ""
+		return nil
 	}
+	return []byte(element)
 }
 
-func populateKey(ref Reference, dataset *ld.RDFDataset, as AssignmentStack) (string, string) {
-	var p, q string
+func populateKey(ref Reference, dataset *ld.RDFDataset, as AssignmentStack) ([]byte, []byte) {
+	var p, q []byte
 	quad := dataset.Graphs[ref.Graph][ref.Index]
 	if ref.P == "" {
 		// p's slot is a URI or constant value
 		place := (ref.Place + 1) % 3
 		p = indexElement(place, quad)
 	} else if i, has := as.deps[ref.P]; has {
-		p = as.maps[i][p].Value
+		p = as.maps[i][ref.P].Value
 	} else {
 		log.Fatalln("Could not find p in assignment stack", ref.P)
 	}
@@ -37,7 +39,7 @@ func populateKey(ref Reference, dataset *ld.RDFDataset, as AssignmentStack) (str
 		place := (ref.Place + 2) % 3
 		p = indexElement(place, quad)
 	} else if i, has := as.deps[ref.Q]; has {
-		q = as.maps[i][q].Value
+		q = as.maps[i][ref.Q].Value
 	} else {
 		log.Fatalln("Could not find q in assignment stack", ref.Q)
 	}
@@ -48,9 +50,9 @@ func getValueKey(ref Reference, dataset *ld.RDFDataset, as AssignmentStack) []by
 	p, q := populateKey(ref, dataset, as)
 	permutation := valuePrefixes[ref.Place]
 	key := []byte{permutation, tab}
-	key = append(key, []byte(p)...)
+	key = append(key, p...)
 	key = append(key, tab)
-	key = append(key, []byte(q)...)
+	key = append(key, q...)
 	key = append(key, tab)
 	return key
 }
@@ -59,9 +61,9 @@ func getMajorKey(ref Reference, dataset *ld.RDFDataset, as AssignmentStack) []by
 	p, q := populateKey(ref, dataset, as)
 	permutation := majorPrefixes[ref.Place]
 	key := []byte{permutation, tab}
-	key = append(key, []byte(p)...)
+	key = append(key, p...)
 	key = append(key, tab)
-	key = append(key, []byte(q)...)
+	key = append(key, q...)
 	return key
 }
 
@@ -69,9 +71,9 @@ func getMinorKey(ref Reference, dataset *ld.RDFDataset, as AssignmentStack) []by
 	p, q := populateKey(ref, dataset, as)
 	permutation := minorPrefixes[ref.Place]
 	key := []byte{permutation, tab}
-	key = append(key, []byte(q)...)
+	key = append(key, q...)
 	key = append(key, tab)
-	key = append(key, []byte(p)...)
+	key = append(key, p...)
 	return key
 }
 
@@ -99,7 +101,7 @@ func countReferences(am AssignmentMap, as AssignmentStack, dataset *ld.RDFDatase
 	return nil
 }
 
-func solveAssignment(id string, assignment *Assignment, as AssignmentStack, dataset *ld.RDFDataset, txn *badger.Txn) error {
+func solveAssignment(id string, assignment *Assignment, as AssignmentStack, dataset *ld.RDFDataset, txn *badger.Txn) (bool, error) {
 	index := 0
 	count := assignment.References[index].Count
 	for i, reference := range assignment.References {
@@ -116,37 +118,109 @@ func solveAssignment(id string, assignment *Assignment, as AssignmentStack, data
 	iter := txn.NewIterator(opts)
 	defer iter.Close()
 	var value []byte
+	var key []byte
+	var valueStart int
 	var err error
-	for iter.Seek(prefix); iter.ValidForPrefix(prefix); iter.Next() {
+	var passed bool
+	secondValues := make([][]byte, len(assignment.References)-1)
+
+	// This is a tricky one
+	if assignment.Iterator == nil {
+		iter.Seek(prefix)
+	} else {
+		iter.Seek(assignment.Iterator)
+		iter.Next()
+	}
+
+	for ; iter.ValidForPrefix(prefix); iter.Next() {
 		item := iter.Item()
+		key = item.KeyCopy(key)
 		value, err = item.ValueCopy(value)
 		if err != nil {
-			return err
+			return false, err
 		}
 
-		// Strip value of the CID and graph label prefix
+		// Strip value of the CID and graph label prefix.
+		// This is why we used \n for the delimiter before the actual value,
+		// since \t is used multiple times before it.
 		for i, b := range value {
 			if b == '\n' {
-				value = value[i+1:]
+				valueStart = i
 				break
 			}
 		}
 
-		// Now value is really actually the value.
-		// for i, reference := range assignment.References {
-		// 	if i == index {
-		// 		continue
-		// 	}
-		// }
+		// Okay so each reference is an "expectation" of a triple.
+		// It's NOT the case that every triple that matches the prefix has to match
+		// Only that some do
+		for i, reference := range assignment.References {
+			if i == index {
+				continue
+			}
+			secondPrefix := getValueKey(reference, dataset, as)
+			opts := badger.DefaultIteratorOptions
+			opts.PrefetchSize = int(reference.Count)
+			opts.PrefetchValues = true
+			secondIter := txn.NewIterator(opts)
+			defer iter.Close()
+			var secondValue []byte
+
+			for secondIter.Seek(secondPrefix); secondIter.ValidForPrefix(secondPrefix); secondIter.Next() {
+				secondItem := secondIter.Item()
+				secondValue, err = secondItem.ValueCopy(secondValue)
+				if err != nil {
+					return false, err
+				}
+
+				var secondValueStart int
+				for i, b := range secondValue {
+					if b == '\n' {
+						secondValueStart = i
+						break
+					}
+				}
+
+				if len(secondValue)-secondValueStart == len(value)-valueStart {
+					passed = true
+					for i, b := range value {
+						if secondValue[i] != b {
+							passed = false
+							break
+						}
+					}
+				}
+				// If one of the references matches, we exit immediately
+				// (aka the reference is satisfiable)
+				if passed {
+					break
+				}
+			}
+			// The is the result of passed over all prefixes of reference
+			if passed {
+				j := i
+				if j > index {
+					j--
+				}
+				secondValues[j] = secondValue
+			} else {
+				break
+			}
+		}
+
+		// This is the final thing for all references in value
+		if passed {
+			break
+		} else {
+			value = nil
+		}
 	}
+
 	if value == nil {
-		// !FAILURE :-o
-		// back up the track
-	} else {
-
+		return false, nil
 	}
-
-	return nil
+	assignment.Value = value[valueStart:]
+	assignment.Iterator = key
+	return passed, nil
 }
 
 func solveAssignmentMap(am AssignmentMap, as AssignmentStack, dataset *ld.RDFDataset, txn *badger.Txn) error {
@@ -157,21 +231,28 @@ func solveAssignmentMap(am AssignmentMap, as AssignmentStack, dataset *ld.RDFDat
 	}
 
 	// TODO: have a better sorting heuristic than iteration
-	for id, assignment := range am {
-		err = solveAssignment(id, assignment, as, dataset, txn)
+	assignmentKeys := make([]string, len(am))
+	var i int
+	for id := range am {
+		assignmentKeys[i] = id
+		i++
+	}
+	var j int
+	for j < len(am) {
+		id := assignmentKeys[j]
+		assignment := am[id]
+		passed, err := solveAssignment(id, assignment, as, dataset, txn)
 		if err != nil {
 			return err
+		} else if passed {
+			// Do not have to backtrack :-)
+			j++
+		} else if j == 0 {
+
+		} else {
+			// Have to backtrack :-(
+			j--
 		}
 	}
 	return nil
-}
-
-func query(dataset *ld.RDFDataset, db *badger.DB, cb func(AssignmentStack) error) error {
-	as := getAssignmentStack(dataset)
-	return db.View(func(txn *badger.Txn) error {
-		for _, am := range as.maps {
-			solveAssignmentMap(am, as, dataset, txn)
-		}
-		return cb(as)
-	})
 }
