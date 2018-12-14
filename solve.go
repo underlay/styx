@@ -8,13 +8,13 @@ import (
 	"github.com/piprate/json-gold/ld"
 )
 
-func indexElement(place uint8, quad *ld.Quad) []byte {
+func indexElement(permutation uint8, quad *ld.Quad) []byte {
 	var element string
-	if place == 0 {
+	if permutation == 0 {
 		element = quad.Subject.GetValue()
-	} else if place == 1 {
+	} else if permutation == 1 {
 		element = quad.Predicate.GetValue()
-	} else if place == 2 {
+	} else if permutation == 2 {
 		element = quad.Object.GetValue()
 	} else {
 		return nil
@@ -23,32 +23,32 @@ func indexElement(place uint8, quad *ld.Quad) []byte {
 }
 
 func populateKey(ref Reference, dataset *ld.RDFDataset, as AssignmentStack) ([]byte, []byte) {
-	var p, q []byte
+	var m, n []byte
 	quad := dataset.Graphs[ref.Graph][ref.Index]
-	if ref.P == "" {
+	if ref.M == "" {
 		// p's slot is a URI or constant value
-		place := (ref.Place + 1) % 3
-		p = indexElement(place, quad)
-	} else if i, has := as.deps[ref.P]; has {
-		p = as.maps[i][ref.P].Value
+		permutation := (ref.Permutation + 1) % 3
+		m = indexElement(permutation, quad)
+	} else if i, has := as.deps[ref.M]; has {
+		m = as.maps[i][ref.M].Value
 	} else {
-		log.Fatalln("Could not find p in assignment stack", ref.P)
+		log.Fatalln("Could not find ref.M in assignment stack", ref.M)
 	}
 
-	if ref.Q == "" {
-		place := (ref.Place + 2) % 3
-		p = indexElement(place, quad)
-	} else if i, has := as.deps[ref.Q]; has {
-		q = as.maps[i][ref.Q].Value
+	if ref.N == "" {
+		permutation := (ref.Permutation + 2) % 3
+		n = indexElement(permutation, quad)
+	} else if i, has := as.deps[ref.N]; has {
+		n = as.maps[i][ref.N].Value
 	} else {
-		log.Fatalln("Could not find q in assignment stack", ref.Q)
+		log.Fatalln("Could not find ref.N in assignment stack", ref.N)
 	}
-	return p, q
+	return m, n
 }
 
 func getValueKey(ref Reference, dataset *ld.RDFDataset, as AssignmentStack) []byte {
 	p, q := populateKey(ref, dataset, as)
-	permutation := valuePrefixes[ref.Place]
+	permutation := ValuePrefixes[ref.Permutation]
 	key := []byte{permutation, tab}
 	key = append(key, p...)
 	key = append(key, tab)
@@ -59,7 +59,7 @@ func getValueKey(ref Reference, dataset *ld.RDFDataset, as AssignmentStack) []by
 
 func getMajorKey(ref Reference, dataset *ld.RDFDataset, as AssignmentStack) []byte {
 	p, q := populateKey(ref, dataset, as)
-	permutation := majorPrefixes[ref.Place]
+	permutation := MajorPrefixes[ref.Permutation]
 	key := []byte{permutation, tab}
 	key = append(key, p...)
 	key = append(key, tab)
@@ -69,7 +69,7 @@ func getMajorKey(ref Reference, dataset *ld.RDFDataset, as AssignmentStack) []by
 
 func getMinorKey(ref Reference, dataset *ld.RDFDataset, as AssignmentStack) []byte {
 	p, q := populateKey(ref, dataset, as)
-	permutation := minorPrefixes[ref.Place]
+	permutation := MinorPrefixes[ref.Permutation]
 	key := []byte{permutation, tab}
 	key = append(key, q...)
 	key = append(key, tab)

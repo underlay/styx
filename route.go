@@ -55,7 +55,7 @@ type Assignment struct {
 	Constraints  []Reference    // constraints on layer siblings
 	References   []Reference    // slice of references that force this assignment's value
 	Value        []byte         // initialized to nil; filled in during actual search
-	Iterator     []byte         // pointer for backtracking. similarly initialized
+	Iterator     []byte         // pointer for backtracking. also initialized nil
 	Sources      []string       // CID+graph+index (hopefully multiple for one value)
 	Dependencies map[string]int // Indices of previous assignments. Could merge with refs?
 	Count        uint64         // The sum of References.Count
@@ -72,12 +72,12 @@ type AssignmentStack struct {
 
 // Reference is a reference in a dataset
 type Reference struct {
-	Graph string
-	Index int
-	Place uint8 // this is {0, 1, 2}, or 4 for no place at all
-	P     string
-	Q     string
-	Count uint64
+	Graph       string
+	Index       int
+	Permutation uint8 // this is {0, 1, 2}, or 4 for no place at all
+	M           string
+	N           string
+	Count       uint64
 }
 
 // Codex is a map of refs
@@ -198,11 +198,11 @@ func haveDinner(as AssignmentStack, codex Codex) (AssignmentStack, Codex) {
 	for id, refs := range codex.Single {
 		deps := map[string]int{}
 		for _, ref := range refs {
-			if ref.P != "" {
-				deps[ref.P] = as.deps[ref.P]
+			if ref.M != "" {
+				deps[ref.M] = as.deps[ref.M]
 			}
-			if ref.Q != "" {
-				deps[ref.Q] = as.deps[ref.Q]
+			if ref.N != "" {
+				deps[ref.N] = as.deps[ref.N]
 			}
 		}
 		am[id] = &Assignment{References: refs, Dependencies: deps}
