@@ -2,7 +2,9 @@ package styx
 
 import (
 	"encoding/binary"
+	"fmt"
 	"log"
+	"regexp"
 	"strings"
 
 	"github.com/dgraph-io/badger"
@@ -16,7 +18,7 @@ name         type    description
 permutation  uint8   an integer {0, 1, 2} corresponding to a rotation of three elements
 prefix       byte    a byte {a, b, c, i, j, k, x, y, z}
 s, p, o      string  escaped subject, predicate, or object quad elements, respectively
-m, n         string  escaped quad elements, but in the order they appear in the key of an entry
+m, n         []byte  escaped quad elements, but in the order they appear in the key of an entry
 key          []byte  slice that exists (or will exist) as a real key in Badger
 counter      uint64  value of an index key, or postfix of a value key
 
@@ -73,7 +75,7 @@ var MinorPrefixes = [3]byte{'x', 'y', 'z'}
 var minorPrefixMap = map[byte]uint8{'x': 0, 'y': 1, 'z': 2}
 
 // A PermuteIndex is either permuteMajor, permuteMinor, or permuteValue
-type PermuteIndex func(uint8, string, string, string) (byte, string, string, string)
+type PermuteIndex func(uint8, string, string, string) (byte, []byte, []byte, []byte)
 
 // Our delimiter of choice
 // The "tab" is such a cute concept; idk why she's not more popular
@@ -100,22 +102,22 @@ func updateIndex(
 		// only about the prefix and the two key elements.
 		prefix, m, n, _ := permuteIndex(permutation, s, p, o)
 		key := assembleKey(prefix, m, n, nil)
-		index, err := txn.Get(key)
+		indexItem, err := txn.Get(key)
 		if err == badger.ErrKeyNotFound {
 			counterValues[permutation] = InitialCounter
 		} else if err != nil {
 			return counterValues, err
-		} else if index.UserMeta() != prefix {
+		} else if indexItem.UserMeta() != prefix {
 			log.Fatalln("Mismatching meta tag in major index")
 		} else {
-			counter, err = index.ValueCopy(counter)
+			counter, err = indexItem.ValueCopy(counter)
 			if err != nil {
 				return counterValues, err
 			}
-			counterValues[permutation] = binary.BigEndian.Uint64(counter)
+			counterValues[permutation] = binary.BigEndian.Uint64(counter) + 1
 		}
 
-		binary.BigEndian.PutUint64(counter, counterValues[permutation]+1)
+		binary.BigEndian.PutUint64(counter, counterValues[permutation])
 		err = txn.SetWithMeta(key, counter, prefix)
 		if err != nil {
 			return counterValues, err
@@ -154,7 +156,7 @@ func insert(cid string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 			for permutation = 0; permutation < 3; permutation++ {
 				prefix, m, n, value := permuteValue(permutation, s, p, o)
 				val := append(g, value...)
-				binary.BigEndian.PutUint64(counter, majorValues[i]) // warning: opinion
+				binary.BigEndian.PutUint64(counter, majorValues[permutation]) // warning: opinion
 				key := assembleKey(prefix, m, n, counter)
 				err = txn.SetWithMeta(key, val, prefix)
 				if err != nil {
@@ -166,12 +168,12 @@ func insert(cid string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 	return nil
 }
 
-func assembleKey(prefix byte, m string, n string, counter []byte) []byte {
+func assembleKey(prefix byte, m []byte, n []byte, counter []byte) []byte {
 	length := 1 + 1 + len(m) + 1 + len(n)
 	if counter != nil {
 		length += 1 + len(counter)
 	}
-	key := make([]byte, length)
+	key := make([]byte, 0, length)
 	key = append(key, prefix)
 	key = append(key, tab)
 	key = append(key, m...)
@@ -184,43 +186,46 @@ func assembleKey(prefix byte, m string, n string, counter []byte) []byte {
 	return key
 }
 
-func permuteValue(permutation uint8, s string, p string, o string) (byte, string, string, string) {
+func permuteValue(permutation uint8, s string, p string, o string) (byte, []byte, []byte, []byte) {
+	var S, P, O []byte = []byte(s), []byte(p), []byte(o)
 	prefix := ValuePrefixes[permutation]
 	if prefix == 'a' {
-		return prefix, p, o, s
+		return prefix, P, O, S
 	} else if prefix == 'b' {
-		return prefix, o, s, p
+		return prefix, O, S, P
 	} else if prefix == 'c' {
-		return prefix, s, p, o
+		return prefix, S, P, O
 	}
 	log.Fatalln("Invalid value permutation")
-	return prefix, "", "", ""
+	return prefix, nil, nil, nil
 }
 
-func permuteMajor(permutation uint8, s string, p string, o string) (byte, string, string, string) {
+func permuteMajor(permutation uint8, s string, p string, o string) (byte, []byte, []byte, []byte) {
+	var S, P, O []byte = []byte(s), []byte(p), []byte(o)
 	prefix := MajorPrefixes[permutation]
 	if prefix == 'i' {
-		return prefix, p, o, s
+		return prefix, P, O, S
 	} else if prefix == 'j' {
-		return prefix, o, s, p
+		return prefix, O, S, P
 	} else if prefix == 'k' {
-		return prefix, s, p, o
+		return prefix, S, P, O
 	}
 	log.Fatalln("Invalid major permutation")
-	return prefix, "", "", ""
+	return prefix, nil, nil, nil
 }
 
-func permuteMinor(permutation uint8, s string, p string, o string) (byte, string, string, string) {
+func permuteMinor(permutation uint8, s string, p string, o string) (byte, []byte, []byte, []byte) {
+	var S, P, O []byte = []byte(s), []byte(p), []byte(o)
 	prefix := MinorPrefixes[permutation]
 	if prefix == 'x' {
-		return prefix, o, p, s
+		return prefix, O, P, S
 	} else if prefix == 'y' {
-		return prefix, s, o, p
+		return prefix, S, O, P
 	} else if prefix == 'z' {
-		return prefix, p, s, o
+		return prefix, P, S, O
 	}
 	log.Fatalln("Invalid minor permutation")
-	return prefix, "", "", ""
+	return prefix, nil, nil, nil
 }
 
 // Mostly copied from https://github.com/piprate/json-gold/blob/master/ld/serialize_nquads.go
@@ -230,51 +235,108 @@ func marshallQuad(quad *ld.Quad, cid string, index int) (string, string, string,
 	var s, p, o, g string
 
 	// subject is either an IRI or blank node
-	iri, isIRI := quad.Subject.(*ld.IRI)
-	if isIRI {
-		s = "<" + escape(iri.Value) + ">"
-	} else {
+	if iri, isIRI := quad.Subject.(*ld.IRI); isIRI {
+		s = marshallIRI(iri)
+	} else if blankNode, isBlankNode := quad.Subject.(*ld.BlankNode); isBlankNode {
 		// Prefix blank nodes with the CID root
-		s = cid + quad.Subject.GetValue()[1:]
+		s = marshallBlankNode(blankNode, cid)
+	} else {
+		log.Fatalln("subject is neither an IRI nor a blank node")
 	}
 
 	// predicate is either an IRI or a blank node
-	iri, isIRI = quad.Predicate.(*ld.IRI)
-	if isIRI {
-		p = "<" + escape(iri.Value) + ">"
-	} else {
+	if iri, isIRI := quad.Predicate.(*ld.IRI); isIRI {
+		p = marshallIRI(iri)
+	} else if blankNode, isBlankNode := quad.Predicate.(*ld.BlankNode); isBlankNode {
 		// Prefix blank nodes with the CID root
-		p = cid + quad.Predicate.GetValue()[1:]
+		p = marshallBlankNode(blankNode, cid)
+	} else {
+		log.Fatalln("predicate is neither an IRI nor a blank node")
 	}
 
 	// object is an IRI, blank node, or a literal
-	iri, isIRI = quad.Object.(*ld.IRI)
-	if isIRI {
-		o = "<" + escape(iri.Value) + ">"
-	} else if ld.IsBlankNode(quad.Object) {
-		o = cid + escape(quad.Object.GetValue())[1:]
+	if iri, isIRI := quad.Object.(*ld.IRI); isIRI {
+		o = marshallIRI(iri)
+	} else if blankNode, isBlankNode := quad.Object.(*ld.BlankNode); isBlankNode {
+		o = marshallBlankNode(blankNode, cid)
+	} else if literal, isLiteral := quad.Object.(*ld.Literal); isLiteral {
+		o = marshallLiteral(literal)
 	} else {
-		literal := quad.Object.(*ld.Literal)
-		o = "\"" + escape(literal.GetValue()) + "\""
-		if literal.Datatype == ld.RDFLangString {
-			o += "@" + literal.Language
-		} else if literal.Datatype != ld.XSDString {
-			o += "^^<" + escape(literal.Datatype) + ">"
-		}
+		log.Fatalln("object is neither an IRI nor a blank node nor a literal value")
 	}
 
-	g = cid
+	g = "dweb:/ipfs/" + cid
+	indexString := fmt.Sprintf("%d", index)
 	if quad.Graph == nil {
-		g += "\t" + string(index)
-	} else if ld.IsIRI(quad.Graph) {
-		g += "#" + quad.Graph.GetValue() + "\t" + string(index)
-	} else if blankNode, isBlank := quad.Graph.(*ld.BlankNode); isBlank {
-		g += blankNode.Attribute[1:] + "\t" + string(index)
+		g += "\t" + indexString
+	} else if ld.IsIRI(quad.Graph) || ld.IsBlankNode(quad.Graph) {
+		g += "#" + quad.Graph.GetValue() + "\t" + indexString
 	} else {
 		log.Fatalln("Unexpected graph label", quad.Graph.GetValue())
 	}
 
 	return s, p, o, []byte(g + "\n")
+}
+
+func marshallBlankNode(blankNode *ld.BlankNode, cid string) string {
+	return "<dweb:/ipfs/" + cid + "#" + blankNode.Attribute + ">"
+}
+
+func marshallIRI(iri *ld.IRI) string {
+	return "<" + escape(iri.Value) + ">"
+}
+
+func marshallLiteral(literal *ld.Literal) string {
+	value := "\"" + escape(literal.Value) + "\""
+	if literal.Datatype == ld.RDFLangString {
+		value += "@" + literal.Language
+	} else if literal.Datatype != ld.XSDString {
+		value += "^^<" + escape(literal.Datatype) + ">"
+	}
+	return value
+}
+
+const (
+	iri      = "^<([^>]*)>$"
+	blank    = "^_:(?:[A-Za-z][A-Za-z0-9]*)$"
+	plain    = "\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\""
+	datatype = "(?:\\^\\^<([^>]*)>)"
+	language = "(?:@([a-z]+(?:-[a-zA-Z0-9]+)*))"
+	literal  = "^" + plain + "(?:" + datatype + "|" + language + ")?$"
+)
+
+var iriRegex = regexp.MustCompile(iri)
+var blankRegex = regexp.MustCompile(blank)
+var literalRegex = regexp.MustCompile(literal)
+
+func unmarshalValue(value []byte) ld.Node {
+	fmt.Println("unmarshaling value", string(value))
+	var node ld.Node
+	if iriRegex.Match(value) {
+		end := len(value) - 1
+		node = ld.NewIRI(unescape(string(value[1:end])))
+	} else if blankRegex.Match(value) {
+		node = ld.NewBlankNode(unescape(string(value)))
+	} else if match := literalRegex.FindStringSubmatch(string(value)); len(match) > 1 {
+		var value, datatype, language string
+		value = unescape(match[1])
+		if len(match) > 3 {
+			datatype = unescape(match[3])
+			if len(match) > 4 {
+				language = unescape(match[4])
+			}
+		}
+
+		if datatype == "" {
+			if language == "" {
+				datatype = ld.XSDString
+			} else {
+				datatype = ld.RDFLangString
+			}
+		}
+		node = ld.NewLiteral(value, datatype, language)
+	}
+	return node
 }
 
 // These are the escape rules for RDF strings.

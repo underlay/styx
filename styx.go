@@ -20,16 +20,21 @@ const format = "application/nquads"
 // Let's set it to 1 just in case we want to ever use 0 for something special.
 const InitialCounter uint64 = 1
 
+// ConstantPermutation is the value we give to all-constant references.
+// Let's make it 7 to be really weird.
+const ConstantPermutation uint8 = 7
+
 func ingest(doc interface{}, db *badger.DB, shell *ipfs.Shell) error {
 	proc := ld.NewJsonLdProcessor()
 	options := ld.NewJsonLdOptions("")
 	options.DocumentLoader = NewIPFSDocumentLoader(nil)
 
 	// Convert to RDF
-	rdf, err := proc.ToRDF(doc, options)
+	rdf, err := proc.Normalize(doc, options)
 	if err != nil {
 		return err
 	}
+
 	dataset := rdf.(*ld.RDFDataset)
 
 	// Normalize and add to IFPS
@@ -48,6 +53,7 @@ func ingest(doc interface{}, db *badger.DB, shell *ipfs.Shell) error {
 	if err != nil {
 		return err
 	}
+
 	return db.Update(func(txn *badger.Txn) error {
 		return insert(cid, dataset, txn)
 	})

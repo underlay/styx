@@ -56,7 +56,7 @@ type Assignment struct {
 	References   []Reference    // slice of references that force this assignment's value
 	Value        []byte         // initialized to nil; filled in during actual search
 	Iterator     []byte         // pointer for backtracking. also initialized nil
-	Sources      []string       // CID+graph+index (hopefully multiple for one value)
+	Sources      [][]byte       // CID+graph+index (hopefully multiple for one value)
 	Dependencies map[string]int // Indices of previous assignments. Could merge with refs?
 	Count        uint64         // The sum of References.Count
 }
@@ -74,9 +74,9 @@ type AssignmentStack struct {
 type Reference struct {
 	Graph       string
 	Index       int
-	Permutation uint8 // this is {0, 1, 2}, or 4 for no place at all
-	M           string
-	N           string
+	Permutation uint8  // this is {0, 1, 2}, or 7 for no place at all ()
+	M           string // These have to be strings in case they're blank node ids
+	N           string // it breaks the convention of m and n being []byte slices, but oh well
 	Count       uint64
 }
 
@@ -140,17 +140,17 @@ func getCodex(dataset *ld.RDFDataset) Codex {
 				c = blankC.Attribute
 			}
 			if !A && !B && !C {
-				ref := Reference{graph, index, 4, "", "", 0}
+				ref := Reference{graph, index, ConstantPermutation, "", "", 0}
 				codex.Constant = append(codex.Constant, ref)
 			} else if (A && !B && !C) || (!A && B && !C) || (!A && !B && C) {
-				var place uint8
+				var permutation uint8
 				if b != "" {
-					place = 2
+					permutation = 1
 				} else if c != "" {
-					place = 3
+					permutation = 2
 				}
 				pivot := a + b + c
-				ref := Reference{graph, index, place, "", "", 0}
+				ref := Reference{graph, index, permutation, "", "", 0}
 				refs, has := codex.Single[pivot]
 				if has {
 					codex.Single[pivot] = append(refs, ref)
@@ -158,24 +158,24 @@ func getCodex(dataset *ld.RDFDataset) Codex {
 					codex.Single[pivot] = []Reference{ref}
 				}
 			} else if A && B && !C {
-				refA := Reference{graph, index, 1, b, "", 0}
-				refB := Reference{graph, index, 2, "", a, 0}
+				refA := Reference{graph, index, 0, b, "", 0}
+				refB := Reference{graph, index, 1, "", a, 0}
 				insertDouble(a, b, refA, codex)
 				insertDouble(b, a, refB, codex)
 			} else if A && !B && C {
-				refA := Reference{graph, index, 1, c, "", 0}
-				refC := Reference{graph, index, 3, "", a, 0}
+				refA := Reference{graph, index, 0, "", c, 0}
+				refC := Reference{graph, index, 2, a, "", 0}
 				insertDouble(a, c, refA, codex)
 				insertDouble(c, a, refC, codex)
 			} else if !A && B && C {
-				refB := Reference{graph, index, 2, c, "", 0}
-				refC := Reference{graph, index, 3, "", b, 0}
+				refB := Reference{graph, index, 1, c, "", 0}
+				refC := Reference{graph, index, 2, "", b, 0}
 				insertDouble(b, c, refB, codex)
 				insertDouble(c, b, refC, codex)
 			} else if A && B && C {
-				refA := Reference{graph, index, 1, b, c, 0}
-				refB := Reference{graph, index, 2, c, a, 0}
-				refC := Reference{graph, index, 3, a, b, 0}
+				refA := Reference{graph, index, 0, b, c, 0}
+				refB := Reference{graph, index, 1, c, a, 0}
+				refC := Reference{graph, index, 2, a, b, 0}
 				insertTriple(a, b, c, refA, codex)
 				insertTriple(a, c, b, refA, codex)
 				insertTriple(b, a, c, refB, codex)

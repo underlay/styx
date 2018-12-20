@@ -214,6 +214,7 @@ func printAssignmentStack(as AssignmentStack) {
 		for k, v := range m {
 			b, _ := json.Marshal(v)
 			fmt.Printf("  %s: "+string(b)+"\n", k)
+			fmt.Println("        " + string(v.Value))
 		}
 	}
 }
@@ -290,10 +291,21 @@ func TestConstrain(t *testing.T) {
 }
 
 func TestSolve(t *testing.T) {
-	data := "ipfs://QmVcYFaWU6co4TUnc6bvRsKwcjnK4GVHbMA29sA7egCHhd"
+	data := map[string]interface{}{
+		"@context": map[string]interface{}{
+			"@vocab": "http://schema.org/",
+		},
+		"@type": "Person",
+		"name":  "Joel",
+		"age":   "22",
+		"friend": map[string]interface{}{
+			"@type": "Person",
+			"name":  "Colin",
+			"age":   "24",
+		},
+	}
 
-	proc := ld.NewJsonLdProcessor()
-	options := ld.NewJsonLdOptions("")
+	sh := ipfs.NewShell("localhost:5001")
 
 	// Create DB
 	opts := badger.DefaultOptions
@@ -306,7 +318,7 @@ func TestSolve(t *testing.T) {
 	defer db.Close()
 
 	fmt.Println("about to do the thing")
-	ingest(data, db, nil)
+	ingest(data, db, sh)
 
 	fmt.Println("we did the freaking thing")
 
@@ -316,17 +328,20 @@ func TestSolve(t *testing.T) {
 		"@context": map[string]interface{}{
 			"@vocab": "http://schema.org/",
 		},
-		"name":   "Joel",
-		"friend": map[string]interface{}{},
+		"friend": map[string]interface{}{
+			"@type": "Person",
+			"name":  "Colin",
+		},
+		"age": map[string]interface{}{},
 	}
 
-	queryRDF, err := proc.ToRDF(q, options)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	queryDataset := queryRDF.(*ld.RDFDataset)
-	err = query(queryDataset, db, func(as AssignmentStack) error {
-		fmt.Println(as)
+	err = query(q, sh, db, func(as AssignmentStack) error {
+		fmt.Println("wow")
+		printAssignmentStack(as)
 		return nil
 	})
+	if err != nil {
+		fmt.Println("there was an error:", err.Error())
+		// log.Fatalln(err)
+	}
 }
