@@ -310,7 +310,6 @@ var blankRegex = regexp.MustCompile(blank)
 var literalRegex = regexp.MustCompile(literal)
 
 func unmarshalValue(value []byte) ld.Node {
-	fmt.Println("unmarshaling value", string(value))
 	var node ld.Node
 	if iriRegex.Match(value) {
 		end := len(value) - 1
@@ -320,10 +319,10 @@ func unmarshalValue(value []byte) ld.Node {
 	} else if match := literalRegex.FindStringSubmatch(string(value)); len(match) > 1 {
 		var value, datatype, language string
 		value = unescape(match[1])
-		if len(match) > 3 {
-			datatype = unescape(match[3])
-			if len(match) > 4 {
-				language = unescape(match[4])
+		if len(match) > 2 {
+			datatype = unescape(match[2])
+			if len(match) > 3 {
+				language = unescape(match[3])
 			}
 		}
 

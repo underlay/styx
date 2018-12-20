@@ -3,7 +3,6 @@ package styx
 import (
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"strconv"
 
 	"github.com/dgraph-io/badger"
@@ -92,15 +91,17 @@ func query(q interface{}, sh *ipfs.Shell, db *badger.DB, cb func(AssignmentStack
 																value["@type"] = literal.Datatype
 															}
 														} else if literal.Datatype == ld.XSDDouble {
-															f := big.NewFloat(0)
-															err = f.UnmarshalText([]byte(literal.Value))
+															// f := big.NewFloat(0)
+															// err = f.UnmarshalText([]byte(literal.Value))
+															f, err := strconv.ParseFloat(literal.Value, 64)
 															if err != nil {
 																return err
 															}
 															value["@value"] = f
 														} else if literal.Datatype == ld.XSDInteger {
-															z := big.NewInt(0)
-															err = z.UnmarshalText([]byte(literal.Value))
+															// z := big.NewInt(0)
+															// err = z.UnmarshalText([]byte(literal.Value))
+															z, err := strconv.ParseInt(literal.Value, 10, 0)
 															if err != nil {
 																return err
 															}
@@ -111,12 +112,14 @@ func query(q interface{}, sh *ipfs.Shell, db *badger.DB, cb func(AssignmentStack
 													}
 												} else {
 													fmt.Println("COULD NOT MATCH IRI OR LITERAL", ldNode)
+													return nil // TODO: make an error
 												}
 											}
 										}
 									}
 								} else {
-									// Here it's fine if it doesn't match
+									// Here it's fine if it doesn't match. There will be constant
+									// values like {"prop": 100} that are used for constraints.
 								}
 							}
 						} else {

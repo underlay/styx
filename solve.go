@@ -105,21 +105,19 @@ func (sa SortedAssignments) Swap(i, j int) {
 
 func countReferences(am AssignmentMap, as AssignmentStack, dataset *ld.RDFDataset, txn *badger.Txn) error {
 	counter := make([]byte, 8)
-	// var major bool
+	var major bool
 	for _, assignment := range am {
 		var sum uint64
 		for _, reference := range assignment.References {
-			// This is really unnecessary, but just for a sense of balance:
-			// alternate between getting the count from the major and minor indices
-			// var indexKey []byte
-			// if major {
-			// 	indexKey = getMajorKey(reference, dataset, as)
-			// } else {
-			// 	indexKey = getMinorKey(reference, dataset, as)
-			// }
-			// major = !major
-
-			indexKey := getMajorKey(reference, dataset, as)
+			// This is really over the top, but just for a sense of balance:
+			// alternate between getting the count from the major and minor indices.
+			var indexKey []byte
+			if major {
+				indexKey = getMajorKey(reference, dataset, as)
+			} else {
+				indexKey = getMinorKey(reference, dataset, as)
+			}
+			major = !major
 
 			indexItem, err := txn.Get(indexKey)
 			if err != nil {

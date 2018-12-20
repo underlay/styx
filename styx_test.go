@@ -291,20 +291,6 @@ func TestConstrain(t *testing.T) {
 }
 
 func TestSolve(t *testing.T) {
-	data := map[string]interface{}{
-		"@context": map[string]interface{}{
-			"@vocab": "http://schema.org/",
-		},
-		"@type": "Person",
-		"name":  "Joel",
-		"age":   "22",
-		"friend": map[string]interface{}{
-			"@type": "Person",
-			"name":  "Colin",
-			"age":   "24",
-		},
-	}
-
 	sh := ipfs.NewShell("localhost:5001")
 
 	// Create DB
@@ -318,23 +304,46 @@ func TestSolve(t *testing.T) {
 	defer db.Close()
 
 	fmt.Println("about to do the thing")
+
+	var data map[string]interface{}
+	err = json.Unmarshal([]byte(`{
+		"@context": {
+			"@vocab": "http://schema.org/"
+		},
+		"@type": "Person",
+		"name": "Joel",
+		"age": 22,
+		"friend": {
+			"@type": "Person",
+			"name": "Colin",
+			"age": 24
+		}
+	}`), &data)
+
+	if err != nil {
+		fmt.Println("error", err.Error())
+		return
+	}
 	ingest(data, db, sh)
 
 	fmt.Println("we did the freaking thing")
 
 	// Okay now the data has been ingested
 	// We want to construct a query
-	q := map[string]interface{}{
-		"@context": map[string]interface{}{
-			"@vocab": "http://schema.org/",
-		},
-		"friend": map[string]interface{}{
+	var q map[string]interface{}
+	err = json.Unmarshal([]byte(`{
+		"@context": { "@vocab": "http://schema.org/" },
+		"friend": {
 			"@type": "Person",
-			"name":  "Colin",
+			"name": "Colin"
 		},
-		"age": map[string]interface{}{},
-	}
+		"age": {}
+	}`), &q)
 
+	if err != nil {
+		fmt.Println("error", err.Error())
+		return
+	}
 	err = query(q, sh, db, func(as AssignmentStack) error {
 		fmt.Println("wow")
 		printAssignmentStack(as)
