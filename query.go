@@ -10,19 +10,15 @@ import (
 	"github.com/piprate/json-gold/ld"
 )
 
-func query(q interface{}, sh *ipfs.Shell, db *badger.DB, cb func(AssignmentStack) error) error {
+func query(q map[string]interface{}, sh *ipfs.Shell, db *badger.DB, cb func(AssignmentStack) error) error {
 	proc := ld.NewJsonLdProcessor()
 	options := ld.NewJsonLdOptions("")
 	options.Explicit = true
-	var needToExtractGraph bool
-	if object, isObject := q.(map[string]interface{}); isObject {
-		if _, hasGraph := object["@graph"]; !hasGraph {
-			needToExtractGraph = true
-		}
-	}
+
+	// We'll come back to this flag at the very end
+	_, queryHasGraph := q["@graph"]
 
 	flattened, err := proc.Flatten(q, nil, options)
-	fmt.Println("flattened!", flattened)
 	if err != nil {
 		return err
 	}
@@ -33,11 +29,19 @@ func query(q interface{}, sh *ipfs.Shell, db *badger.DB, cb func(AssignmentStack
 	}
 
 	dataset := rdf.(*ld.RDFDataset)
+
+	for graph, quads := range dataset.Graphs {
+		fmt.Printf("%s:\n", graph)
+		for i, quad := range quads {
+			fmt.Printf("%2d: %s %s %s\n", i, quad.Subject.GetValue(), quad.Predicate.GetValue(), quad.Object.GetValue())
+		}
+	}
+
 	as := getAssignmentStack(dataset)
-	fmt.Println("about to query or something")
 	return db.View(func(txn *badger.Txn) error {
 		for _, am := range as.maps {
 			pass, err := solveAssignmentMap(am, as, dataset, txn)
+			fmt.Println("solving assignment map", pass, err)
 			if err != nil {
 				return err
 			} else if !pass {
@@ -46,13 +50,11 @@ func query(q interface{}, sh *ipfs.Shell, db *badger.DB, cb func(AssignmentStack
 		}
 		flattened, match := flattened.([]interface{})
 		if !match {
-			fmt.Println("the thing does not match!!!!!", flattened)
 			return nil // TODO: make an error
 		}
 		for _, node := range flattened {
 			node, match := node.(map[string]interface{})
 			if match {
-				fmt.Println("match!", node)
 				for key, value := range node {
 					if key == "@id" {
 						if value, match := value.(string); match && value[:2] == "_:" {
@@ -137,7 +139,7 @@ func query(q interface{}, sh *ipfs.Shell, db *badger.DB, cb func(AssignmentStack
 		}
 
 		// Extract a single top-level graph element if necessary
-		if graph, hasGraph := framed["@graph"]; needToExtractGraph && hasGraph {
+		if graph, hasGraph := framed["@graph"]; !queryHasGraph && hasGraph {
 			if array, isArray := graph.([]interface{}); isArray && len(array) == 1 {
 				if object, isObject := array[0].(map[string]interface{}); isObject {
 					delete(framed, "@graph")
@@ -148,12 +150,12 @@ func query(q interface{}, sh *ipfs.Shell, db *badger.DB, cb func(AssignmentStack
 			}
 		}
 
-		fmt.Println("hahaha the thing got frammmeeed")
-		b, err := json.Marshal(framed)
+		b, err := json.MarshalIndent(framed, "", "  ")
 		if err != nil {
 			return err
 		}
 		fmt.Println(string(b))
+
 		return cb(as)
 	})
 }

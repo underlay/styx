@@ -1,14 +1,18 @@
 package styx
 
 import (
-	"io"
 	"net/url"
+	"strings"
 
+	cid "github.com/ipfs/go-cid"
 	ipfs "github.com/ipfs/go-ipfs-api"
 	"github.com/piprate/json-gold/ld"
 )
 
-// IPFSDocumentLoader is an implementation of DocumentLoader for dweb URIs
+// DefaultShellAddress is the default shell address
+const DefaultShellAddress = "localhost:5001"
+
+// IPFSDocumentLoader is an implementation of DocumentLoader for ipfs:// and dweb:/ipfs/ URIs
 type IPFSDocumentLoader struct {
 	shell *ipfs.Shell
 }
@@ -20,46 +24,49 @@ func (dl *IPFSDocumentLoader) LoadDocument(u string) (*ld.RemoteDocument, error)
 	if err != nil {
 		return nil, ld.NewJsonLdError(ld.LoadingDocumentFailed, err)
 	}
-	var reader io.Reader
+
+	// I'm pretty sure we shouldn't do anything with contextURL.
 	var contextURL string
-	protocol := parsedURL.Scheme
-	protocolError := "unsupported URI scheme: " + protocol
-	if protocol == "ipfs" {
-		path := parsedURL.Host + parsedURL.Path
-		result, err := dl.shell.Cat(path)
+
+	var origin, path string
+	if parsedURL.Scheme == "ipfs" {
+		origin = parsedURL.Host
+		path = parsedURL.Path
+	} else if parsedURL.Scheme == "dweb" && parsedURL.Path[:6] == "/ipfs/" {
+		index := strings.Index(parsedURL.Path[6:], "/")
+		if index == -1 {
+			index = len(parsedURL.Path)
+		} else {
+			index += 6
+		}
+		origin = parsedURL.Path[6:index]
+		path = parsedURL.Path[index:]
+	}
+
+	if c, err := cid.Decode(origin); err != nil {
+		return nil, err
+	} else if c.Version() == 0 {
+		result, err := dl.shell.Cat(origin + path)
 		if err != nil {
 			return nil, ld.NewJsonLdError(ld.LoadingDocumentFailed, err)
 		}
 		defer result.Close()
-		reader = result
-	} else if protocol == "dweb" {
-		root := parsedURL.Path[:6]
-		rest := parsedURL.Path[6:]
-		if root == "/ipfs/" {
-			result, err := dl.shell.Cat(rest)
-			if err != nil {
-				return nil, ld.NewJsonLdError(ld.LoadingDocumentFailed, err)
-			}
-			defer result.Close()
-			reader = result
-		} else if root == "/ipld/" {
-			var document interface{}
-			err := dl.shell.DagGet(rest, &document)
-			if err != nil {
-				return nil, err
-			}
-			return &ld.RemoteDocument{DocumentURL: u, Document: document, ContextURL: contextURL}, nil
-		} else {
-			return nil, ld.NewJsonLdError(ld.LoadingDocumentFailed, protocolError)
+		document, err := ld.DocumentFromReader(result)
+		if err != nil {
+			return nil, err
 		}
+		return &ld.RemoteDocument{DocumentURL: u, Document: document, ContextURL: contextURL}, nil
+	} else if c.Type() == cid.DagCBOR {
+		var document interface{}
+		err := dl.shell.DagGet(origin+path, &document)
+		if err != nil {
+			return nil, err
+		}
+		return &ld.RemoteDocument{DocumentURL: u, Document: document, ContextURL: contextURL}, nil
 	} else {
-		return nil, ld.NewJsonLdError(ld.LoadingDocumentFailed, protocolError)
+		err := "Unsupported URI scheme: " + parsedURL.Scheme
+		return nil, ld.NewJsonLdError(ld.LoadingDocumentFailed, err)
 	}
-	document, err := ld.DocumentFromReader(reader)
-	if err != nil {
-		return nil, err
-	}
-	return &ld.RemoteDocument{DocumentURL: u, Document: document, ContextURL: contextURL}, nil
 }
 
 // NewIPFSDocumentLoader creates a new instance of IPFSDocumentLoader
@@ -67,7 +74,7 @@ func NewIPFSDocumentLoader(shell *ipfs.Shell) *IPFSDocumentLoader {
 	rval := &IPFSDocumentLoader{shell: shell}
 
 	if rval.shell == nil {
-		rval.shell = ipfs.NewShell("localhost:5001")
+		rval.shell = ipfs.NewShell(DefaultShellAddress)
 	}
 	return rval
 }

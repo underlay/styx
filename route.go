@@ -74,9 +74,9 @@ type AssignmentStack struct {
 type Reference struct {
 	Graph       string
 	Index       int
-	Permutation uint8  // this is {0, 1, 2}, or 7 for no place at all ()
-	M           string // These have to be strings in case they're blank node ids
-	N           string // it breaks the convention of m and n being []byte slices, but oh well
+	Permutation uint8   // this is {0, 1, 2}, or 7 for no place at all ()
+	M           ld.Node // These have to be strings in case they're blank node ids
+	N           ld.Node // it breaks the convention of m and n being []byte slices, but oh well
 	Count       uint64
 }
 
@@ -140,17 +140,23 @@ func getCodex(dataset *ld.RDFDataset) Codex {
 				c = blankC.Attribute
 			}
 			if !A && !B && !C {
-				ref := Reference{graph, index, ConstantPermutation, "", "", 0}
+				ref := Reference{graph, index, ConstantPermutation, nil, nil, 0}
 				codex.Constant = append(codex.Constant, ref)
 			} else if (A && !B && !C) || (!A && B && !C) || (!A && !B && C) {
-				var permutation uint8
-				if b != "" {
-					permutation = 1
-				} else if c != "" {
-					permutation = 2
+				ref := Reference{graph, index, 0, nil, nil, 0}
+				if A {
+					ref.M = quad.Predicate
+					ref.N = quad.Object
+				} else if B {
+					ref.Permutation = 1
+					ref.M = quad.Object
+					ref.N = quad.Subject
+				} else if C {
+					ref.Permutation = 2
+					ref.M = quad.Subject
+					ref.N = quad.Predicate
 				}
 				pivot := a + b + c
-				ref := Reference{graph, index, permutation, "", "", 0}
 				refs, has := codex.Single[pivot]
 				if has {
 					codex.Single[pivot] = append(refs, ref)
@@ -158,24 +164,24 @@ func getCodex(dataset *ld.RDFDataset) Codex {
 					codex.Single[pivot] = []Reference{ref}
 				}
 			} else if A && B && !C {
-				refA := Reference{graph, index, 0, b, "", 0}
-				refB := Reference{graph, index, 1, "", a, 0}
+				refA := Reference{graph, index, 0, blankB, quad.Object, 0}
+				refB := Reference{graph, index, 1, quad.Object, blankA, 0}
 				insertDouble(a, b, refA, codex)
 				insertDouble(b, a, refB, codex)
 			} else if A && !B && C {
-				refA := Reference{graph, index, 0, "", c, 0}
-				refC := Reference{graph, index, 2, a, "", 0}
+				refA := Reference{graph, index, 0, quad.Predicate, blankC, 0}
+				refC := Reference{graph, index, 2, blankA, quad.Predicate, 0}
 				insertDouble(a, c, refA, codex)
 				insertDouble(c, a, refC, codex)
 			} else if !A && B && C {
-				refB := Reference{graph, index, 1, c, "", 0}
-				refC := Reference{graph, index, 2, "", b, 0}
+				refB := Reference{graph, index, 1, blankC, quad.Subject, 0}
+				refC := Reference{graph, index, 2, quad.Subject, blankB, 0}
 				insertDouble(b, c, refB, codex)
 				insertDouble(c, b, refC, codex)
 			} else if A && B && C {
-				refA := Reference{graph, index, 0, b, c, 0}
-				refB := Reference{graph, index, 1, c, a, 0}
-				refC := Reference{graph, index, 2, a, b, 0}
+				refA := Reference{graph, index, 0, blankB, blankC, 0}
+				refB := Reference{graph, index, 1, blankC, blankA, 0}
+				refC := Reference{graph, index, 2, blankA, blankB, 0}
 				insertTriple(a, b, c, refA, codex)
 				insertTriple(a, c, b, refA, codex)
 				insertTriple(b, a, c, refB, codex)
@@ -198,11 +204,11 @@ func haveDinner(as AssignmentStack, codex Codex) (AssignmentStack, Codex) {
 	for id, refs := range codex.Single {
 		deps := map[string]int{}
 		for _, ref := range refs {
-			if ref.M != "" {
-				deps[ref.M] = as.deps[ref.M]
+			if M, isBlank := ref.M.(ld.BlankNode); isBlank {
+				deps[M.Attribute] = as.deps[M.Attribute]
 			}
-			if ref.N != "" {
-				deps[ref.N] = as.deps[ref.N]
+			if N, isBlank := ref.N.(ld.BlankNode); isBlank {
+				deps[N.Attribute] = as.deps[N.Attribute]
 			}
 		}
 		am[id] = &Assignment{References: refs, Dependencies: deps}

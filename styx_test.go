@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"os"
 	"testing"
 
 	"encoding/json"
@@ -13,136 +14,232 @@ import (
 	"github.com/piprate/json-gold/ld"
 )
 
-func TestIPFS(t *testing.T) {
-	shell := ipfs.NewShell("localhost:5001")
-	data := map[string]interface{}{
-		"@context": map[string]interface{}{
-			"@vocab": "http://schema.org/",
-		},
-		"name": "Vincent van Gogh",
+// Replace at your leisure
+const path = "/tmp/badger"
+
+// Replace at your leisure
+var sh = ipfs.NewShell("localhost:5001")
+
+func TestIPFSDocumentLoader(t *testing.T) {
+	data := []byte(`{
+		"@context": { "@vocab": "http://schema.org/" },
+		"name": "Vincent van Gogh"
+	}`)
+
+	if !sh.IsUp() {
+		t.Error("IPFS Daemon not running")
 	}
 
-	b, err := json.Marshal(data)
+	checkExpanded := func(result []interface{}) {
+		if len(result) == 1 {
+			if v, match := result[0].(map[string]interface{}); match {
+				if v, has := v["http://schema.org/name"]; has {
+					if v, match := v.([]interface{}); match && len(v) == 1 {
+						if v, match := v[0].(map[string]interface{}); match {
+							if v, has := v["@value"]; has && v == "Vincent van Gogh" {
+								return
+							}
+						}
+					}
+				}
+			}
+		}
+		fmt.Println("GONNA ERROR SIGNAL")
+		t.Error("IPFS document loaded did not expand document correctly")
+	}
+
+	cidIpfs, err := sh.Add(bytes.NewReader(data))
 	if err != nil {
-		log.Fatalln(err)
+		t.Error(err)
 	}
 
-	cid, err := shell.Add(bytes.NewReader(b))
+	cidIpld, err := sh.DagPut(data, "json", "cbor")
 	if err != nil {
-		log.Fatalln(err)
+		t.Error(err)
 	}
 
-	uri := "ipfs://" + cid
-
-	fmt.Println("got uri", uri)
-	proc := ld.NewJsonLdProcessor()
-	options := ld.NewJsonLdOptions("")
-	options.DocumentLoader = NewIPFSDocumentLoader(shell)
-
-	res, err := proc.Expand(uri, options)
-	fmt.Println(res, err)
-}
-
-func TestIPLD(t *testing.T) {
-	shell := ipfs.NewShell("localhost:5001")
-	data := map[string]interface{}{
-		"@context": map[string]interface{}{
-			"@vocab": "http://schema.org/",
-		},
-		"@type": "Person",
-		"name":  "Vincent van Gogh",
-	}
-
-	bytes, err := json.Marshal(data)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	cid, err := shell.DagPut(bytes, "json", "cbor")
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	uri := "dweb:/ipld/" + cid
-
-	fmt.Println("got uri", uri)
+	fmt.Println(cidIpfs, cidIpld)
 
 	proc := ld.NewJsonLdProcessor()
 	options := ld.NewJsonLdOptions("")
-	options.DocumentLoader = NewIPFSDocumentLoader(shell)
+	options.DocumentLoader = NewIPFSDocumentLoader(sh)
 
-	res, err := proc.Expand(uri, options)
-	fmt.Println(res, err)
+	ipfsURI := "ipfs://" + cidIpfs
+	ipfsResult, err := proc.Expand(ipfsURI, options)
+	if err != nil {
+		t.Error(err)
+	}
+	checkExpanded(ipfsResult)
+
+	fmt.Println("check passed")
+
+	dwebIpfsURI := "dweb:/ipfs/" + cidIpfs
+	dwebIpfsResult, err := proc.Expand(dwebIpfsURI, options)
+	if err != nil {
+		t.Error(err)
+	}
+	checkExpanded(dwebIpfsResult)
+
+	ipldURI := "ipfs://" + cidIpld
+	ipldResult, err := proc.Expand(ipldURI, options)
+	if err != nil {
+		t.Error(err)
+	}
+	checkExpanded(ipldResult)
+
+	dwebIpldURI := "dweb:/ipfs/" + cidIpld
+	dwebIpldResult, err := proc.Expand(dwebIpldURI, options)
+	if err != nil {
+		t.Error(err)
+	}
+	checkExpanded(dwebIpldResult)
 }
 
 func TestIngest(t *testing.T) {
-	u := "ipfs://QmZUjboQkj5xyrrv1ty8zb8QvXDzAh6yE3D9KUXZpKh3S9"
+	var data interface{}
+	json.Unmarshal([]byte(`{
+		"@context": { "@vocab": "http://schema.org/" },
+		"@type": "DigitalDocument",
+		"@graph": {
+			"name": "Joel",
+			"age": 22,
+			"friend": {
+				"@id": "http://example.org/gabriel",
+				"name": {
+					"@value": "Gabriel",
+					"@language": "es"
+				}
+			}
+		}
+	}`), &data)
 
-	// Create shell
-	sh := ipfs.NewShell("localhost:5001")
+	if !sh.IsUp() {
+		t.Error("IPFS Daemon not running")
+	}
+
+	// Remove old db
+	if err := os.RemoveAll(path); err != nil {
+		t.Error(err)
+	}
 
 	// Create DB
 	opts := badger.DefaultOptions
-	opts.Dir = "/tmp/badger"
-	opts.ValueDir = "/tmp/badger"
+	opts.Dir = path
+	opts.ValueDir = path
+
 	db, err := badger.Open(opts)
 	if err != nil {
-		log.Fatal(err)
+		t.Error(err)
 	}
 	defer db.Close()
 
-	ingest(u, db, sh)
-	// var i int
-	// for i < 600 {
-	// 	fmt.Println("doing the thing")
-	// 	i++
-	// 	ingest(data, db, sh)
-	// }
+	err = ingest(data, db, sh)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = db.View(func(txn *badger.Txn) error {
+		iter := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer iter.Close()
+		var key, val []byte
+		for iter.Seek(nil); iter.Valid(); iter.Next() {
+			item := iter.Item()
+			key = item.KeyCopy(key)
+			val, err = item.ValueCopy(val)
+			if err != nil {
+				return err
+			}
+			permutation := key[0]
+			if _, has := valuePrefixMap[permutation]; has {
+				// Value key
+				fmt.Println("Value entry")
+				fmt.Print("  ")
+				fmt.Print(string(key[:len(key)-8]))
+				fmt.Print("\t")
+				fmt.Print(key[len(key)-8:])
+				fmt.Print("\n")
+				fmt.Print("  ")
+				fmt.Print(string(val))
+				fmt.Print("\n")
+			} else if _, has := minorPrefixMap[permutation]; has {
+				// Minor key
+				fmt.Println("Minor entry")
+				fmt.Print("  ")
+				fmt.Print(string(key))
+				fmt.Print("\n")
+				fmt.Print("  ")
+				fmt.Print(val)
+				fmt.Print("\n")
+			} else if _, has := majorPrefixMap[permutation]; has {
+				// Major key
+				fmt.Println("Minor entry")
+				fmt.Print("  ")
+				fmt.Print(string(key))
+				fmt.Print("\n")
+				fmt.Print("  ")
+				fmt.Print(val)
+				fmt.Print("\n")
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Error(err)
+	}
 }
 
 func TestInsert(t *testing.T) {
-	// data
-	cid := "QmbmnUHecmF5MEBETY5J2n2BEXxYssAa4pceKKg59ai9tZ"
-	data := map[string]interface{}{
-		"@context": map[string]interface{}{
-			"@vocab": "http://schema.org/",
-		},
-		"@graph": map[string]interface{}{
-			"name": "Joel Gustafson",
-			"age":  "22",
-			"@graph": map[string]interface{}{
-				"friend": "other person",
-			},
-		},
-	}
+	var data interface{}
+	json.Unmarshal([]byte(`{
+		"@context": { "@vocab": "http://schema.org/" },
+		"@type": "DigitalDocument",
+		"@graph": {
+			"name": "Joel",
+			"age": 22,
+			"friend": {
+				"@id": "http://example.org/gabriel",
+				"name": {
+					"@value": "Gabriel",
+					"@language": "es"
+				}
+			}
+		}
+	}`), &data)
+
 	proc := ld.NewJsonLdProcessor()
 	options := ld.NewJsonLdOptions("")
 	rdf, err := proc.Normalize(data, options)
 	if err != nil {
-		log.Fatalln(err)
+		t.Error(err)
 	}
 
 	dataset := rdf.(*ld.RDFDataset)
+	fmt.Println(dataset)
 
-	// Create DB
+	// Remove old db
+	if err = os.RemoveAll(path); err != nil {
+		t.Error(err)
+	}
+
+	// // Create DB
 	opts := badger.DefaultOptions
-	opts.Dir = "/tmp/badger"
-	opts.ValueDir = "/tmp/badger"
+	opts.Dir = path
+	opts.ValueDir = path
 	db, err := badger.Open(opts)
 	if err != nil {
-		log.Fatal(err)
+		t.Error(err)
 	}
 	defer db.Close()
 
-	db.Update(func(txn *badger.Txn) error {
-		var i int
-		var err error
-		for i < 600 {
-			i++
-			err = insert(cid, dataset, txn)
-		}
-		return err
-	})
+	// db.Update(func(txn *badger.Txn) error {
+	// 	var i int
+	// 	var err error
+	// 	for i < 600 {
+	// 		i++
+	// 		err = insert(cid, dataset, txn)
+	// 	}
+	// 	return err
+	// })
 }
 
 func TestKey(t *testing.T) {
@@ -150,13 +247,16 @@ func TestKey(t *testing.T) {
 	k := "a\tQmbmnUHecmF5MEBETY5J2n2BEXxYssAa4pceKKg59ai9tZ:c14n0\t<http://schema.org/age>"
 	key := []byte(k)
 
+	// Do not remove old db
+
 	// Create DB
 	opts := badger.DefaultOptions
 	opts.Dir = "/tmp/badger"
 	opts.ValueDir = "/tmp/badger"
 	db, err := badger.Open(opts)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err.Error())
+		return
 	}
 	defer db.Close()
 
@@ -181,13 +281,16 @@ func TestKeyIteration(t *testing.T) {
 	// Create key
 	k := "a\tQmbmnUHecmF5MEBETY5J2n2BEXxYssAa4pceKKg59ai9tZ:c14n0\t<http://schema.org/age>"
 	key := []byte(k)
+
+	// Do not remove old db
+
 	// Create DB
 	opts := badger.DefaultOptions
 	opts.Dir = "/tmp/badger"
 	opts.ValueDir = "/tmp/badger"
 	db, err := badger.Open(opts)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 	defer db.Close()
 
@@ -291,25 +394,24 @@ func TestConstrain(t *testing.T) {
 }
 
 func TestSolve(t *testing.T) {
-	sh := ipfs.NewShell("localhost:5001")
+	if err := os.RemoveAll(path); err != nil {
+		log.Fatalln(err)
+	}
 
 	// Create DB
 	opts := badger.DefaultOptions
-	opts.Dir = "/tmp/badger"
-	opts.ValueDir = "/tmp/badger"
+	opts.Dir = path
+	opts.ValueDir = path
 	db, err := badger.Open(opts)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 	defer db.Close()
 
-	fmt.Println("about to do the thing")
-
 	var data map[string]interface{}
 	err = json.Unmarshal([]byte(`{
-		"@context": {
-			"@vocab": "http://schema.org/"
-		},
+		"@context": {	"@vocab": "http://schema.org/" },
+		"@id": "_:joel",
 		"@type": "Person",
 		"name": "Joel",
 		"age": 22,
@@ -321,36 +423,31 @@ func TestSolve(t *testing.T) {
 	}`), &data)
 
 	if err != nil {
-		fmt.Println("error", err.Error())
-		return
+		t.Error(err)
 	}
-	ingest(data, db, sh)
 
-	fmt.Println("we did the freaking thing")
+	ingest(data, db, sh)
 
 	// Okay now the data has been ingested
 	// We want to construct a query
 	var q map[string]interface{}
 	err = json.Unmarshal([]byte(`{
 		"@context": { "@vocab": "http://schema.org/" },
-		"friend": {
-			"@type": "Person",
-			"name": "Colin"
-		},
+		"@type": "Person",
+		"name": "Joel",
 		"age": {}
 	}`), &q)
 
 	if err != nil {
-		fmt.Println("error", err.Error())
-		return
+		t.Error(err)
 	}
+
 	err = query(q, sh, db, func(as AssignmentStack) error {
-		fmt.Println("wow")
-		printAssignmentStack(as)
+		// printAssignmentStack(as)
 		return nil
 	})
+
 	if err != nil {
-		fmt.Println("there was an error:", err.Error())
-		// log.Fatalln(err)
+		t.Error(err)
 	}
 }

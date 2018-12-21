@@ -2,6 +2,7 @@ package styx
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"log"
 	"sort"
@@ -10,55 +11,64 @@ import (
 	"github.com/piprate/json-gold/ld"
 )
 
-func indexElement(permutation uint8, quad *ld.Quad) []byte {
+func marshallNode(node ld.Node) []byte {
 	var element string
-	if permutation == 0 {
-		if iri, isIRI := quad.Subject.(*ld.IRI); isIRI {
-			element = marshallIRI(iri)
-		} else {
-			log.Fatalln("Expected index subject to be IRI", quad.Subject)
-		}
-	} else if permutation == 1 {
-		if iri, isIRI := quad.Predicate.(*ld.IRI); isIRI {
-			element = marshallIRI(iri)
-		} else {
-			log.Fatalln("Expected index predicate to be IRI", quad.Predicate)
-		}
-	} else if permutation == 2 {
-		if iri, isIRI := quad.Object.(*ld.IRI); isIRI {
-			element = marshallIRI(iri)
-		} else if literal, isLiteral := quad.Object.(*ld.Literal); isLiteral {
-			element = marshallLiteral(literal)
-		} else {
-			log.Fatalln("Expected index object to be IRI or literal", quad.Subject)
-		}
+	if iri, isIRI := node.(*ld.IRI); isIRI {
+		element = marshallIRI(iri)
+	} else if literal, isLiteral := node.(*ld.Literal); isLiteral {
+		element = marshallLiteral(literal)
 	} else {
 		return nil
 	}
 	return []byte(element)
 }
 
+// func indexElement(permutation uint8, quad *ld.Quad) []byte {
+// 	var element string
+// 	if permutation == 0 {
+// 		if iri, isIRI := quad.Subject.(*ld.IRI); isIRI {
+// 			element = marshallIRI(iri)
+// 		} else {
+// 			log.Fatalln("Expected index subject to be IRI", quad.Subject)
+// 		}
+// 	} else if permutation == 1 {
+// 		if iri, isIRI := quad.Predicate.(*ld.IRI); isIRI {
+// 			element = marshallIRI(iri)
+// 		} else {
+// 			log.Fatalln("Expected index predicate to be IRI", quad.Predicate)
+// 		}
+// 	} else if permutation == 2 {
+// 		if iri, isIRI := quad.Object.(*ld.IRI); isIRI {
+// 			element = marshallIRI(iri)
+// 		} else if literal, isLiteral := quad.Object.(*ld.Literal); isLiteral {
+// 			element = marshallLiteral(literal)
+// 		} else {
+// 			log.Fatalln("Expected index object to be IRI or literal", quad.Subject)
+// 		}
+// 	} else {
+// 		return nil
+// 	}
+// 	return []byte(element)
+// }
+
 func assembleReferenceKey(ref Reference, dataset *ld.RDFDataset, as AssignmentStack) ([]byte, []byte) {
 	var m, n []byte
-	quad := dataset.Graphs[ref.Graph][ref.Index]
-	if ref.M == "" {
-		// p's slot is an IRI or constant value
-		permutation := (ref.Permutation + 1) % 3
-		m = indexElement(permutation, quad)
-	} else if i, has := as.deps[ref.M]; has {
-		m = as.maps[i][ref.M].Value
+	if M, isBlank := ref.M.(*ld.BlankNode); isBlank {
+		id := M.Attribute
+		index := as.deps[id]
+		m = as.maps[index][id].Value
 	} else {
-		log.Fatalln("Could not find ref.M in assignment stack", ref.M)
+		m = marshallNode(ref.M)
 	}
 
-	if ref.N == "" {
-		permutation := (ref.Permutation + 2) % 3
-		n = indexElement(permutation, quad)
-	} else if i, has := as.deps[ref.N]; has {
-		n = as.maps[i][ref.N].Value
+	if N, isBlank := ref.N.(*ld.BlankNode); isBlank {
+		id := N.Attribute
+		index := as.deps[id]
+		n = as.maps[index][id].Value
 	} else {
-		log.Fatalln("Could not find ref.N in assignment stack", ref.N)
+		n = marshallNode(ref.N)
 	}
+
 	return m, n
 }
 
@@ -145,14 +155,12 @@ func countReferences(am AssignmentMap, as AssignmentStack, dataset *ld.RDFDatase
 }
 
 func solveAssignmentMap(am AssignmentMap, as AssignmentStack, dataset *ld.RDFDataset, txn *badger.Txn) (bool, error) {
-	fmt.Println("solving assignment map")
 	// The first thing we do is populate the assignment map with counter stats
 	err := countReferences(am, as, dataset, txn)
+	fmt.Println("counted references", err)
 	if err != nil {
 		return false, err
 	}
-
-	fmt.Println("We counted references!")
 
 	// Good job. The assignment map is now populated.
 
@@ -175,22 +183,24 @@ func solveAssignmentMap(am AssignmentMap, as AssignmentStack, dataset *ld.RDFDat
 
 	var j int
 	for j < len(am) {
-		fmt.Println("the current assignment index is", j)
+		fmt.Println("iterating with j", j)
 		id, assignment := sortedAssignments.Ids[j], sortedAssignments.Assignments[j]
 		value, err := solveAssignment(id, assignment, as, dataset, txn)
+		fmt.Println("solving assignment", value, err)
 		if err != nil {
 			return false, err
 		} else if value != nil {
 			// Do not have to backtrack :-)
-			fmt.Println("success! continuing on to the next assignment", j)
+			fmt.Println("do not have to backtrack! :-)")
 			j++
-			fmt.Println(j)
 		} else if j == 0 {
-			fmt.Println("failure! assignment unfulfillable")
+			fmt.Println("failed to resolve")
+			b, _ := json.MarshalIndent(assignment, "", "  ")
+			fmt.Println(string(b))
 			return false, nil
 		} else {
 			// Have to backtrack :-(
-			fmt.Println("setback! backtracking to previous assignment")
+			fmt.Println("have to backtrack! :-(")
 			j--
 		}
 	}
@@ -198,7 +208,6 @@ func solveAssignmentMap(am AssignmentMap, as AssignmentStack, dataset *ld.RDFDat
 }
 
 func solveAssignment(id string, assignment *Assignment, as AssignmentStack, dataset *ld.RDFDataset, txn *badger.Txn) ([]byte, error) {
-	fmt.Println("I am solving an assignment.")
 	if assignment.References == nil || len(assignment.References) == 0 {
 		log.Fatalln("Why is assignment.References empty?")
 	}
@@ -219,7 +228,7 @@ func solveAssignment(id string, assignment *Assignment, as AssignmentStack, data
 	assignment.Iterator = iterator
 	assignment.Sources = sources
 
-	fmt.Println("returning with a value", string(value))
+	fmt.Println("got value", value, string(value))
 
 	return value, nil
 }
