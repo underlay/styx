@@ -1,10 +1,9 @@
 package styx
 
 import (
-	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
 	"sort"
 
 	"github.com/dgraph-io/badger"
@@ -23,35 +22,7 @@ func marshallNode(node ld.Node) []byte {
 	return []byte(element)
 }
 
-// func indexElement(permutation uint8, quad *ld.Quad) []byte {
-// 	var element string
-// 	if permutation == 0 {
-// 		if iri, isIRI := quad.Subject.(*ld.IRI); isIRI {
-// 			element = marshallIRI(iri)
-// 		} else {
-// 			log.Fatalln("Expected index subject to be IRI", quad.Subject)
-// 		}
-// 	} else if permutation == 1 {
-// 		if iri, isIRI := quad.Predicate.(*ld.IRI); isIRI {
-// 			element = marshallIRI(iri)
-// 		} else {
-// 			log.Fatalln("Expected index predicate to be IRI", quad.Predicate)
-// 		}
-// 	} else if permutation == 2 {
-// 		if iri, isIRI := quad.Object.(*ld.IRI); isIRI {
-// 			element = marshallIRI(iri)
-// 		} else if literal, isLiteral := quad.Object.(*ld.Literal); isLiteral {
-// 			element = marshallLiteral(literal)
-// 		} else {
-// 			log.Fatalln("Expected index object to be IRI or literal", quad.Subject)
-// 		}
-// 	} else {
-// 		return nil
-// 	}
-// 	return []byte(element)
-// }
-
-func assembleReferenceKey(ref Reference, dataset *ld.RDFDataset, as AssignmentStack) ([]byte, []byte) {
+func assembleReferenceKey(ref *Reference, dataset *ld.RDFDataset, as AssignmentStack) ([]byte, []byte) {
 	var m, n []byte
 	if M, isBlank := ref.M.(*ld.BlankNode); isBlank {
 		id := M.Attribute
@@ -72,31 +43,11 @@ func assembleReferenceKey(ref Reference, dataset *ld.RDFDataset, as AssignmentSt
 	return m, n
 }
 
-func getValueKeyPrefix(ref Reference, dataset *ld.RDFDataset, as AssignmentStack) []byte {
+func getValueKeyPrefix(ref *Reference, dataset *ld.RDFDataset, as AssignmentStack) []byte {
 	m, n := assembleReferenceKey(ref, dataset, as)
 	prefix := ValuePrefixes[ref.Permutation]
 	return assembleKey(prefix, m, n, nil)
 }
-
-func getMajorKey(ref Reference, dataset *ld.RDFDataset, as AssignmentStack) []byte {
-	m, n := assembleReferenceKey(ref, dataset, as)
-	prefix := MajorPrefixes[ref.Permutation]
-	return assembleKey(prefix, m, n, nil)
-}
-
-func getMinorKey(ref Reference, dataset *ld.RDFDataset, as AssignmentStack) []byte {
-	m, n := assembleReferenceKey(ref, dataset, as)
-	prefix := MinorPrefixes[ref.Permutation]
-	// sketchy af
-	return assembleKey(prefix, n, m, nil)
-}
-
-// SortedReferences implements sort.Interface by Reference.Count
-type SortedReferences []Reference
-
-func (sr SortedReferences) Len() int           { return len(sr) }
-func (sr SortedReferences) Less(i, j int) bool { return sr[i].Count < sr[j].Count }
-func (sr SortedReferences) Swap(i, j int)      { sr[i], sr[j] = sr[j], sr[i] }
 
 // SortedAssignments implements sort.Interface by Assignment.Count
 type SortedAssignments struct {
@@ -113,61 +64,12 @@ func (sa SortedAssignments) Swap(i, j int) {
 	sa.Ids[i], sa.Ids[j] = sa.Ids[j], sa.Ids[i]
 }
 
-func countReferences(am AssignmentMap, as AssignmentStack, dataset *ld.RDFDataset, txn *badger.Txn) error {
-	counter := make([]byte, 8)
-	var major bool
-	for _, assignment := range am {
-		var sum uint64
-		for _, reference := range assignment.References {
-			// This is really over the top, but just for a sense of balance:
-			// alternate between getting the count from the major and minor indices.
-			var indexKey []byte
-			if major {
-				indexKey = getMajorKey(reference, dataset, as)
-			} else {
-				indexKey = getMinorKey(reference, dataset, as)
-			}
-			major = !major
-
-			indexItem, err := txn.Get(indexKey)
-			if err != nil {
-				return err
-			}
-
-			counter, err = indexItem.ValueCopy(counter)
-			if err != nil {
-				return err
-			}
-
-			reference.Count = binary.BigEndian.Uint64(counter)
-			sum += reference.Count
-		}
-
-		// Now that we've populated Reference.Count, it's time to sort the
-		// references in the assignment map
-		sort.Sort(SortedReferences(assignment.References))
-
-		// Cool! Now we just populate assignment.Count with the sum
-		// that we were keeping track of the whole time and we're done!
-		assignment.Count = sum
-	}
-	return nil
-}
-
 func solveAssignmentMap(am AssignmentMap, as AssignmentStack, dataset *ld.RDFDataset, txn *badger.Txn) (bool, error) {
-	// The first thing we do is populate the assignment map with counter stats
-	err := countReferences(am, as, dataset, txn)
-	fmt.Println("counted references", err)
-	if err != nil {
-		return false, err
-	}
-
-	// Good job. The assignment map is now populated.
-
+	length := len(am)
 	// Create the sortedAssignment struct that we'll sort in a second
 	sortedAssignments := SortedAssignments{
-		Assignments: make([]*Assignment, len(am)),
-		Ids:         make([]string, len(am)),
+		Assignments: make([]*Assignment, length),
+		Ids:         make([]string, length),
 	}
 
 	// Populate it in whatever order range decides to give us
@@ -182,11 +84,12 @@ func solveAssignmentMap(am AssignmentMap, as AssignmentStack, dataset *ld.RDFDat
 	sort.Sort(sortedAssignments)
 
 	var j int
-	for j < len(am) {
+	set := map[string]*Assignment{}
+	for j < length {
 		fmt.Println("iterating with j", j)
 		id, assignment := sortedAssignments.Ids[j], sortedAssignments.Assignments[j]
-		value, err := solveAssignment(id, assignment, as, dataset, txn)
-		fmt.Println("solving assignment", value, err)
+		set[id] = assignment
+		value, err := solveAssignment(set, id, as, dataset, txn)
 		if err != nil {
 			return false, err
 		} else if value != nil {
@@ -195,40 +98,107 @@ func solveAssignmentMap(am AssignmentMap, as AssignmentStack, dataset *ld.RDFDat
 			j++
 		} else if j == 0 {
 			fmt.Println("failed to resolve")
-			b, _ := json.MarshalIndent(assignment, "", "  ")
+			b, _ := json.MarshalIndent(sortedAssignments.Assignments[j], "", "  ")
 			fmt.Println(string(b))
 			return false, nil
 		} else {
 			// Have to backtrack :-(
 			fmt.Println("have to backtrack! :-(")
+			delete(set, id)
 			j--
 		}
 	}
 	return true, nil
 }
 
-func solveAssignment(id string, assignment *Assignment, as AssignmentStack, dataset *ld.RDFDataset, txn *badger.Txn) ([]byte, error) {
+func checkBlankConstraint(node ld.Node, index int, set map[string]*Assignment, as AssignmentStack) (bool, *ld.BlankNode, error) {
+	if blank, isBlank := node.(*ld.BlankNode); isBlank {
+		if i, has := as.deps[blank.Attribute]; has {
+			_, solved := set[blank.Attribute]
+			return (i < index) || solved, blank, nil
+		}
+		return false, nil, errors.New("could not find blank node in dep map")
+	}
+	return true, nil, nil
+}
+
+func solveAssignment(set map[string]*Assignment, id string, as AssignmentStack, dataset *ld.RDFDataset, txn *badger.Txn) ([]byte, error) {
+	assignment, hasAssignment := set[id]
+	index, hasIndex := as.deps[id]
 	if assignment.References == nil || len(assignment.References) == 0 {
-		log.Fatalln("Why is assignment.References empty?")
+		return nil, errors.New("assignment.References is empty")
+	} else if !hasAssignment || !hasIndex {
+		return nil, errors.New("assignment or index not found in map")
 	}
 
-	joins := make([][]byte, len(assignment.References)-1)
-	pivot := getValueKeyPrefix(assignment.References[0], dataset, as)
-	for i := 1; i < len(assignment.References); i++ {
-		reference := assignment.References[i]
-		joins[i-1] = getValueKeyPrefix(reference, dataset, as)
+	reference := assignment.References[0]
+	pivot := getValueKeyPrefix(reference, dataset, as)
+
+	references := assignment.References[1:]
+	constraints := []*Reference{}
+
+	if assignment.Constraints != nil && len(assignment.Constraints) > 0 {
+		counter := make([]byte, 8)
+		for _, constraint := range assignment.Constraints {
+			if m, M, err := checkBlankConstraint(constraint.M, index, set, as); err != nil {
+				return nil, err
+			} else if m {
+				if n, N, err := checkBlankConstraint(constraint.N, index, set, as); err != nil {
+					return nil, err
+				} else if n {
+					if (M != nil && M.Attribute == id) || (N != nil && N.Attribute == id) {
+						constraints = append(constraints, constraint)
+					} else {
+						count, err := countReference(constraint, true, counter, txn, dataset, as)
+						if err == badger.ErrKeyNotFound {
+							return nil, nil
+						} else if err != nil {
+							return nil, err
+						}
+						constraint.Count = count
+						references = append(references, constraint)
+					}
+				}
+			}
+		}
 	}
 
-	value, iterator, sources, err := join(pivot, assignment.Iterator, int(assignment.References[0].Count), joins, txn)
-	if err != nil {
-		return nil, err
+	sort.Sort(SortedReferences(references))
+
+	joins := make([][]byte, len(references))
+	for i, ref := range references {
+		joins[i] = getValueKeyPrefix(ref, dataset, as)
+	}
+
+	var value, iterator []byte
+	var sources [][]byte
+	var err error
+	for {
+		value, iterator, sources, err = join(pivot, assignment.Iterator, int(reference.Count), joins, txn)
+		if err != nil {
+			return nil, err
+		}
+		assignment.Value = value
+		assignment.Iterator = iterator
+		assignment.Sources = sources
+		constraintSources, err := checkConstraints(constraints, as, dataset, txn)
+		if err != nil {
+			return nil, err
+		} else if constraintSources != nil {
+
+		}
 	}
 
 	assignment.Value = value
 	assignment.Iterator = iterator
 	assignment.Sources = sources
 
-	fmt.Println("got value", value, string(value))
-
 	return value, nil
+}
+
+func checkConstraints(constraints []*Reference, as AssignmentStack, dataset *ld.RDFDataset, txn *badger.Txn) ([]byte, error) {
+	// for _, constraint := range constraints {
+
+	// }
+	return nil, nil
 }

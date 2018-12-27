@@ -31,7 +31,7 @@ But if the key is a value key, it continues with another tab, and then the count
 ----------------
 
 An "index key" is a key for a major or minor index scheme.
-Index keys start with {i j k x y z} and their values are big-endian uint64s.
+Index keys start with {i j k} or {x y z} and their values are big-endian uint64s.
 These uint64s are "counters" whose value is the total number of quad entries
 for that particular <m... n...> pair.
 
@@ -41,7 +41,7 @@ When we insert a quad, we increment all six counters for index keys
 A "value key" is a key for a value index scheme.
 Crucially, even though there are six index counters to increment, they occur in three
 pairs of identical values (the <s p> entries are identical to the <p s> entries, etc),
-so we only have three value keys to write (arbitrarily choosing the three "clockwise"
+so we only have three value keys to write (arbitrarily choosing the three clockwise ("major")
 rotations <s p>, <p o>, and <o s>). Value keys start with {a b c}, end with a big-endian
 uint64 (since Badger iterates in lexicographic order), and their values look like
 ---- values ----

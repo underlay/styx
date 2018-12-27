@@ -1,6 +1,9 @@
 package styx
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/piprate/json-gold/ld"
 )
 
@@ -52,8 +55,8 @@ in the query to be resolved with the same value
 
 // An Assignment is a setting of a value to a variable
 type Assignment struct {
-	Constraints  []Reference    // constraints on layer siblings
-	References   []Reference    // slice of references that force this assignment's value
+	Constraints  []*Reference   // constraints on layer siblings
+	References   []*Reference   // slice of references that force this assignment's value
 	Value        []byte         // initialized to nil; filled in during actual search
 	Iterator     []byte         // pointer for backtracking. also initialized nil
 	Sources      [][]byte       // CID+graph+index (hopefully multiple for one value)
@@ -80,23 +83,27 @@ type Reference struct {
 	Count       uint64
 }
 
+func (ref *Reference) String() string {
+	return fmt.Sprintf("%s/%d:%d {%s %s} * %d", ref.Graph, ref.Index, ref.Permutation, ref.M.GetValue(), ref.N.GetValue(), ref.Count)
+}
+
 // Codex is a map of refs
 type Codex struct {
-	Constant []Reference
-	Single   map[string][]Reference
-	Double   map[string]map[string][]Reference
-	Triple   map[string]map[string]map[string][]Reference
+	Constant []*Reference
+	Single   map[string][]*Reference
+	Double   map[string]map[string][]*Reference
+	Triple   map[string]map[string]map[string][]*Reference
 }
 
 func insertDouble(a string, b string, ref Reference, codex Codex) {
 	if mapA, hasA := codex.Double[a]; hasA {
 		if refsAB, hasAB := mapA[b]; hasAB {
-			mapA[b] = append(refsAB, ref)
+			mapA[b] = append(refsAB, &ref)
 		} else {
-			mapA[b] = []Reference{ref}
+			mapA[b] = []*Reference{&ref}
 		}
 	} else {
-		codex.Double[a] = map[string][]Reference{b: []Reference{ref}}
+		codex.Double[a] = map[string][]*Reference{b: []*Reference{&ref}}
 	}
 }
 
@@ -104,24 +111,24 @@ func insertTriple(a string, b string, c string, ref Reference, codex Codex) {
 	if mapA, hasA := codex.Triple[a]; hasA {
 		if mapAB, hasAB := mapA[b]; hasAB {
 			if refsABC, hasABC := mapAB[c]; hasABC {
-				mapAB[c] = append(refsABC, ref)
+				mapAB[c] = append(refsABC, &ref)
 			} else {
-				mapAB[c] = []Reference{ref}
+				mapAB[c] = []*Reference{&ref}
 			}
 		} else {
-			mapA[b] = map[string][]Reference{c: []Reference{ref}}
+			mapA[b] = map[string][]*Reference{c: []*Reference{&ref}}
 		}
 	} else {
-		codex.Triple[a] = map[string]map[string][]Reference{b: map[string][]Reference{c: []Reference{ref}}}
+		codex.Triple[a] = map[string]map[string][]*Reference{b: map[string][]*Reference{c: []*Reference{&ref}}}
 	}
 }
 
 func getCodex(dataset *ld.RDFDataset) Codex {
 	codex := Codex{
-		Constant: []Reference{},
-		Single:   map[string][]Reference{},
-		Double:   map[string]map[string][]Reference{},
-		Triple:   map[string]map[string]map[string][]Reference{},
+		Constant: []*Reference{},
+		Single:   map[string][]*Reference{},
+		Double:   map[string]map[string][]*Reference{},
+		Triple:   map[string]map[string]map[string][]*Reference{},
 	}
 
 	for graph, quads := range dataset.Graphs {
@@ -141,7 +148,7 @@ func getCodex(dataset *ld.RDFDataset) Codex {
 			}
 			if !A && !B && !C {
 				ref := Reference{graph, index, ConstantPermutation, nil, nil, 0}
-				codex.Constant = append(codex.Constant, ref)
+				codex.Constant = append(codex.Constant, &ref)
 			} else if (A && !B && !C) || (!A && B && !C) || (!A && !B && C) {
 				ref := Reference{graph, index, 0, nil, nil, 0}
 				if A {
@@ -159,9 +166,9 @@ func getCodex(dataset *ld.RDFDataset) Codex {
 				pivot := a + b + c
 				refs, has := codex.Single[pivot]
 				if has {
-					codex.Single[pivot] = append(refs, ref)
+					codex.Single[pivot] = append(refs, &ref)
 				} else {
-					codex.Single[pivot] = []Reference{ref}
+					codex.Single[pivot] = []*Reference{&ref}
 				}
 			} else if A && B && !C {
 				refA := Reference{graph, index, 0, blankB, quad.Object, 0}
@@ -216,7 +223,7 @@ func haveDinner(as AssignmentStack, codex Codex) (AssignmentStack, Codex) {
 	}
 
 	// There are no more singles left
-	codex.Single = map[string][]Reference{}
+	codex.Single = map[string][]*Reference{}
 
 	// for a := range as.deps { // <-- I think this was a typo but will leave for posterity
 	for a := range am {
@@ -345,6 +352,7 @@ func haveDinner(as AssignmentStack, codex Codex) (AssignmentStack, Codex) {
 
 func getAssignmentStack(dataset *ld.RDFDataset) AssignmentStack {
 	codex := getCodex(dataset)
+	printCodex(codex)
 	as := AssignmentStack{maps: []AssignmentMap{}, deps: map[string]int{}}
 	for {
 		as, codex = haveDinner(as, codex)
@@ -352,5 +360,16 @@ func getAssignmentStack(dataset *ld.RDFDataset) AssignmentStack {
 			break
 		}
 	}
+	printAssignmentStack(as)
 	return as
+}
+
+func printCodex(codex Codex) {
+	fmt.Println("--- codex ---")
+	s, _ := json.MarshalIndent(codex.Single, "", "  ")
+	d, _ := json.MarshalIndent(codex.Double, "", "  ")
+	t, _ := json.MarshalIndent(codex.Triple, "", "  ")
+	fmt.Println(string(s))
+	fmt.Println(string(d))
+	fmt.Println(string(t))
 }
