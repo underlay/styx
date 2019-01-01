@@ -6,7 +6,7 @@ import (
 
 	cid "github.com/ipfs/go-cid"
 	ipfs "github.com/ipfs/go-ipfs-api"
-	"github.com/piprate/json-gold/ld"
+	ld "github.com/piprate/json-gold/ld"
 )
 
 // DefaultShellAddress is the default shell address
@@ -71,10 +71,9 @@ func (dl *IPFSDocumentLoader) LoadDocument(u string) (*ld.RemoteDocument, error)
 
 // NewIPFSDocumentLoader creates a new instance of IPFSDocumentLoader
 func NewIPFSDocumentLoader(shell *ipfs.Shell) *IPFSDocumentLoader {
-	rval := &IPFSDocumentLoader{shell: shell}
-
-	if rval.shell == nil {
-		rval.shell = ipfs.NewShell(DefaultShellAddress)
+	loader := &IPFSDocumentLoader{shell: shell}
+	if loader.shell == nil {
+		loader.shell = ipfs.NewShell(DefaultShellAddress)
 	}
-	return rval
+	return loader
 }

@@ -1,10 +1,13 @@
 package styx
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"sort"
 
-	"github.com/piprate/json-gold/ld"
+	"github.com/dgraph-io/badger"
+	ld "github.com/piprate/json-gold/ld"
 )
 
 /*
@@ -51,35 +54,22 @@ https://en.wikipedia.org/wiki/Subgraph_isomorphism_problem
 This isn't quite subgraph isomorphism since we want to allow two different variables
 in the query to be resolved with the same value
 ("surjective subgraph homomorphism" or "subgraph epimorphism" if you really took notes)
+
+So we're gonna have a slice of assigned Assignments
+and a map of unassigned ones
+
+two heuristics: one for backtracking and one for forward selection
+(possibly really bad??? maybe actually okay)
+{ o o o o o } * { o o o o o }
 */
-
-// An Assignment is a setting of a value to a variable
-type Assignment struct {
-	Constraints  []*Reference   // constraints on layer siblings
-	References   []*Reference   // slice of references that force this assignment's value
-	Value        []byte         // initialized to nil; filled in during actual search
-	Iterator     []byte         // pointer for backtracking. also initialized nil
-	Sources      [][]byte       // CID+graph+index (hopefully multiple for one value)
-	Dependencies map[string]int // Indices of previous assignments. Could merge with refs?
-	Count        uint64         // The sum of References.Count
-}
-
-// AssignmentMap is just a map of blank node ids to assignments
-type AssignmentMap map[string]*Assignment
-
-// An AssignmentStack is a slice of assignment maps
-type AssignmentStack struct {
-	deps map[string]int
-	maps []AssignmentMap
-}
 
 // Reference is a reference in a dataset
 type Reference struct {
 	Graph       string
 	Index       int
-	Permutation uint8   // this is {0, 1, 2}, or 7 for no place at all ()
-	M           ld.Node // These have to be strings in case they're blank node ids
-	N           ld.Node // it breaks the convention of m and n being []byte slices, but oh well
+	Permutation uint8
+	M           ld.Node
+	N           ld.Node
 	Count       uint64
 }
 
@@ -87,49 +77,332 @@ func (ref *Reference) String() string {
 	return fmt.Sprintf("%s/%d:%d {%s %s} * %d", ref.Graph, ref.Index, ref.Permutation, ref.M.GetValue(), ref.N.GetValue(), ref.Count)
 }
 
-// Codex is a map of refs
+type Constraint struct {
+	Single []*Reference
+	Double map[string][]*Reference
+	Triple []*Reference
+}
+
+func NewConstraint() *Constraint {
+	return &Constraint{
+		Single: []*Reference{},
+		Double: map[string][]*Reference{},
+		Triple: []*Reference{},
+	}
+}
+
+// Codex is a map of refs.
 type Codex struct {
-	Constant []*Reference
-	Single   map[string][]*Reference
-	Double   map[string]map[string][]*Reference
-	Triple   map[string]map[string]map[string][]*Reference
+	Constraint *Constraint
+	Single     []*Reference
+	Double     map[string][]*Reference
+	Triple     map[string]map[string][]*Reference
 }
 
-func insertDouble(a string, b string, ref Reference, codex Codex) {
-	if mapA, hasA := codex.Double[a]; hasA {
-		if refsAB, hasAB := mapA[b]; hasAB {
-			mapA[b] = append(refsAB, &ref)
-		} else {
-			mapA[b] = []*Reference{&ref}
-		}
-	} else {
-		codex.Double[a] = map[string][]*Reference{b: []*Reference{&ref}}
+func (codex *Codex) String() string {
+	val := fmt.Sprintln("--- codex ---")
+	c, _ := json.MarshalIndent(codex.Constraint, "", "\t")
+	s, _ := json.MarshalIndent(codex.Single, "", "\t")
+	d, _ := json.MarshalIndent(codex.Double, "", "\t")
+	t, _ := json.MarshalIndent(codex.Triple, "", "\t")
+	val += fmt.Sprintf("%s\n%s\n%s\n%s\n", string(c), string(s), string(d), string(t))
+	return val
+}
+
+func NewCodex() *Codex {
+	return &Codex{
+		Constraint: NewConstraint(),
+		Single:     []*Reference{},
+		Double:     map[string][]*Reference{},
+		Triple:     map[string]map[string][]*Reference{},
 	}
 }
 
-func insertTriple(a string, b string, c string, ref Reference, codex Codex) {
-	if mapA, hasA := codex.Triple[a]; hasA {
-		if mapAB, hasAB := mapA[b]; hasAB {
-			if refsABC, hasABC := mapAB[c]; hasABC {
-				mapAB[c] = append(refsABC, &ref)
+type CodexMap map[string]*Codex
+
+func (codexMap CodexMap) GetCodex(id string) *Codex {
+	codex, has := codexMap[id]
+	if !has {
+		codex = NewCodex()
+		codexMap[id] = codex
+	}
+	return codex
+}
+
+// An Index into a Codex
+type Index struct {
+	start int
+	end   int
+	path  []string
+	refs  []*Reference
+}
+
+// A Dependency is an index into a Codex
+type Dependency struct {
+	Constraint map[string][]*Index
+	Single     map[string][]*Index            // these indices are either doubles or triples
+	Double     map[string]map[string][]*Index // these indices are guaranteed to be Triples
+}
+
+func NewDependeny() *Dependency {
+	return &Dependency{
+		Constraint: map[string][]*Index{},
+		Single:     map[string][]*Index{},
+		Double:     map[string]map[string][]*Index{},
+	}
+}
+
+// An Assignment is a setting of a value to a variable
+type Assignment struct {
+	Value      []byte
+	Iterator   []byte
+	Sources    []*Source
+	Codex      *Codex // a codex is a general-purpose catalog of references???
+	Dependency *Dependency
+}
+
+// func (assignment *Assignment) String() string {
+// 	val := fmt.Sprintln("--- assignment ---")
+// 	val += fmt.Sprintf("%v\n", assignment)
+// 	return val
+// }
+
+// A Future is a sortable map of Assignments
+type Future struct {
+	constants []*Reference
+	slice     []string
+	index     map[string]*Assignment
+}
+
+func (future *Future) Len() int {
+	return len(future.slice)
+}
+
+func (future *Future) Less(a int, b int) bool {
+	// probably do something with this:
+	// A := future.index[future.slice[a]]
+	// B := future.index[future.slice[b]]
+	return true
+}
+
+func (future *Future) Swap(a int, b int) {
+	future.slice[a], future.slice[b] = future.slice[b], future.slice[a]
+}
+
+// Pop the last-sorted assignment out of the map
+func (future *Future) Pop() (string, *Assignment) {
+	index := future.Len() - 1
+	id := future.slice[index]
+	future.slice = future.slice[:index]
+	assignment := future.index[id]
+	delete(future.index, id)
+	return id, assignment
+}
+
+// Push is not like normal pushing at all
+func (future *Future) Push(next string) {
+	for _, assignment := range future.index {
+		// Constraints first. Only one option.
+		constraint := assignment.Codex.Constraint
+		if refs, has := constraint.Double[next]; has {
+			delete(constraint.Double, next)
+			start := len(constraint.Single)
+			end := start + len(refs)
+			constraint.Single = append(constraint.Single, refs...)
+			index := &Index{start, end, nil, nil}
+			if single, has := assignment.Dependency.Constraint[next]; has {
+				assignment.Dependency.Constraint[next] = append(single, index)
 			} else {
-				mapAB[c] = []*Reference{&ref}
+				assignment.Dependency.Constraint[next] = []*Index{index}
 			}
-		} else {
-			mapA[b] = map[string][]*Reference{c: []*Reference{&ref}}
 		}
-	} else {
-		codex.Triple[a] = map[string]map[string][]*Reference{b: map[string][]*Reference{c: []*Reference{&ref}}}
+
+		// Now non-constraints
+		if triple, has := assignment.Codex.Triple[next]; has {
+			delete(assignment.Codex.Triple, next)
+			for id, refs := range triple {
+				mirrorRefs := assignment.Codex.Triple[id][next]
+				delete(assignment.Codex.Triple[id], next)
+				// Codex
+				if double, has := assignment.Codex.Double[id]; has {
+					assignment.Codex.Double[id] = append(double, mirrorRefs...)
+				} else {
+					assignment.Codex.Double[id] = mirrorRefs
+				}
+				// Dependency
+				if single, has := assignment.Dependency.Single[id]; has {
+					start := len(single)
+					end := start + len(mirrorRefs)
+					index := &Index{start, end, nil, refs}
+					assignment.Dependency.Single[id] = append(single, index)
+				} else {
+					index := &Index{0, len(mirrorRefs), nil, refs}
+					assignment.Dependency.Single[id] = []*Index{index}
+				}
+			}
+			start := len(assignment.Codex.Single)
+			end := start + len(refs)
+			assignment.Codex.Single = append(assignment.Codex.Single, refs...)
+			assignment.Dependency.Single[next] = [2]int{start, end}
+		}
 	}
 }
 
-func getCodex(dataset *ld.RDFDataset) Codex {
-	codex := Codex{
-		Constant: []*Reference{},
-		Single:   map[string][]*Reference{},
-		Double:   map[string]map[string][]*Reference{},
-		Triple:   map[string]map[string]map[string][]*Reference{},
+// Count populates the Count field of all the references in the codex
+func (future *Future) Count(past *Past, txn *badger.Txn) error {
+	var err error
+	count := make([]byte, 8)
+	for _, assignment := range future.index {
+		// Count constants
+		// for _, ref := range assignment.Codex.Constant {
+		// 	prefix := ValuePrefixes[ref.Permutation]
+		// 	...
+		// }
+		// Count singles
+		for _, ref := range assignment.Codex.Single {
+			permutation := (ref.Permutation + 1) % 3
+			prefix := MajorPrefixes[permutation] // we should really be alternating
+			m := marshalReferenceNode(ref.M, past)
+			if m == nil {
+				return fmt.Errorf("Could not resolve M: %v", ref.M)
+			}
+			n := marshalReferenceNode(ref.N, past)
+			if n == nil {
+				return fmt.Errorf("Could not resolve N: %v", ref.N)
+			}
+			key := assembleKey(prefix, m, n, nil)
+			count, err = populateReferenceCount(key, count, ref, txn)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Count doubles
+		for _, refMap := range assignment.Codex.Double {
+			for _, ref := range refMap {
+				m := marshalReferenceNode(ref.M, past)
+				n := marshalReferenceNode(ref.N, past)
+				if m == nil && n == nil {
+					return fmt.Errorf("Could not resolve either M or N: %v, %v", ref.M, ref.N)
+				}
+				var permutation uint8
+				var a []byte
+				if m != nil {
+					permutation = (ref.Permutation + 1) % 3
+					a = m
+				} else if n != nil {
+					permutation = (ref.Permutation + 2) % 3
+					a = n
+				}
+				prefix := IndexPrefixes[permutation]
+				key := assembleKey(prefix, a, nil, nil)
+				count, err = populateReferenceCount(count, key, ref, txn)
+				if err != nil {
+					return err
+				}
+			}
+		}
 	}
+	return err
+}
+
+// This is re-used between Major, Minor, and Index keys
+func populateReferenceCount(count []byte, key []byte, ref *Reference, txn *badger.Txn) ([]byte, error) {
+	item, err := txn.Get(key)
+	if err == badger.ErrKeyNotFound {
+		ref.Count = 0
+	} else if err != nil {
+		return nil, err
+	} else if count, err = item.ValueCopy(count); err != nil {
+		return nil, err
+	} else {
+		ref.Count = binary.BigEndian.Uint64(count)
+	}
+	return count, err
+}
+
+func marshalReferenceNode(node ld.Node, past *Past) []byte {
+	if blank, isBlank := node.(*ld.BlankNode); isBlank {
+		if assignment, has := past.index[blank.Attribute]; has {
+			return assignment.Value
+		}
+		return nil
+	}
+	return []byte(node.GetValue())
+}
+
+// A Past is... also a sortable map of Assignments
+type Past struct {
+	slice []string
+	index map[string]*Assignment
+}
+
+func (past *Past) Len() int {
+	return len(past.slice)
+}
+
+func (past *Past) Less(a int, b int) bool {
+	// probably do something with this:
+	// A := past.index[past.slice[a]]
+	// B := past.index[past.slice[b]]
+	return true
+}
+
+func (past *Past) Swap(a int, b int) {
+	past.slice[a], past.slice[b] = past.slice[b], past.slice[a]
+}
+
+// Pop here is different but hilarious
+func (past *Past) Pop(future *Future) {
+
+}
+
+func insertDouble(a string, b string, ref *Reference, codexMap CodexMap) {
+	codex := codexMap.GetCodex(a)
+	if refs, has := codex.Double[b]; has {
+		codex.Double[b] = append(refs, ref)
+	} else {
+		codex.Double[b] = []*Reference{ref}
+	}
+}
+
+func insertTriple(a string, b string, c string, ref *Reference, codexMap CodexMap) {
+	codex := codexMap.GetCodex(a)
+	if mapB, hasB := codex.Triple[b]; hasB {
+		if refs, has := mapB[c]; has {
+			mapB[c] = append(refs, ref)
+		} else {
+			mapB[c] = []*Reference{ref}
+		}
+	} else {
+		refs := []*Reference{ref}
+		codex.Triple[b] = map[string][]*Reference{c: refs}
+	}
+}
+
+func getInitialFuture(dataset *ld.RDFDataset) *Future {
+	constants, codexMap := getInitalCodex(dataset)
+	future := &Future{
+		constants: constants,
+		slice:     []string{},
+		index:     map[string]*Assignment{},
+	}
+	for id, codex := range codexMap {
+		future.slice = append(future.slice, id)
+		future.index[id] = &Assignment{
+			Value:      nil,
+			Iterator:   nil,
+			Sources:    []*Source{},
+			Codex:      codex,
+			Dependency: NewDependeny(),
+		}
+	}
+	return future
+}
+
+func getInitalCodex(dataset *ld.RDFDataset) ([]*Reference, CodexMap) {
+	constants := []*Reference{}
+	codexMap := CodexMap{}
 
 	for graph, quads := range dataset.Graphs {
 		for index, quad := range quads {
@@ -147,10 +420,10 @@ func getCodex(dataset *ld.RDFDataset) Codex {
 				c = blankC.Attribute
 			}
 			if !A && !B && !C {
-				ref := Reference{graph, index, ConstantPermutation, nil, nil, 0}
-				codex.Constant = append(codex.Constant, &ref)
+				ref := &Reference{graph, index, ConstantPermutation, nil, nil, 0}
+				constants = append(constants, ref)
 			} else if (A && !B && !C) || (!A && B && !C) || (!A && !B && C) {
-				ref := Reference{graph, index, 0, nil, nil, 0}
+				ref := &Reference{graph, index, 0, nil, nil, 0}
 				if A {
 					ref.M = quad.Predicate
 					ref.N = quad.Object
@@ -164,212 +437,104 @@ func getCodex(dataset *ld.RDFDataset) Codex {
 					ref.N = quad.Predicate
 				}
 				pivot := a + b + c
-				refs, has := codex.Single[pivot]
-				if has {
-					codex.Single[pivot] = append(refs, &ref)
-				} else {
-					codex.Single[pivot] = []*Reference{&ref}
-				}
+				codex := codexMap.GetCodex(pivot)
+				codex.Single = append(codex.Single, ref)
 			} else if A && B && !C {
-				refA := Reference{graph, index, 0, blankB, quad.Object, 0}
-				refB := Reference{graph, index, 1, quad.Object, blankA, 0}
-				insertDouble(a, b, refA, codex)
-				insertDouble(b, a, refB, codex)
+				if blankA.Attribute == blankB.Attribute {
+					ref := &Reference{graph, index, PermutationAB, nil, quad.Object, 0}
+					codex := codexMap.GetCodex(blankA.Attribute)
+					codex.Constraint.Single = append(codex.Constraint.Single, ref)
+				} else {
+					refA := &Reference{graph, index, PermutationA, blankB, quad.Object, 0}
+					refB := &Reference{graph, index, PermutationB, quad.Object, blankA, 0}
+					insertDouble(a, b, refA, codexMap)
+					insertDouble(b, a, refB, codexMap)
+				}
 			} else if A && !B && C {
-				refA := Reference{graph, index, 0, quad.Predicate, blankC, 0}
-				refC := Reference{graph, index, 2, blankA, quad.Predicate, 0}
-				insertDouble(a, c, refA, codex)
-				insertDouble(c, a, refC, codex)
+				if blankA.Attribute == blankC.Attribute {
+					ref := &Reference{graph, index, PermutationCA, nil, quad.Predicate, 0}
+					codex := codexMap.GetCodex(blankC.Attribute)
+					codex.Constraint.Single = append(codex.Constraint.Single, ref)
+				} else {
+					refA := &Reference{graph, index, PermutationA, quad.Predicate, blankC, 0}
+					refC := &Reference{graph, index, PermutationC, blankA, quad.Predicate, 0}
+					insertDouble(a, c, refA, codexMap)
+					insertDouble(c, a, refC, codexMap)
+				}
 			} else if !A && B && C {
-				refB := Reference{graph, index, 1, blankC, quad.Subject, 0}
-				refC := Reference{graph, index, 2, quad.Subject, blankB, 0}
-				insertDouble(b, c, refB, codex)
-				insertDouble(c, b, refC, codex)
+				if blankB.Attribute == blankC.Attribute {
+					ref := &Reference{graph, index, PermutationBC, nil, quad.Subject, 0}
+					codex := codexMap.GetCodex(blankB.Attribute)
+					codex.Constraint.Single = append(codex.Constraint.Single, ref)
+				} else {
+					refB := &Reference{graph, index, PermutationB, blankC, quad.Subject, 0}
+					refC := &Reference{graph, index, PermutationC, quad.Subject, blankB, 0}
+					insertDouble(b, c, refB, codexMap)
+					insertDouble(c, b, refC, codexMap)
+				}
 			} else if A && B && C {
-				refA := Reference{graph, index, 0, blankB, blankC, 0}
-				refB := Reference{graph, index, 1, blankC, blankA, 0}
-				refC := Reference{graph, index, 2, blankA, blankB, 0}
-				insertTriple(a, b, c, refA, codex)
-				insertTriple(a, c, b, refA, codex)
-				insertTriple(b, a, c, refB, codex)
-				insertTriple(b, c, a, refB, codex)
-				insertTriple(c, a, b, refC, codex)
-				insertTriple(c, b, a, refC, codex)
-			}
-		}
-	}
-	return codex
-}
-
-// Let's have dinner
-func haveDinner(as AssignmentStack, codex Codex) (AssignmentStack, Codex) {
-	am := AssignmentMap{}
-	index := len(as.maps)
-	as.maps = append(as.maps, am)
-
-	// Every single gets added to the new assignment map
-	for id, refs := range codex.Single {
-		deps := map[string]int{}
-		for _, ref := range refs {
-			if M, isBlank := ref.M.(ld.BlankNode); isBlank {
-				deps[M.Attribute] = as.deps[M.Attribute]
-			}
-			if N, isBlank := ref.N.(ld.BlankNode); isBlank {
-				deps[N.Attribute] = as.deps[N.Attribute]
-			}
-		}
-		am[id] = &Assignment{References: refs, Dependencies: deps}
-		as.deps[id] = index
-	}
-
-	// There are no more singles left
-	codex.Single = map[string][]*Reference{}
-
-	// for a := range as.deps { // <-- I think this was a typo but will leave for posterity
-	for a := range am {
-
-		// We're checking for entries of a:b:* NOT because we care about them (they get deleted),
-		// but because we know that they mirror entries of b:a:*.
-		if mapA, has := codex.Double[a]; has {
-			delete(codex.Double, a) // `a` was promoted, we delete its entries
-			for b := range mapA {
-				if refs, has := codex.Double[b][a]; has {
-					delete(codex.Double[b], a)
-					if assignment, has := am[b]; has {
-						if assignment.Constraints == nil {
-							assignment.Constraints = refs
-						} else {
-							assignment.Constraints = append(assignment.Constraints, refs...)
-						}
-						if am[a].Constraints == nil {
-							am[a].Constraints = mapA[b]
-						} else {
-							am[a].Constraints = append(am[a].Constraints, mapA[b]...)
-						}
-					} else if refsB, has := codex.Single[b]; has {
-						codex.Single[b] = append(refsB, refs...)
+				var ab, bc, ca bool = blankA.Attribute == blankB.Attribute, blankB.Attribute == blankC.Attribute, blankC.Attribute == blankA.Attribute
+				if ab && bc && ca {
+					ref := &Reference{graph, index, PermutationABC, nil, nil, 0}
+					codex := codexMap.GetCodex(blankA.Attribute)
+					codex.Constraint.Triple = append(codex.Constraint.Triple, ref)
+				} else if ab {
+					ref := &Reference{graph, index, PermutationAB, nil, blankC, 0}
+					codex := codexMap.GetCodex(blankA.Attribute)
+					if double, has := codex.Constraint.Double[blankC.Attribute]; has {
+						codex.Constraint.Double[blankC.Attribute] = append(double, ref)
 					} else {
-						codex.Single[b] = refs
+						codex.Constraint.Double[blankC.Attribute] = []*Reference{ref}
 					}
-				}
-			}
-		}
-
-		// Again, we're looking up a:b:c so that we can promote { b:a:c, b:c:a, c:a:b, c:b:a }
-		// a:b:c and a:c:b get deleted.
-		if mapA, has := codex.Triple[a]; has {
-			delete(codex.Triple, a)
-			for b, mapB := range mapA {
-				_, hasB := am[b]
-				delete(mapA, b)
-				for c, refs := range mapB {
-					if _, has := mapA[c]; has || b == c {
-						/*
-							# Diagonal iteration over double-nested map keys {u, v, w, x, y, z...}
-							This and "delete(mapA, b)" are a hack to iterate "diagonally" over an unsorted map.
-							Right now we have a double nested map iterator. We know that the key sets are the same
-							(that for every (b, c) key pair down here there's also a (c, b) key pair in either
-							the past or the future). BUT we don't want to double-insert the references that we find.
-
-							So to consolidate the redundancy that we introduced when we called insertDouble() *twice*
-							for each quad (and insertTriple() three times!), we delete the keys of the outer loop
-							as we iterate, and break from the inner loop if we haven't deleted `c` from the outer loop yet.
-							That way we get a unique iteration for every order-agnostic choice of pairs.
-							As a special case, we want to also iterate when b == c.
-
-							Here 'o' is "the inner loop code executes" and 'x' is "this break statement skips the iteration"
-								u v w x y z ...
-							u o x x x x x
-							v o o x x x x
-							w o o o x x x
-							x o o o o x x
-							y o o o o o x
-							z o o o o o o
-							...
-						*/
-						break
-					}
-					// Phew okay
-					_, hasC := am[c]
-					if hasB && hasC {
-						// B and C are both assigned.
-						if am[a].Constraints == nil {
-							am[a].Constraints = refs
-						} else {
-							am[a].Constraints = append(am[a].Constraints, refs...)
-						}
-					} else if hasB {
-						// Only B has been assigned; C is now a single.
-						if refs, has := codex.Triple[c][a][b]; has {
-							delete(codex.Triple[c][a], b)
-							delete(codex.Triple[c][b], a)
-							if refsC, has := codex.Single[c]; has {
-								codex.Single[c] = append(refsC, refs...)
-							} else {
-								codex.Single[c] = refs
-							}
-						}
-					} else if hasC {
-						// Only C has been assigned; B is now a single
-						if refs, has := codex.Triple[b][c][a]; has {
-							delete(codex.Triple[b][c], a)
-							delete(codex.Triple[b][a], c)
-							if refsB, has := codex.Single[b]; has {
-								codex.Single[b] = append(refsB, refs...)
-							} else {
-								codex.Single[b] = refs
-							}
-						}
+				} else if bc {
+					ref := &Reference{graph, index, PermutationBC, nil, blankA, 0}
+					codex := codexMap.GetCodex(blankB.Attribute)
+					if double, has := codex.Constraint.Double[blankA.Attribute]; has {
+						codex.Constraint.Double[blankA.Attribute] = append(double, ref)
 					} else {
-						// Neither have been assigned; both now doubles.
-						// B
-						if refsBCA, has := codex.Triple[b][c][a]; has {
-							delete(codex.Triple[b][c], a)
-							delete(codex.Triple[b][a], c)
-							if refsBC, has := codex.Double[b][c]; has {
-								codex.Double[b][c] = append(refsBC, refsBCA...)
-							} else {
-								codex.Double[b][c] = refsBCA
-							}
-						}
-						// C
-						if refsCAB, has := codex.Triple[c][a][b]; has {
-							delete(codex.Triple[c][a], b)
-							delete(codex.Triple[c][b], a)
-							if refsCB, has := codex.Double[c][b]; has {
-								codex.Double[c][b] = append(refsCB, refsCAB...)
-							} else {
-								codex.Double[c][b] = refsCAB
-							}
-						}
+						codex.Constraint.Double[blankA.Attribute] = []*Reference{ref}
 					}
+				} else if ca {
+					ref := &Reference{graph, index, PermutationCA, nil, blankB, 0}
+					codex := codexMap.GetCodex(blankC.Attribute)
+					if double, has := codex.Constraint.Double[blankB.Attribute]; has {
+						codex.Constraint.Double[blankB.Attribute] = append(double, ref)
+					} else {
+						codex.Constraint.Double[blankB.Attribute] = []*Reference{ref}
+					}
+				} else {
+					refA := &Reference{graph, index, 0, blankB, blankC, 0}
+					refB := &Reference{graph, index, 1, blankC, blankA, 0}
+					refC := &Reference{graph, index, 2, blankA, blankB, 0}
+					insertTriple(a, b, c, refA, codexMap)
+					insertTriple(a, c, b, refA, codexMap)
+					insertTriple(b, a, c, refB, codexMap)
+					insertTriple(b, c, a, refB, codexMap)
+					insertTriple(c, a, b, refC, codexMap)
+					insertTriple(c, b, a, refC, codexMap)
 				}
 			}
 		}
 	}
-	return as, codex
+	return constants, codexMap
 }
 
-func getAssignmentStack(dataset *ld.RDFDataset) AssignmentStack {
-	codex := getCodex(dataset)
-	printCodex(codex)
-	as := AssignmentStack{maps: []AssignmentMap{}, deps: map[string]int{}}
-	for {
-		as, codex = haveDinner(as, codex)
-		if len(codex.Single) == 0 {
-			break
-		}
+func induct(past *Past, future *Future, txn *badger.Txn) error {
+	err := future.Count(past, txn)
+	if err != nil {
+		return err
 	}
-	printAssignmentStack(as)
-	return as
+	sort.Stable(future)
+	id, assignment := future.Pop()
+	solve(id, assignment)
+	if assignment.Value == nil {
+		past.Pop(future)
+	} else {
+		future.Push(id)
+	}
+	return nil
 }
 
-func printCodex(codex Codex) {
-	fmt.Println("--- codex ---")
-	s, _ := json.MarshalIndent(codex.Single, "", "  ")
-	d, _ := json.MarshalIndent(codex.Double, "", "  ")
-	t, _ := json.MarshalIndent(codex.Triple, "", "  ")
-	fmt.Println(string(s))
-	fmt.Println(string(d))
-	fmt.Println(string(t))
+func solve(id string, assignment *Assignment) {
+
 }

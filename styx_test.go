@@ -3,13 +3,13 @@ package styx
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"testing"
 
 	"encoding/json"
 
 	"github.com/dgraph-io/badger"
+	proto "github.com/golang/protobuf/proto"
 	ipfs "github.com/ipfs/go-ipfs-api"
 	"github.com/piprate/json-gold/ld"
 )
@@ -160,14 +160,11 @@ func TestIngest(t *testing.T) {
 			if _, has := valuePrefixMap[permutation]; has {
 				// Value key
 				fmt.Println("Value entry")
-				fmt.Print("  ")
-				fmt.Print(string(key[:len(key)-8]))
-				fmt.Print("\t")
-				fmt.Print(key[len(key)-8:])
-				fmt.Print("\n")
-				fmt.Print("  ")
-				fmt.Print(string(val))
-				fmt.Print("\n")
+				fmt.Println("\t" + string(key))
+				sourceList := &SourceList{}
+				proto.Unmarshal(val, sourceList)
+				bytes, _ := json.MarshalIndent(sourceList, "\t", "\t")
+				fmt.Println(string(bytes))
 			} else if _, has := minorPrefixMap[permutation]; has {
 				// Minor key
 				fmt.Println("Minor entry")
@@ -221,143 +218,8 @@ func TestInsert(t *testing.T) {
 	}
 
 	dataset := rdf.(*ld.RDFDataset)
-	fmt.Println(dataset)
-
-	db := openDB(t)
-	defer db.Close()
-}
-
-func TestPromote(t *testing.T) {
-	var data map[string]interface{}
-	json.Unmarshal([]byte(`{
-		"@context": { "@vocab": "http://schema.org/" },
-		"@type": "Person",
-		"name": "Vincent van Gogh",
-		"friend": {
-			"name": {}
-		}
-	}`), &data)
-
-	proc := ld.NewJsonLdProcessor()
-	options := ld.NewJsonLdOptions("")
-	rdf, err := proc.ToRDF(data, options)
-	if err != nil {
-		t.Error(err)
-	}
-
-	dataset := rdf.(*ld.RDFDataset)
 	printDataset(dataset)
 
-	as := getAssignmentStack(dataset)
-	printAssignmentStack(as)
-}
-
-func TestConstrain(t *testing.T) {
-	data := map[string]interface{}{
-		"@context": map[string]interface{}{
-			"@vocab": "http://schema.org/",
-		},
-		"name": "Joel",
-		"friend": map[string]interface{}{
-			"name": "Joel 2",
-		},
-	}
-	proc := ld.NewJsonLdProcessor()
-	options := ld.NewJsonLdOptions("")
-	rdf, err := proc.ToRDF(data, options)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	dataset := rdf.(*ld.RDFDataset)
-
-	for _, quad := range dataset.Graphs["@default"] {
-		fmt.Println(quad.Subject.GetValue(), quad.Predicate.GetValue(), quad.Object.GetValue())
-	}
-
-	codex := getCodex(dataset)
-	as := AssignmentStack{maps: []AssignmentMap{}, deps: map[string]int{}}
-	printCodex(codex)
-	printAssignmentStack(as)
-	as, codex = haveDinner(as, codex)
-	printCodex(codex)
-	printAssignmentStack(as)
-}
-
-func TestSolve(t *testing.T) {
-	var data map[string]interface{}
-	err := json.Unmarshal([]byte(`{
-		"@context": {	"@vocab": "http://schema.org/" },
-		"@graph": [
-			{
-				"@type": "Tulpa",
-				"name": "Someone else"
-			},
-			{
-				"@type": "Person",
-				"name": "A person"
-			},
-			{
-				"@type": "Tulpa",
-				"name": "Colin",
-				"age": 4,
-				"friend": {
-					"@type": "Tulpa",
-					"name": "Joel",
-					"age": 2
-				}
-			},
-			{
-				"@type": "Person",
-				"name": "Joel",
-				"age": 22,
-				"friend": {
-					"@type": "Person",
-					"name": "Colin",
-					"age": 24
-				}
-			}
-		]
-	}`), &data)
-
-	if err != nil {
-		t.Error(err)
-	}
-
 	db := openDB(t)
 	defer db.Close()
-
-	ingest(data, db, sh)
-
-	// Okay now the data has been ingested
-	// We want to construct a query
-	var q Graph
-	err = json.Unmarshal([]byte(`{
-		"@context": { "@vocab": "http://schema.org/" },
-		"age": {},
-		"name": "Colin",
-		"friend": {
-			"age": {},
-			"name": "Joel"
-		}
-	}`), &q)
-
-	if err != nil {
-		t.Error(err)
-	}
-
-	err = query(q, sh, db, func(result, prov, fail map[string]interface{}) error {
-		if result != nil {
-			b, err := json.MarshalIndent(result, "", "  ")
-			if err != nil {
-				return err
-			}
-			fmt.Println(string(b))
-		}
-		return nil
-	})
-
-	if err != nil {
-		t.Error(err)
-	}
 }

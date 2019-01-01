@@ -1,0 +1,26 @@
+syntax = "proto3";
+package styx;
+
+message SourceList {
+	repeated Source sources = 2;
+}
+
+message Source {
+	bytes cid = 1;
+	string graph = 2;
+	int32 index = 3;
+}
+
+message Literal {
+	string value = 1;
+	string language = 2;
+	string datatype = 3;
+}
+
+message Value {
+	oneof value {
+		string iri = 1;
+		Source blank = 2;
+		Literal literal = 3;
+	}
+}
