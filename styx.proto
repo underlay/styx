@@ -11,6 +11,11 @@ message Source {
 	int32 index = 3;
 }
 
+message Blank {
+	bytes cid = 1;
+	string id = 2;
+}
+
 message Literal {
 	string value = 1;
 	string language = 2;
@@ -20,7 +25,7 @@ message Literal {
 message Value {
 	oneof value {
 		string iri = 1;
-		Source blank = 2;
+		Blank blank = 2;
 		Literal literal = 3;
 	}
 }

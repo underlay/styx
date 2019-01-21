@@ -1,5 +1,7 @@
 package styx
 
+import "github.com/dgraph-io/badger"
+
 // Algorithm has to be URDNA2015
 const Algorithm = "URDNA2015"
 
@@ -22,3 +24,7 @@ const PermutationABC uint8 = 9
 
 // InitialCounter is the first value we write to major, minor, & index keys
 const InitialCounter uint64 = 1
+
+var iteratorOptions = badger.IteratorOptions{
+	PrefetchValues: false,
+}

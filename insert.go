@@ -13,13 +13,13 @@ import (
 )
 
 /*
-#  format         value type  prefixes
+#  format            value type  prefixes
 --------------------------------------
-3  p a \t b \t c  SourceList  {a b c}
-6  p a \n b       uint64      {i j k l m n}
-3  p a            uint64      {x y z}
+3  p \t a \t b \t c  SourceList  {a b c}
+6  p \t a \t b       uint64      {i j k l m n}
+3  p \t a            uint64      {x y z}
 ----------------------------
-14
+12
 */
 
 // ValuePrefixes address the value indices
@@ -30,11 +30,11 @@ var valuePrefixMap = map[byte]uint8{'a': 0, 'b': 1, 'c': 2}
 var MajorPrefixes = [3]byte{'i', 'j', 'k'}
 var majorPrefixMap = map[byte]uint8{'i': 0, 'j': 1, 'k': 2}
 
-// MinorPrefixes address the "clockwise" indices {ops, sop, pso}
+// MinorPrefixes address the "clockwise" indices {sop, pso, ops}
 var MinorPrefixes = [3]byte{'l', 'm', 'n'}
 var minorPrefixMap = map[byte]uint8{'l': 0, 'm': 1, 'n': 2}
 
-// IndexPrefixes addres the single-element total counts {s, p, o}
+// IndexPrefixes address the single-element total counts {s, p, o}
 var IndexPrefixes = [3]byte{'x', 'y', 'z'}
 var indexPrefixMap = map[byte]uint8{'x': 0, 'y': 1, 'z': 2}
 
@@ -64,18 +64,20 @@ func updateIndex(major bool, count, s, p, o []byte, txn *badger.Txn) ([3]uint64,
 			prefix = MinorPrefixes[permutation]
 		}
 		key := assembleKey(prefix, a, b, c)
+		if len(b) > 255 {
+			return countValues, errors.New("Cannot insert a key longer than 255 characters")
+		}
+		meta := uint8(len(b))
 		item, err := txn.Get(key)
 		if err == badger.ErrKeyNotFound {
 			countValues[permutation] = InitialCounter
 		} else if err != nil {
 			return countValues, err
-		} else if item.UserMeta() != prefix {
-			return countValues, errors.New("Mismatching meta tag in major index")
 		} else if count, err = item.ValueCopy(count); err != nil {
 			countValues[permutation] = binary.BigEndian.Uint64(count) + 1
 		}
 		binary.BigEndian.PutUint64(count, countValues[permutation])
-		err = txn.SetWithMeta(key, count, prefix)
+		err = txn.SetWithMeta(key, count, meta)
 		if err != nil {
 			return countValues, err
 		}
@@ -180,7 +182,7 @@ func insert(origin string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 					if err != nil {
 						return err
 					}
-					err = txn.SetWithMeta(key, bytes, prefix)
+					err = txn.SetWithMeta(key, bytes, byte(len(c)))
 					if err != nil {
 						return err
 					}
@@ -192,7 +194,7 @@ func insert(origin string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 				indexItem, err := txn.Get(indexKey)
 				if err == badger.ErrKeyNotFound {
 					binary.BigEndian.PutUint64(count, InitialCounter)
-					err = txn.SetWithMeta(key, count, indexPrefix)
+					err = txn.SetWithMeta(key, count, byte(len(a)))
 					if err != nil {
 						return err
 					}
@@ -226,8 +228,7 @@ func assembleKey(prefix byte, a, b, c []byte) []byte {
 		keySize += 1 + len(b) + 1 + len(c)
 	}
 	key := make([]byte, 2, keySize)
-	key[0] = prefix
-	key[1] = tab
+	key[0], key[1] = prefix, tab
 	key = append(key, a...)
 	if _, has := indexPrefixMap[prefix]; !has {
 		key = append(key, tab)
