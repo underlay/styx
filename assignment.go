@@ -84,7 +84,6 @@ type Assignment struct {
 	Past         *Past
 	Future       map[string]ReferenceSet
 	Static       CursorSet
-	Trace        [][2][]byte // bet you've never seen this in the wild
 	Dependencies Dependencies
 }
 
@@ -94,11 +93,21 @@ type Assignment struct {
 // 	return val
 // }
 
-// Close the dangling iterators in a.Present
+// Close all dangling iterators
 func (a *Assignment) Close() {
-	for _, ref := range a.Present {
-		ref.Cursor.Iterator.Close()
-		ref.Cursor.Iterator = nil
+	for _, cursor := range a.Static {
+		if cursor.Iterator != nil {
+			cursor.Iterator.Close()
+			cursor.Iterator = nil
+		}
+	}
+	if a.Past != nil {
+		for _, cursor := range a.Past.Cursors {
+			if cursor.Iterator != nil {
+				cursor.Iterator.Close()
+				cursor.Iterator = nil
+			}
+		}
 	}
 }
 
@@ -189,4 +198,13 @@ func (a *Assignment) Next() []byte {
 		}
 	}
 	return value
+}
+
+// All *badger.Iterators are initialized during getAssignmentTree. Close them all here!
+func closeAssignments(index map[string]*Assignment) {
+	for _, assignment := range index {
+		if assignment != nil {
+			assignment.Close()
+		}
+	}
 }

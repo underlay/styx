@@ -96,6 +96,7 @@ func query(dataset *ld.RDFDataset, txn *badger.Txn) error {
 	fmt.Printf("Constants: %v\n", constants)
 
 	slice, index, err := codexMap.getAssignmentTree(txn)
+	defer closeAssignments(index)
 	if err != nil {
 		return err
 	}

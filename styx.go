@@ -2,23 +2,43 @@ package styx
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
+	badger "github.com/dgraph-io/badger"
+	cid "github.com/ipfs/go-cid"
 	ipfs "github.com/ipfs/go-ipfs-api"
-
-	"github.com/dgraph-io/badger"
-	"github.com/piprate/json-gold/ld"
+	ld "github.com/piprate/json-gold/ld"
 )
 
-func ingest(doc interface{}, db *badger.DB, sh *ipfs.Shell) error {
+func (source *Source) toCompactString() string {
+	c, err := cid.Parse(source.Cid)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	return fmt.Sprintf("%s#%s[%d]", c.String(), source.Graph, source.Index)
+}
+
+func (sourceList *SourceList) toCompactString() string {
+	s := "["
+	for i, source := range sourceList.Sources {
+		if i > 0 {
+			s += ", "
+		}
+		s += source.toCompactString()
+	}
+	return s + "]"
+}
+
+func ingest(doc interface{}, db *badger.DB, sh *ipfs.Shell) (string, error) {
 	proc := ld.NewJsonLdProcessor()
 	options := ld.NewJsonLdOptions("")
 	options.DocumentLoader = NewIPFSDocumentLoader(sh)
 
-	// Convert to normnalized RDF
-	rdf, err := proc.Normalize(doc, options)
+	// Convert to RDF
+	rdf, err := proc.ToRDF(doc, options)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	dataset := rdf.(*ld.RDFDataset)
@@ -29,7 +49,7 @@ func ingest(doc interface{}, db *badger.DB, sh *ipfs.Shell) error {
 	api := ld.NewJsonLdApi()
 	normalized, err := api.Normalize(dataset, options)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	fmt.Println("normalized")
@@ -38,10 +58,10 @@ func ingest(doc interface{}, db *badger.DB, sh *ipfs.Shell) error {
 	reader := strings.NewReader(normalized.(string))
 	cid, err := sh.Add(reader)
 	if err != nil {
-		return err
+		return cid, err
 	}
 
-	return db.Update(func(txn *badger.Txn) error {
+	return cid, db.Update(func(txn *badger.Txn) error {
 		return insert(cid, dataset, txn)
 	})
 }
