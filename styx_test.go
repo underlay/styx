@@ -24,10 +24,12 @@ var sampleData = []byte(`{
 	"@type": "DigitalDocument",
 	"age": 33,
 	"@graph": {
+		"@type": "Person",
 		"name": "Joel",
 		"age": [22, 23],
 		"friend": {
 			"@id": "http://example.org/gabriel",
+			"@type": "Person",
 			"age": [22],
 			"name": {
 				"@value": "Gabriel",
@@ -35,6 +37,13 @@ var sampleData = []byte(`{
 			}
 		}
 	}
+}`)
+
+var sampleQuery = []byte(`{
+	"@context": { "@vocab": "http://schema.org/" },
+	"@type": "Person",
+	"name": "Joel",
+	"age": {}
 }`)
 
 func openDB(t *testing.T, clean bool) *badger.DB {
@@ -139,7 +148,10 @@ func TestIPFSDocumentLoader(t *testing.T) {
 
 func TestIngest(t *testing.T) {
 	var data map[string]interface{}
-	json.Unmarshal(sampleData, &data)
+	err := json.Unmarshal(sampleData, &data)
+	if err != nil {
+		t.Error(err)
+	}
 
 	db := openDB(t, true)
 	defer db.Close()
@@ -169,7 +181,7 @@ func TestIngest(t *testing.T) {
 				sourceList := &SourceList{}
 				proto.Unmarshal(val, sourceList)
 				// bytes, _ := json.MarshalIndent(sourceList.Sources, "  ", "  ")
-				fmt.Printf("Value entry\n  %s\n  %s\n", string(key), sourceList.toCompactString())
+				fmt.Printf("Value entry\n  %s\n  %s\n", string(key), sourcesToString(sourceList.Sources))
 			} else if _, has := minorPrefixMap[prefix]; has {
 				// Minor key
 				fmt.Printf("Minor entry\n  %s\n  %v\n", string(key), val)
@@ -185,6 +197,35 @@ func TestIngest(t *testing.T) {
 		fmt.Printf("Printed %d database entries\n", i)
 		return nil
 	})
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestQuery(t *testing.T) {
+	var data map[string]interface{}
+	err := json.Unmarshal(sampleData, &data)
+	if err != nil {
+		t.Error(err)
+	}
+
+	db := openDB(t, true)
+	defer db.Close()
+
+	origin, err := ingest(data, db, sh)
+	if err != nil {
+		t.Error(err)
+	}
+
+	fmt.Printf("Origin: %s\n", origin)
+
+	var queryData map[string]interface{}
+	err = json.Unmarshal(sampleQuery, &queryData)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println("got query", queryData)
+	err = query(queryData, db, sh)
 	if err != nil {
 		t.Error(err)
 	}

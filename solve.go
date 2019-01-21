@@ -87,8 +87,11 @@ func solve(id string, slice []string, index map[string]*Assignment) ([]byte, err
 	return nil, nil
 }
 
-func query(dataset *ld.RDFDataset, txn *badger.Txn) error {
+func solveDataset(dataset *ld.RDFDataset, txn *badger.Txn) error {
 	constants, codexMap, err := getInitalCodexMap(dataset)
+	fmt.Println("Got the stuff")
+	// fmt.Println(codexMap.String())
+	printCodexMap(codexMap)
 	if err != nil {
 		return err
 	}
@@ -97,6 +100,7 @@ func query(dataset *ld.RDFDataset, txn *badger.Txn) error {
 
 	slice, index, err := codexMap.getAssignmentTree(txn)
 	defer closeAssignments(index)
+	printAssignments(slice, index)
 	if err != nil {
 		return err
 	}
@@ -110,6 +114,6 @@ func query(dataset *ld.RDFDataset, txn *badger.Txn) error {
 			return err
 		}
 	}
-	fmt.Printf("Assignments:\n%v\n%v\n", slice, index)
+
 	return nil
 }

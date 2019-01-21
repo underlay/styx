@@ -19,15 +19,41 @@ func (source *Source) toCompactString() string {
 	return fmt.Sprintf("%s#%s[%d]", c.String(), source.Graph, source.Index)
 }
 
-func (sourceList *SourceList) toCompactString() string {
+func sourcesToString(sources []*Source) string {
 	s := "["
-	for i, source := range sourceList.Sources {
+	for i, source := range sources {
 		if i > 0 {
 			s += ", "
 		}
 		s += source.toCompactString()
 	}
 	return s + "]"
+}
+
+func printCodexMap(c *CodexMap) {
+	fmt.Println("----- Codex Map -----")
+	for _, id := range c.Slice {
+		fmt.Printf("---- %s ----\n%s\n", id, c.Index[id].String())
+	}
+	fmt.Println("----- End of Codex Map -----")
+}
+
+func query(doc interface{}, db *badger.DB, sh *ipfs.Shell) error {
+	proc := ld.NewJsonLdProcessor()
+	options := ld.NewJsonLdOptions("")
+	options.DocumentLoader = NewIPFSDocumentLoader(sh)
+
+	// Convert to RDF
+	rdf, err := proc.Normalize(doc, options)
+	if err != nil {
+		return err
+	}
+
+	dataset := rdf.(*ld.RDFDataset)
+	printDataset(dataset)
+	return db.View(func(txn *badger.Txn) error {
+		return solveDataset(dataset, txn)
+	})
 }
 
 func ingest(doc interface{}, db *badger.DB, sh *ipfs.Shell) (string, error) {
@@ -72,5 +98,14 @@ func printDataset(dataset *ld.RDFDataset) {
 		for i, quad := range quads {
 			fmt.Printf("%2d: %s %s %s\n", i, quad.Subject.GetValue(), quad.Predicate.GetValue(), quad.Object.GetValue())
 		}
+	}
+}
+
+func printAssignments(slice []string, index map[string]*Assignment) {
+	fmt.Println("printing assignments", slice)
+	for _, id := range slice {
+		a := index[id]
+		fmt.Printf("id: %s\n", id)
+		fmt.Println(a.String())
 	}
 }

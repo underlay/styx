@@ -1,6 +1,7 @@
 package styx
 
 import (
+	fmt "fmt"
 	"sort"
 
 	badger "github.com/dgraph-io/badger"
@@ -18,9 +19,19 @@ type Past struct {
 
 // Push a dependency into the past
 func (past *Past) Push(id string, order int, refs ReferenceSet) {
-	past.Index[id] = refs
+	if past.Index == nil {
+		past.Index = map[string]ReferenceSet{id: refs}
+	} else {
+		past.Index[id] = refs
+	}
+
+	if past.Order == nil {
+		past.Order = map[string]int{id: order}
+	} else {
+		past.Order[id] = order
+	}
+
 	past.Slice = append(past.Slice, id)
-	past.Order[id] = order
 }
 
 // Sort interface for pastOrder
@@ -79,19 +90,27 @@ type Assignment struct {
 	Value        []byte
 	ValueRoot    []byte
 	Sources      []*Source
-	Present      ReferenceSet
 	Constraint   ReferenceSet
+	Present      ReferenceSet
 	Past         *Past
 	Future       map[string]ReferenceSet
 	Static       CursorSet
 	Dependencies Dependencies
 }
 
-// func (a *Assignment) String() string {
-// 	val := fmt.Sprintln("--- assignment ---")
-// 	val += fmt.Sprintf("%v\n", assignment)
-// 	return val
-// }
+func (a *Assignment) String() string {
+	val := fmt.Sprintln("--- assignment ---")
+	val += fmt.Sprintf("Value: %s\n", string(a.Value))
+	val += fmt.Sprintf("ValueRoot: %s\n", string(a.ValueRoot))
+	val += fmt.Sprintf("Sources: %s\n", sourcesToString(a.Sources))
+	val += fmt.Sprintf("Constraint: %s\n", a.Constraint.String())
+	val += fmt.Sprintf("Present: %s\n", a.Present.String())
+	val += fmt.Sprintln("Future:")
+	for id, refs := range a.Future {
+		val += fmt.Sprintf("  %s: %s\n", id, refs.String())
+	}
+	return val
+}
 
 // Close all dangling iterators
 func (a *Assignment) Close() {
@@ -112,12 +131,14 @@ func (a *Assignment) Close() {
 }
 
 func (a *Assignment) setValueRoot(txn *badger.Txn) {
+	fmt.Println("attempting to set the value root")
+	fmt.Println(a.String())
 	cs := CursorSet{}
 	if a.Present.Len() > 0 {
 		for _, ref := range a.Present {
 			ref.Cursor.Iterator = txn.NewIterator(iteratorOptions)
-			m := []byte(ref.M.GetValue())
-			n := []byte(ref.N.GetValue())
+			m := marshalNode("", ref.M)
+			n := marshalNode("", ref.N)
 			permutation := (ref.Permutation + 1) % 3
 			prefix := ValuePrefixes[permutation]
 			ref.Cursor.Prefix = assembleKey(prefix, m, n, nil) // ends in \t
@@ -125,7 +146,7 @@ func (a *Assignment) setValueRoot(txn *badger.Txn) {
 		}
 	}
 
-	if len(a.Future) == 0 {
+	if len(a.Future) > 0 {
 		for _, refs := range a.Future {
 			for _, ref := range refs {
 				ref.Cursor.Iterator = txn.NewIterator(iteratorOptions)
@@ -133,11 +154,11 @@ func (a *Assignment) setValueRoot(txn *badger.Txn) {
 				if !m && n {
 					permutation := (ref.Permutation + 1) % 3
 					prefix := MinorPrefixes[permutation]
-					ref.Cursor.Prefix = assembleKey(prefix, []byte(ref.M.GetValue()), nil, nil)
+					ref.Cursor.Prefix = assembleKey(prefix, marshalNode("", ref.M), nil, nil)
 				} else if m && !n {
 					permutation := (ref.Permutation + 2) % 3
 					prefix := MajorPrefixes[permutation]
-					ref.Cursor.Prefix = assembleKey(prefix, []byte(ref.N.GetValue()), nil, nil)
+					ref.Cursor.Prefix = assembleKey(prefix, marshalNode("", ref.N), nil, nil)
 				}
 				cs = append(cs, ref.Cursor)
 			}

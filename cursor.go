@@ -1,6 +1,8 @@
 package styx
 
-import "github.com/dgraph-io/badger"
+import (
+	"github.com/dgraph-io/badger"
+)
 
 // A Cursor is an Iterator and a Prefix
 type Cursor struct {

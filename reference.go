@@ -18,7 +18,11 @@ type Reference struct {
 }
 
 func (ref *Reference) String() string {
-	return fmt.Sprintf("%s/%d:%d {%s %s}", ref.Graph, ref.Index, ref.Permutation, ref.M.GetValue(), ref.N.GetValue())
+	var count uint64
+	if ref.Cursor != nil {
+		count = ref.Cursor.Count
+	}
+	return fmt.Sprintf("%s/%d:%d %d {%s %s}", ref.Graph, ref.Index, ref.Permutation, count, ref.M.GetValue(), ref.N.GetValue())
 }
 
 func (ref *Reference) assembleCountKey(tree map[string]*Assignment, major bool) ([]byte, bool) {
@@ -37,11 +41,11 @@ func (ref *Reference) assembleCountKey(tree map[string]*Assignment, major bool) 
 		}
 	} else if m != nil && n == nil {
 		permutation := (ref.Permutation + 1) % 3
-		prefix := MajorPrefixes[permutation]
+		prefix := IndexPrefixes[permutation]
 		key = assembleKey(prefix, m, nil, nil)
 	} else if m == nil && n != nil {
 		permutation := (ref.Permutation + 2) % 3
-		prefix := MajorPrefixes[permutation]
+		prefix := IndexPrefixes[permutation]
 		key = assembleKey(prefix, n, nil, nil)
 	}
 	return key, !major
@@ -54,7 +58,7 @@ func marshalReferenceNode(node ld.Node, tree map[string]*Assignment) []byte {
 		}
 		return nil
 	}
-	return []byte(node.GetValue())
+	return marshalNode("", node)
 }
 
 // A ReferenceSet is any slice of References
@@ -72,4 +76,15 @@ func (refs ReferenceSet) toCursorSet() CursorSet {
 		cs = append(cs, ref.Cursor)
 	}
 	return cs
+}
+
+func (refs ReferenceSet) String() string {
+	s := "[ "
+	for i, ref := range refs {
+		if i > 0 {
+			s += ", "
+		}
+		s += ref.String()
+	}
+	return s + " ]"
 }

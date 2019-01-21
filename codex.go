@@ -2,7 +2,6 @@ package styx
 
 import (
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	fmt "fmt"
 	"sort"
@@ -20,11 +19,14 @@ type Codex struct {
 }
 
 func (codex *Codex) String() string {
-	val := fmt.Sprintln("--- codex ---")
-	c, _ := json.MarshalIndent(codex.Constraint, "", "\t")
-	s, _ := json.MarshalIndent(codex.Single, "", "\t")
-	d, _ := json.MarshalIndent(codex.Double, "", "\t")
-	val += fmt.Sprintf("%s\n%s\n%s\n", string(c), string(s), string(d))
+	var val string
+	val += fmt.Sprintf("Constraint: %s\n", ReferenceSet(codex.Constraint).String())
+	val += fmt.Sprintf("Singles: %s\n", ReferenceSet(codex.Single).String())
+	val += fmt.Sprintln("Doubles:")
+	for id, refs := range codex.Double {
+		val += fmt.Sprintf("  %s: %s\n", id, ReferenceSet(refs).String())
+	}
+	val += fmt.Sprintf("Count: %d\n", codex.Count)
 	return val
 }
 
@@ -32,14 +34,6 @@ func (codex *Codex) String() string {
 type CodexMap struct {
 	Index map[string]*Codex
 	Slice []string
-}
-
-func (c *CodexMap) String() string {
-	var s string
-	for _, id := range c.Slice {
-		s += fmt.Sprintf("%s: %s\n", id, c.Index[id].String())
-	}
-	return s
 }
 
 // Sort interface functions
@@ -51,10 +45,14 @@ func (c *CodexMap) Less(a, b int) bool {
 
 // GetCodex retrieves an Codex or creates one if it doesn't exist.
 func (c *CodexMap) GetCodex(id string) *Codex {
+	if c.Index == nil {
+		c.Index = map[string]*Codex{}
+	}
 	codex, has := c.Index[id]
 	if !has {
 		codex = &Codex{}
 		c.Index[id] = codex
+		c.Slice = append(c.Slice, id)
 	}
 	return codex
 }
@@ -62,47 +60,23 @@ func (c *CodexMap) GetCodex(id string) *Codex {
 // InsertDouble into codex.Double
 func (c *CodexMap) InsertDouble(a string, b string, ref *Reference) {
 	codex := c.GetCodex(a)
-	codex.Double[b] = append(codex.Double[b], ref)
-}
-
-// Count each Codex
-func (c *CodexMap) Count(txn *badger.Txn) error {
-	var err error
-	var major bool
-	var key, slice []byte
-	for _, codex := range c.Index {
-		codex.Count = 0
-		for _, ref := range codex.Single {
-			key, major = ref.assembleCountKey(nil, major)
-			slice, ref.Cursor.Count, err = getCount(key, slice, txn)
-			if err != nil {
-				return err
-			} else if ref.Cursor.Count == 0 {
-				return fmt.Errorf("Insoluble reference: %v", ref)
-			}
-			codex.Count += ref.Cursor.Count
-		}
-		for _, refs := range codex.Double {
-			for _, ref := range refs {
-				key, major = ref.assembleCountKey(nil, major)
-				slice, ref.Cursor.Count, err = getCount(key, slice, txn)
-				if err != nil {
-					return err
-				} else if ref.Cursor.Count == 0 {
-					return fmt.Errorf("Insoluble reference: %v", ref)
-				}
-				codex.Count += ref.Cursor.Count
-			}
-		}
+	if codex.Double == nil {
+		codex.Double = map[string][]*Reference{}
 	}
-	return nil
+	if refs, has := codex.Double[b]; has {
+		codex.Double[b] = append(refs, ref)
+	} else {
+		codex.Double[b] = []*Reference{ref}
+	}
+
 }
 
 // This is re-used between Major, Minor, and Index keys
 func getCount(count []byte, key []byte, txn *badger.Txn) ([]byte, uint64, error) {
 	item, err := txn.Get(key)
+	fmt.Println("got count item", err)
 	if err == badger.ErrKeyNotFound {
-		return count, 0, nil
+		return nil, 0, nil
 	} else if err != nil {
 		return nil, 0, err
 	} else if count, err = item.ValueCopy(count); err != nil {
@@ -114,21 +88,61 @@ func getCount(count []byte, key []byte, txn *badger.Txn) ([]byte, uint64, error)
 
 // TODO: Make Sure you close the assignment.Present iterators some day
 func (c *CodexMap) getAssignmentTree(txn *badger.Txn) ([]string, map[string]*Assignment, error) {
-	err := c.Count(txn)
-	if err != nil {
-		return nil, nil, err
+	var err error
+	var major bool
+	var key []byte
+	count := make([]byte, 8)
+	fmt.Println("getting the assignment tree", c.Slice)
+
+	// Update the counts before sorting the codex map
+	for _, codex := range c.Index {
+		codex.Count = 0
+		for _, ref := range codex.Single {
+			key, major = ref.assembleCountKey(nil, major)
+			fmt.Println("assembled single key", string(key))
+			ref.Cursor = &Cursor{}
+			count, ref.Cursor.Count, err = getCount(count, key, txn)
+			if err != nil {
+				fmt.Println("returning with error from getCount", err)
+				return nil, nil, err
+			} else if ref.Cursor.Count == 0 {
+				return nil, nil, fmt.Errorf("Single reference count of zero: %s", ref.String())
+			}
+			codex.Count += ref.Cursor.Count
+		}
+		for _, refs := range codex.Double {
+			for _, ref := range refs {
+				key, major = ref.assembleCountKey(nil, major)
+				fmt.Println("assembled double key", string(key))
+				ref.Cursor = &Cursor{}
+				count, ref.Cursor.Count, err = getCount(count, key, txn)
+				if err != nil {
+					return nil, nil, err
+				} else if ref.Cursor.Count == 0 {
+					return nil, nil, fmt.Errorf("Double reference count of zero: %s", ref.String())
+				}
+				codex.Count += ref.Cursor.Count
+			}
+		}
 	}
+
+	fmt.Println("sorted values:")
+	printCodexMap(c)
+	// Now sort the codex map
 	sort.Stable(c)
+	fmt.Println("the codex map has been sorted", c.Slice)
+
 	index := map[string]*Assignment{}
 	indexMap := map[string]int{}
 	for i, id := range c.Slice {
+		fmt.Println("Creating assignment for", id)
 		indexMap[id] = i
 
 		codex := c.Index[id]
 
 		index[id] = &Assignment{
-			Present:    codex.Single,
-			Constraint: codex.Constraint,
+			Constraint: ReferenceSet(codex.Constraint),
+			Present:    ReferenceSet(codex.Single),
 			Past:       &Past{},
 			Future:     map[string]ReferenceSet{},
 		}
