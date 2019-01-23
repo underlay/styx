@@ -1,6 +1,9 @@
 package styx
 
 import (
+	"encoding/json"
+	fmt "fmt"
+
 	"github.com/dgraph-io/badger"
 )
 
@@ -11,6 +14,11 @@ type Cursor struct {
 	Iterator *badger.Iterator
 	Prefix   []byte
 	Count    uint64
+}
+
+func (cursor *Cursor) String() string {
+	return fmt.Sprintf("%s/%d", cursor.ID, cursor.Index)
+	// return fmt.Sprintf("%s/%d: %s | %d", cursor.ID, cursor.Index, string(cursor.Prefix), cursor.Count)
 }
 
 func (cursor *Cursor) Value() []byte {
@@ -29,7 +37,11 @@ func (cursor *Cursor) Next() []byte {
 
 func (cursor *Cursor) Seek(value []byte) []byte {
 	key := append(cursor.Prefix, value...)
+	bytes, _ := json.Marshal(string(key))
+	fmt.Println("seeking to key", string(bytes))
 	cursor.Iterator.Seek(key)
+	fmt.Println("valid", cursor.Iterator.ValidForPrefix(cursor.Prefix))
+	fmt.Println("item", cursor.Iterator.Item().String())
 	return cursor.Value()
 }
 
@@ -42,9 +54,12 @@ type Seekable interface {
 func Seek(s Seekable, value []byte) []byte {
 	var count int
 	l := s.Len()
+	fmt.Println("seekable length", l)
 	for i := 0; count < l; i = (i + 1) % l {
 		cursor := s.getCursor(i)
+		fmt.Println("got cursor", cursor, string(cursor.Prefix), string(value))
 		next := cursor.Seek(value)
+		fmt.Println("got cursor next", string(next))
 		if next == nil {
 			return nil
 		} else if string(next) == string(value) {
@@ -69,6 +84,17 @@ func Next(s Seekable) []byte {
 
 // A CursorSet is just a slice of Cursors
 type CursorSet []*Cursor
+
+func (cs CursorSet) String() string {
+	val := "[ "
+	for i, cursor := range cs {
+		if i > 0 {
+			val += ", "
+		}
+		val += cursor.String()
+	}
+	return val + " ]"
+}
 
 // Sort interface for CursorSet
 func (cs CursorSet) Len() int { return len(cs) }

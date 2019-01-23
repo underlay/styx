@@ -21,29 +21,32 @@ const path = "/tmp/badger"
 var sh = ipfs.NewShell("localhost:5001")
 var sampleData = []byte(`{
 	"@context": { "@vocab": "http://schema.org/" },
-	"@type": "DigitalDocument",
-	"age": 33,
-	"@graph": {
-		"@type": "Person",
-		"name": "Joel",
-		"age": [22, 23],
-		"friend": {
-			"@id": "http://example.org/gabriel",
+	"@graph": [
+		{
 			"@type": "Person",
-			"age": [22],
-			"name": {
-				"@value": "Gabriel",
-				"@language": "es"
-			}
+			"name": "Joel",
+			"birthDate": "1996-02-02",
+			"children": { "@id": "http://people.com/liljoel" }
+		},
+		{
+			"@id": "http://people.com/liljoel",
+			"@type": "Person",
+			"name": "Little Joel",
+			"birthDate": "2030-11-10"
 		}
-	}
+	]
 }`)
 
 var sampleQuery = []byte(`{
-	"@context": { "@vocab": "http://schema.org/" },
+	"@context": {
+		"@vocab": "http://schema.org/",
+		"parent": { "@reverse": "children" }
+	},
 	"@type": "Person",
-	"name": "Joel",
-	"age": {}
+	"birthDate": {},
+	"parent": {
+		"name": "Joel"
+	}
 }`)
 
 func openDB(t *testing.T, clean bool) *badger.DB {
@@ -156,7 +159,7 @@ func TestIngest(t *testing.T) {
 	db := openDB(t, true)
 	defer db.Close()
 
-	origin, err := ingest(data, db, sh)
+	origin, err := Ingest(data, db, sh)
 	if err != nil {
 		t.Error(err)
 	}
@@ -207,14 +210,16 @@ func TestQuery(t *testing.T) {
 	err := json.Unmarshal(sampleData, &data)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	db := openDB(t, true)
 	defer db.Close()
 
-	origin, err := ingest(data, db, sh)
+	origin, err := Ingest(data, db, sh)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	fmt.Printf("Origin: %s\n", origin)
@@ -223,9 +228,19 @@ func TestQuery(t *testing.T) {
 	err = json.Unmarshal(sampleQuery, &queryData)
 	if err != nil {
 		t.Error(err)
+		return
 	}
-	fmt.Println("got query", queryData)
-	err = query(queryData, db, sh)
+
+	callback := func(result interface{}) error {
+		bytes, err := json.MarshalIndent(result, "", "\t")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(bytes))
+		return nil
+	}
+
+	err = Query(queryData, callback, db, sh)
 	if err != nil {
 		t.Error(err)
 	}

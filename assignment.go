@@ -1,8 +1,9 @@
 package styx
 
 import (
-	fmt "fmt"
+	"fmt"
 	"sort"
+	"strings"
 
 	badger "github.com/dgraph-io/badger"
 	ld "github.com/piprate/json-gold/ld"
@@ -17,21 +18,45 @@ type Past struct {
 	Indices map[string]map[int]int
 }
 
+func (past *Past) String() string {
+	val := fmt.Sprintf("Past: %s\n", past.Cursors.String())
+	for _, id := range past.Slice {
+		val += fmt.Sprintf("  %s: %s\n", id, past.Index[id].String())
+		pad := strings.Repeat(" ", len(id))
+		for _, ref := range past.Index[id] {
+			if ref.Cursor != nil {
+				val += fmt.Sprintf("  %s  %s | %d\n", pad, string(ref.Cursor.Prefix), ref.Cursor.Count)
+			}
+		}
+	}
+	return val
+}
+
 // Push a dependency into the past
-func (past *Past) Push(id string, order int, refs ReferenceSet) {
+func (past *Past) Push(dep string, order int, refs ReferenceSet) {
 	if past.Index == nil {
-		past.Index = map[string]ReferenceSet{id: refs}
+		past.Index = map[string]ReferenceSet{dep: refs}
 	} else {
-		past.Index[id] = refs
+		past.Index[dep] = refs
 	}
 
 	if past.Order == nil {
-		past.Order = map[string]int{id: order}
+		past.Order = map[string]int{dep: order}
 	} else {
-		past.Order[id] = order
+		past.Order[dep] = order
 	}
 
-	past.Slice = append(past.Slice, id)
+	past.Slice = append(past.Slice, dep)
+}
+
+func (past *Past) insertIndex(id string, index int, value int) {
+	if past.Indices == nil {
+		past.Indices = map[string]map[int]int{id: map[int]int{index: value}}
+	} else if past.Indices[id] == nil {
+		past.Indices[id] = map[int]int{index: value}
+	} else {
+		past.Indices[id][index] = value
+	}
 }
 
 // Sort interface for pastOrder
@@ -109,30 +134,33 @@ func (a *Assignment) String() string {
 	for id, refs := range a.Future {
 		val += fmt.Sprintf("  %s: %s\n", id, refs.String())
 	}
+	if a.Past != nil {
+		val += a.Past.String()
+	}
 	return val
 }
 
 // Close all dangling iterators
-func (a *Assignment) Close() {
-	for _, cursor := range a.Static {
-		if cursor.Iterator != nil {
-			cursor.Iterator.Close()
-			cursor.Iterator = nil
-		}
-	}
-	if a.Past != nil {
-		for _, cursor := range a.Past.Cursors {
-			if cursor.Iterator != nil {
-				cursor.Iterator.Close()
-				cursor.Iterator = nil
-			}
-		}
-	}
-}
+// func (a *Assignment) Close() {
+// 	for _, cursor := range a.Static {
+// 		if cursor.Iterator != nil {
+// 			cursor.Iterator.Close()
+// 			cursor.Iterator = nil
+// 		}
+// 	}
+// 	if a.Past != nil {
+// 		for _, cursor := range a.Past.Cursors {
+// 			if cursor.Iterator != nil {
+// 				cursor.Iterator.Close()
+// 				cursor.Iterator = nil
+// 			}
+// 		}
+// 	}
+// }
 
 func (a *Assignment) setValueRoot(txn *badger.Txn) {
-	fmt.Println("attempting to set the value root")
-	fmt.Println(a.String())
+	// fmt.Println("attempting to set the value root")
+	// fmt.Println(a.String())
 	cs := CursorSet{}
 	if a.Present.Len() > 0 {
 		for _, ref := range a.Present {
@@ -165,11 +193,32 @@ func (a *Assignment) setValueRoot(txn *badger.Txn) {
 		}
 	}
 
+	length := len(cs)
 	sort.Stable(cs)
+
+	if len(a.Past.Slice) > 0 {
+		for _, id := range a.Past.Slice {
+			for _, ref := range a.Past.Index[id] {
+				ref.Cursor.Iterator = txn.NewIterator(iteratorOptions)
+				m, n := ld.IsBlankNode(ref.M), ld.IsBlankNode(ref.N)
+				if !m && n {
+					permutation := (ref.Permutation + 1) % 3
+					prefix := MinorPrefixes[permutation]
+					ref.Cursor.Prefix = assembleKey(prefix, marshalNode("", ref.M), nil, nil)
+				} else if m && !n {
+					permutation := (ref.Permutation + 2) % 3
+					prefix := MajorPrefixes[permutation]
+					ref.Cursor.Prefix = assembleKey(prefix, marshalNode("", ref.N), nil, nil)
+				}
+				cs = append(cs, ref.Cursor)
+			}
+		}
+	}
+
 	valueRoot := Seek(cs, nil)
+	a.Static = cs[:length]
 	if valueRoot != nil {
 		a.ValueRoot = valueRoot
-		a.Static = cs
 	}
 }
 
@@ -181,9 +230,13 @@ func (a *Assignment) Seek(value []byte) []byte {
 		value = Seek(a.Static, value)
 	}
 
+	fmt.Println("starting to seek from", string(value), a.Past.Slice)
+	fmt.Println("past cursor set", a.Past.Cursors)
 	if a.Past.Cursors.Len() > 0 {
 		for {
+			fmt.Println("top of loop with value", string(value))
 			next := Seek(a.Past.Cursors, value)
+			fmt.Println("got next value of", string(next))
 			if next == nil {
 				return nil
 			} else if string(next) == string(value) {
@@ -200,7 +253,6 @@ func (a *Assignment) Seek(value []byte) []byte {
 }
 
 // Next value
-// ALl the backtracking logic has to happen here
 func (a *Assignment) Next() []byte {
 	value := Next(a.Static)
 	if a.Past.Cursors.Len() > 0 {
@@ -222,10 +274,10 @@ func (a *Assignment) Next() []byte {
 }
 
 // All *badger.Iterators are initialized during getAssignmentTree. Close them all here!
-func closeAssignments(index map[string]*Assignment) {
-	for _, assignment := range index {
-		if assignment != nil {
-			assignment.Close()
-		}
-	}
-}
+// func closeAssignments(index map[string]*Assignment) {
+// 	for _, assignment := range index {
+// 		if assignment != nil {
+// 			assignment.Close()
+// 		}
+// 	}
+// }

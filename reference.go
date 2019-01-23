@@ -25,6 +25,15 @@ func (ref *Reference) String() string {
 	return fmt.Sprintf("%s/%d:%d %d {%s %s}", ref.Graph, ref.Index, ref.Permutation, count, ref.M.GetValue(), ref.N.GetValue())
 }
 
+func (ref *Reference) Close() {
+	if ref.Cursor != nil {
+		if ref.Cursor.Iterator != nil {
+			ref.Cursor.Iterator.Close()
+			ref.Cursor.Iterator = nil
+		}
+	}
+}
+
 func (ref *Reference) assembleCountKey(tree map[string]*Assignment, major bool) ([]byte, bool) {
 	m := marshalReferenceNode(ref.M, tree)
 	n := marshalReferenceNode(ref.N, tree)
@@ -51,9 +60,9 @@ func (ref *Reference) assembleCountKey(tree map[string]*Assignment, major bool) 
 	return key, !major
 }
 
-func marshalReferenceNode(node ld.Node, tree map[string]*Assignment) []byte {
+func marshalReferenceNode(node ld.Node, index map[string]*Assignment) []byte {
 	if blank, isBlank := node.(*ld.BlankNode); isBlank {
-		if assignment, has := tree[blank.Attribute]; has {
+		if assignment, has := index[blank.Attribute]; has {
 			return assignment.Value
 		}
 		return nil

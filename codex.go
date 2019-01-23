@@ -3,11 +3,11 @@ package styx
 import (
 	"encoding/binary"
 	"errors"
-	fmt "fmt"
+	"fmt"
 	"sort"
 
-	"github.com/dgraph-io/badger"
-	"github.com/piprate/json-gold/ld"
+	badger "github.com/dgraph-io/badger"
+	ld "github.com/piprate/json-gold/ld"
 )
 
 // Codex is a map of refs. A codex is always relative to a specific variable.
@@ -15,7 +15,9 @@ type Codex struct {
 	Constraint []*Reference            // an almost-always empty list of refs that include the codex's variable more than once
 	Single     []*Reference            // list of refs that include the variable once, and two known values
 	Double     map[string][]*Reference // list of refs that include the variable once, one unknown value, and one known value
-	Count      uint64                  // The sum of key counts for Single and Double. Count is the only mutable value in a codex.
+	Norm       uint64                  // The sum of squares of key counts of references.
+	Length     int                     // The total number of references
+	Count      uint64
 }
 
 func (codex *Codex) String() string {
@@ -26,8 +28,20 @@ func (codex *Codex) String() string {
 	for id, refs := range codex.Double {
 		val += fmt.Sprintf("  %s: %s\n", id, ReferenceSet(refs).String())
 	}
-	val += fmt.Sprintf("Count: %d\n", codex.Count)
+	val += fmt.Sprintf("Norm: %d\n", codex.Norm)
+	val += fmt.Sprintf("Length: %d\n", codex.Length)
 	return val
+}
+
+func (codex *Codex) Close() {
+	for _, ref := range codex.Single {
+		ref.Close()
+	}
+	for _, refs := range codex.Double {
+		for _, ref := range refs {
+			ref.Close()
+		}
+	}
 }
 
 // A CodexMap associates ids with Codex maps.
@@ -40,7 +54,9 @@ type CodexMap struct {
 func (c *CodexMap) Len() int      { return len(c.Slice) }
 func (c *CodexMap) Swap(a, b int) { c.Slice[a], c.Slice[b] = c.Slice[b], c.Slice[a] }
 func (c *CodexMap) Less(a, b int) bool {
-	return c.Index[c.Slice[a]].Count < c.Index[c.Slice[b]].Count
+	A, B := c.Index[c.Slice[a]], c.Index[c.Slice[b]]
+	// return (float32(A.Norm) / float32(A.Length)) < (float32(B.Norm) / float32(B.Length))
+	return A.Count > B.Count
 }
 
 // GetCodex retrieves an Codex or creates one if it doesn't exist.
@@ -74,7 +90,6 @@ func (c *CodexMap) InsertDouble(a string, b string, ref *Reference) {
 // This is re-used between Major, Minor, and Index keys
 func getCount(count []byte, key []byte, txn *badger.Txn) ([]byte, uint64, error) {
 	item, err := txn.Get(key)
-	fmt.Println("got count item", err)
 	if err == badger.ErrKeyNotFound {
 		return nil, 0, nil
 	} else if err != nil {
@@ -92,28 +107,26 @@ func (c *CodexMap) getAssignmentTree(txn *badger.Txn) ([]string, map[string]*Ass
 	var major bool
 	var key []byte
 	count := make([]byte, 8)
-	fmt.Println("getting the assignment tree", c.Slice)
 
 	// Update the counts before sorting the codex map
 	for _, codex := range c.Index {
 		codex.Count = 0
 		for _, ref := range codex.Single {
 			key, major = ref.assembleCountKey(nil, major)
-			fmt.Println("assembled single key", string(key))
 			ref.Cursor = &Cursor{}
 			count, ref.Cursor.Count, err = getCount(count, key, txn)
 			if err != nil {
-				fmt.Println("returning with error from getCount", err)
 				return nil, nil, err
 			} else if ref.Cursor.Count == 0 {
 				return nil, nil, fmt.Errorf("Single reference count of zero: %s", ref.String())
 			}
 			codex.Count += ref.Cursor.Count
+			codex.Norm += ref.Cursor.Count * ref.Cursor.Count
+			codex.Length++
 		}
 		for _, refs := range codex.Double {
 			for _, ref := range refs {
 				key, major = ref.assembleCountKey(nil, major)
-				fmt.Println("assembled double key", string(key))
 				ref.Cursor = &Cursor{}
 				count, ref.Cursor.Count, err = getCount(count, key, txn)
 				if err != nil {
@@ -122,20 +135,21 @@ func (c *CodexMap) getAssignmentTree(txn *badger.Txn) ([]string, map[string]*Ass
 					return nil, nil, fmt.Errorf("Double reference count of zero: %s", ref.String())
 				}
 				codex.Count += ref.Cursor.Count
+				codex.Norm += ref.Cursor.Count * ref.Cursor.Count
+				codex.Length++
 			}
 		}
 	}
 
-	fmt.Println("sorted values:")
-	printCodexMap(c)
+	// fmt.Println("sorted values:")
+	// printCodexMap(c)
 	// Now sort the codex map
 	sort.Stable(c)
-	fmt.Println("the codex map has been sorted", c.Slice)
+	// fmt.Println("the codex map has been sorted", c.Slice)
 
 	index := map[string]*Assignment{}
 	indexMap := map[string]int{}
 	for i, id := range c.Slice {
-		fmt.Println("Creating assignment for", id)
 		indexMap[id] = i
 
 		codex := c.Index[id]
@@ -148,10 +162,16 @@ func (c *CodexMap) getAssignmentTree(txn *badger.Txn) ([]string, map[string]*Ass
 		}
 
 		deps := map[int]int{}
-		var cursorCount int
+		past := index[id].Past
 		for dep, refs := range codex.Double {
 			if j, has := indexMap[dep]; has {
-				index[id].Past.Push(dep, j, refs)
+				past.Push(dep, j, refs)
+				for k, ref := range refs {
+					ref.Cursor.ID = dep
+					ref.Cursor.Index = k
+					past.insertIndex(dep, k, len(past.Cursors))
+					past.Cursors = append(past.Cursors, ref.Cursor)
+				}
 				if j > deps[j] {
 					deps[j] = j
 				}
@@ -162,24 +182,17 @@ func (c *CodexMap) getAssignmentTree(txn *badger.Txn) ([]string, map[string]*Ass
 				}
 			} else {
 				index[id].Future[dep] = refs
-				cursorCount += len(refs)
 			}
 		}
 
 		index[id].Past.sortOrder()
 
-		cursors := make(CursorSet, 0, cursorCount)
-		for _, id := range index[id].Past.Slice {
-			for k, ref := range index[id].Past.Index[id] {
-				ref.Cursor.ID = id
-				ref.Cursor.Index = k
-				ref.Cursor.Iterator = txn.NewIterator(iteratorOptions)
-				index[id].Past.Indices[id][k] = len(cursors)
-				cursors = append(cursors, ref.Cursor)
-			}
-		}
-
-		index[id].Past.Cursors = cursors
+		// cursors := make(CursorSet, 0, cursorCount)
+		// fmt.Println(len(index[id].Past.Slice), index[id].Past.Slice)
+		// fmt.Println("and cursorCount", cursorCount)
+		// for _, dep := range index[id].Past.Slice {
+		// 	fmt.Println("trying for id", id)
+		// }
 
 		index[id].Dependencies = make([]int, 0, len(deps))
 		for j := range deps {
@@ -187,13 +200,21 @@ func (c *CodexMap) getAssignmentTree(txn *badger.Txn) ([]string, map[string]*Ass
 		}
 		sort.Sort(index[id].Dependencies)
 
+		// fmt.Println("about to set value root for", id)
 		index[id].setValueRoot(txn)
 		if index[id].ValueRoot == nil {
 			return nil, nil, fmt.Errorf("Assignment's static intersect is empty: %v", index[id])
 		}
 	}
 	// return slice, index, nil
+	// fmt.Println("returning slice", c.Slice)
 	return c.Slice, index, nil
+}
+
+func (c *CodexMap) Close() {
+	for _, id := range c.Slice {
+		c.Index[id].Close()
+	}
 }
 
 func makeReference(graph string, index int, permutation byte, m ld.Node, n ld.Node) *Reference {
