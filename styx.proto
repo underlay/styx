@@ -1,25 +1,31 @@
 syntax = "proto3";
+package styx;
 
-// Just use raw bytes for major key.
-// message MajorKey {
-//   string A = 1;
-// }
-
-message MajorValue {
-  repeated string B = 1;
-  repeated string C = 2;
+message SourceList {
+	repeated Source sources = 2;
 }
 
-message MinorKey {
-  string A = 1;
-  string B = 2;
+message Source {
+	bytes cid = 1;
+	string graph = 2;
+	int32 index = 3;
 }
 
-message MinorValue {
-  repeated MinorEntry Entries = 1;
+message Blank {
+	bytes cid = 1;
+	string id = 2;
 }
 
-message MinorEntry {
-  string C = 1;
-  bytes Cid = 2;
+message Literal {
+	string value = 1;
+	string language = 2;
+	string datatype = 3;
+}
+
+message Value {
+	oneof value {
+		string iri = 1;
+		Blank blank = 2;
+		Literal literal = 3;
+	}
 }

@@ -1,122 +1,96 @@
 # styx
 
-Home-grown quadstore inspired by [Hexastore](https://dl.acm.org/citation.cfm?id=1453965), tailored for use in the Underlay. 
+Home-grown quadstore inspired by [Hexastore](https://dl.acm.org/citation.cfm?id=1453965), tailored for use in the Underlay.
 
-## Usage
+```golang
+// Open an IPFS Shell
+sh := ipfs.NewShell("localhost:5001")
 
-### Create a store
-```go
-path := "./leveldb"
-store := OpenStore(path)
+// Open a Badger database
+path := "/tmp/badger"
+opts := badger.DefaultOptions
+opts.Dir = path
+opts.ValueDir = path
+
+db, err := badger.Open(opts)
+
+// Ingest some data as JSON-LD
+var data map[string]interface{}
+var dataBytes = []byte(`{
+  "@context": { "@vocab": "http://schema.org/" },
+  "@graph": [
+    {
+      "@type": "Person",
+      "name": "Joel",
+      "birthDate": "1996-02-02",
+      "children": { "@id": "http://people.com/liljoel" }
+    },
+    {
+      "@id": "http://people.com/liljoel",
+      "@type": "Person",
+      "name": "Little Joel",
+      "birthDate": "2030-11-10"
+    }
+  ]
+}`)
+
+json.Unmarshal(dataBytes, &data)
+Ingest(data, db, sh)
+
+// Query by subgraph pattern
+var query map[string]interface{}
+var queryBytes = []byte(`{
+  "@context": {
+    "@vocab": "http://schema.org/",
+    "parent": {
+      "@reverse": "children"
+    }
+  },
+  "@type": "Person",
+  "birthDate": {},
+  "parent": {
+    "name": "Joel"
+  }
+}`)
+
+json.Unmarshal(queryBytes, &query)
+Query(query, func(result interface{}) error {
+  // The result will be framed by the query,
+  // as per https://w3c.github.io/json-ld-framing
+  bytes, _ := json.MarshalIndent(result, "", "\t")
+  fmt.Println(string(bytes))
+  return nil
+}, db, sh)
 ```
 
-### Insert an N-Quad
-```go
-triple := Triple{"alice", "likes", "pizza"}
-cid := "QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM" // must be b58-encoded
-quad := Quad{Triple: triple, Cid: cid}
+When ingested, every JSON-LD document is first [normalized as an RDF dataset](https://json-ld.github.io/normalization/spec/).
 
-store.Insert(quad)
+```
+<http://people.com/liljoel> <http://schema.org/birthDate> "2030-11-10" .
+<http://people.com/liljoel> <http://schema.org/name> "Little Joel" .
+<http://people.com/liljoel> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://schema.org/Person> .
+_:c14n0 <http://schema.org/birthDate> "1996-02-02" .
+_:c14n0 <http://schema.org/children> <http://people.com/liljoel> .
+_:c14n0 <http://schema.org/name> "Joel" .
+_:c14n0 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://schema.org/Person> .
 ```
 
-### Index an incomplete triple
-```go
-// "blank nodes" begin with "_:"
-store.IndexTriple(Triple{"alice", "likes", "_:foo"})
-// [{[alice likes pizza] QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM}]
+This (canonicalized) dataset has an IPFS CID of `QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC` (you can view it from [any gateway](https://gateway.underlay.store/ipfs/QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC) or in the [Underlay explorer](https://underlay.github.io/explore/#QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC)!). So when the query processor wants to reference a blank node from that dataset, it'll use a URI staring with `dweb:/ipfs/QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC`, plus a fragment identifier for the (canonicalized) blank node id.
 
-store.IndexTriple(Triple{"alice", "_:bar", "pizza"})
-// [{[alice likes pizza] QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM}]
-
-store.IndexTriple(Triple{"_:baz", "likes", "pizza"})
-// [{[alice likes pizza] QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM}]
 ```
-
-### Ingest JSON-LD documents
-```go
-var doc = map[string]interface{}{
-	"@context": map[string]interface{}{
-		"@vocab": "http://schema.org/",
-	},
-	"@graph": []interface{}{
-		map[string]interface{}{
-			"@type":    "Movie",
-			"name":     "Vertigo",
-			"director": map[string]interface{}{"@id": "_:n0"},
-		},
-		map[string]interface{}{
-			"@id":   "_:n0",
-			"@type": "Person",
-			"name":  "Alfred Hitchcock",
-			"hometown": map[string]interface{}{
-				"population": "12879",
-				"name":       "Leytonstone",
-			},
-		},
-	},
-}
-
-// You have to supply a b58-encoded "label" for every document.
-// This should the document's CID, but we can fake one if we need to.
-store.Ingest(doc, "QmfQ5QAjvg4GtA3wg3adpnDJug8ktA1BxurVqBD8rtgVjM")
-```
-
-### Query with JSON-LD
-```go
-// `Variable` == "http://underlay.mit.edu/query#"
-// It's a special namespace to label variables.
-query := map[string]interface{}{
-	"@context": map[string]interface{}{
-		"@vocab": "http://schema.org/",
-		"$":      Variable,
-	},
-	"@type": "Movie",
-	"name":  "Vertigo",
-	"director": map[string]interface{}{
-		"name": map[string]interface{}{"@id": "$:director"},
-		"hometown": map[string]interface{}{
-			"population": map[string]interface{}{"@id": "$:population"},
-			"name":       map[string]interface{}{"@id": "$:city"},
-		},
-	},
-}
-
-branch, _ := store.ResolveQuery(query)
-
-for variable, value := range branch.frame {
-  if isVariable(variable) {
-    // value.Value is the string value
-    // value.Source is an array of n-quads that support the value
-    fmt.Println(variable, "is", value.Value)
+{
+  "@context": {
+    "@vocab": "http://schema.org/",
+    "parent": {
+      "@reverse": "http://schema.org/children"
+    }
+  },
+  "@id": "http://people.com/liljoel",
+  "@type": "Person",
+  "birthDate": "2030-11-10",
+  "parent": {
+    "@id": "dweb:/ipfs/QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC#_:c14n0",
+    "name": "Joel"
   }
 }
-/*
-director is Alfred Hitchcock
-city is Leytonstone
-population is 12879
-*/
-```
-
-### Query with property path
-```go
-root := map[string]interface{}{
-	"@context": map[string]interface{}{
-		"@vocab": "http://schema.org/",
-	},
-	"name": "Vertigo",
-}
-
-path := []string{"director", "hometown", "population"}
-
-branch, _ := store.ResolvePath(root, path)
-
-for variable, value := range branch.frame {
-	if isVariable(variable) {
-		name := variable[len(Variable):]
-		fmt.Println(name, "is", value.Value)
-	}
-}
-/*
-result is 12879
-*/
 ```
