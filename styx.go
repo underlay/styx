@@ -4,36 +4,73 @@ import (
 	"fmt"
 	"strings"
 
+	badger "github.com/dgraph-io/badger"
 	ipfs "github.com/ipfs/go-ipfs-api"
-
-	"github.com/dgraph-io/badger"
-	"github.com/piprate/json-gold/ld"
+	ld "github.com/piprate/json-gold/ld"
 )
 
-// Algorithm has to be URDNA2015
-const Algorithm = "URDNA2015"
+// Query the database
+func Query(query interface{}, callback func(result interface{}) error, db *badger.DB, sh *ipfs.Shell) error {
+	proc := ld.NewJsonLdProcessor()
+	options := ld.NewJsonLdOptions("")
+	options.DocumentLoader = NewIPFSDocumentLoader(sh)
+	options.ProcessingMode = ld.JsonLd_1_1
+	options.UseNativeTypes = true
+	options.Explicit = true
 
-// Format has to be application/nquads
-const Format = "application/nquads"
+	if asMap, isMap := query.(map[string]interface{}); isMap {
+		_, hasGraph := asMap["@graph"]
+		options.OmitGraph = !hasGraph
+	}
 
-// InitialCounter is the first uint64 value we start counting from.
-// Let's set it to 1 just in case we want to ever use 0 for something special.
-const InitialCounter uint64 = 1
+	// Convert to RDF
+	rdf, err := proc.Normalize(query, options)
+	if err != nil {
+		return err
+	}
 
-// ConstantPermutation is the value we give to all-constant references.
-// We don't even use them for now.
-// Let's make it 7 to be really weird.
-const ConstantPermutation uint8 = 7
+	dataset := rdf.(*ld.RDFDataset)
+	printDataset(dataset)
+	return db.View(func(txn *badger.Txn) error {
+		index, err := solveDataset(dataset, txn)
+		if err != nil {
+			return err
+		}
 
-func ingest(doc interface{}, db *badger.DB, sh *ipfs.Shell) error {
+		var result string
+		for _, quad := range dataset.Graphs[DefaultGraph] {
+			result += string(marshalReferenceNode(quad.Subject, index))
+			result += " "
+			result += string(marshalReferenceNode(quad.Predicate, index))
+			result += " "
+			result += string(marshalReferenceNode(quad.Object, index))
+			result += " .\n"
+		}
+		fmt.Println(result)
+		document, err := proc.FromRDF(result, options)
+		if err != nil {
+			return err
+		}
+
+		framed, err := proc.Frame(document, query, options)
+		if err != nil {
+			return err
+		}
+
+		return callback(framed)
+	})
+}
+
+// Ingest a document
+func Ingest(doc interface{}, db *badger.DB, sh *ipfs.Shell) (string, error) {
 	proc := ld.NewJsonLdProcessor()
 	options := ld.NewJsonLdOptions("")
 	options.DocumentLoader = NewIPFSDocumentLoader(sh)
 
-	// Convert to normnalized RDF
-	rdf, err := proc.Normalize(doc, options)
+	// Convert to RDF
+	rdf, err := proc.ToRDF(doc, options)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	dataset := rdf.(*ld.RDFDataset)
@@ -44,7 +81,7 @@ func ingest(doc interface{}, db *badger.DB, sh *ipfs.Shell) error {
 	api := ld.NewJsonLdApi()
 	normalized, err := api.Normalize(dataset, options)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	fmt.Println("normalized")
@@ -53,14 +90,10 @@ func ingest(doc interface{}, db *badger.DB, sh *ipfs.Shell) error {
 	reader := strings.NewReader(normalized.(string))
 	cid, err := sh.Add(reader)
 	if err != nil {
-		return err
+		return cid, err
 	}
 
-	return db.Update(func(txn *badger.Txn) error {
+	return cid, db.Update(func(txn *badger.Txn) error {
 		return insert(cid, dataset, txn)
 	})
 }
-
-/*
-???
-*/
