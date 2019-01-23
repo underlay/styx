@@ -63,20 +63,20 @@ Query(query, func(result interface{}) error {
 }, db, sh)
 ```
 
-```json
+```
 {
-	"@context": {
-		"@vocab": "http://schema.org/",
-		"parent": {
-			"@reverse": "http://schema.org/children"
-		}
-	},
-	"@id": "http://people.com/liljoel",
-	"@type": "Person",
-	"birthDate": "2030-11-10",
-	"parent": {
-		"@id": "dweb:/ipfs/QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC#_:c14n0",
-		"name": "Joel"
-	}
+  "@context": {
+    "@vocab": "http://schema.org/",
+    "parent": {
+      "@reverse": "http://schema.org/children"
+    }
+  },
+  "@id": "http://people.com/liljoel",
+  "@type": "Person",
+  "birthDate": "2030-11-10",
+  "parent": {
+    "@id": "dweb:/ipfs/QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC#_:c14n0",
+    "name": "Joel"
+  }
 }
 ```
