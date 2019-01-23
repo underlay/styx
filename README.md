@@ -14,52 +14,52 @@ opts.ValueDir = path
 
 db, err := badger.Open(opts)
 
-// Ingest some data
+// Ingest some data as JSON-LD
 var data map[string]interface{}
 var dataBytes = []byte(`{
-	"@context": { "@vocab": "http://schema.org/" },
-	"@graph": [
-		{
-			"@type": "Person",
-			"name": "Joel",
-			"birthDate": "1996-02-02",
-			"children": { "@id": "http://people.com/liljoel" }
-		},
-		{
-			"@id": "http://people.com/liljoel",
-			"@type": "Person",
-			"name": "Little Joel",
-			"birthDate": "2030-11-10"
-		}
-	]
+  "@context": { "@vocab": "http://schema.org/" },
+  "@graph": [
+    {
+      "@type": "Person",
+      "name": "Joel",
+      "birthDate": "1996-02-02",
+      "children": { "@id": "http://people.com/liljoel" }
+    },
+    {
+      "@id": "http://people.com/liljoel",
+      "@type": "Person",
+      "name": "Little Joel",
+      "birthDate": "2030-11-10"
+    }
+  ]
 }`)
 
 json.Unmarshal(dataBytes, &data)
 Ingest(data, db, sh)
 
-// Query by subgraph patter
+// Query by subgraph pattern
 var query map[string]interface{}
 var queryBytes = []byte(`{
-	"@context": {
-		"@vocab": "http://schema.org/",
-		"parent": {
-			"@reverse": "children"
-		}
-	},
-	"@type": "Person",
-	"birthDate": {},
-	"parent": {
-		"name": "Joel"
-	}
+  "@context": {
+    "@vocab": "http://schema.org/",
+    "parent": {
+      "@reverse": "children"
+    }
+  },
+  "@type": "Person",
+  "birthDate": {},
+  "parent": {
+    "name": "Joel"
+  }
 }`)
 
 json.Unmarshal(queryBytes, &query)
 Query(query, func(result interface{}) error {
-	// The result will be framed by the query,
-	// as per https://w3c.github.io/json-ld-framing
-	bytes, _ := json.MarshalIndent(result, "", "\t")
-	fmt.Println(string(bytes))
-	return nil
+  // The result will be framed by the query,
+  // as per https://w3c.github.io/json-ld-framing
+  bytes, _ := json.MarshalIndent(result, "", "\t")
+  fmt.Println(string(bytes))
+  return nil
 }, db, sh)
 ```
 
