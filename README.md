@@ -63,6 +63,20 @@ Query(query, func(result interface{}) error {
 }, db, sh)
 ```
 
+When ingested, every JSON-LD document is first [normalized as an RDF dataset](https://json-ld.github.io/normalization/spec/).
+
+```
+<http://people.com/liljoel> <http://schema.org/birthDate> "2030-11-10" .
+<http://people.com/liljoel> <http://schema.org/name> "Little Joel" .
+<http://people.com/liljoel> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://schema.org/Person> .
+_:c14n0 <http://schema.org/birthDate> "1996-02-02" .
+_:c14n0 <http://schema.org/children> <http://people.com/liljoel> .
+_:c14n0 <http://schema.org/name> "Joel" .
+_:c14n0 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://schema.org/Person> .
+```
+
+This (canonicalized) dataset has an IPFS CID of `QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC` (you can view it from [any gateway](https://gateway.underlay.store/ipfs/QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC) or in the [Underlay explorer](https://underlay.github.io/explore/#QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC)!). So when the query processor wants to reference a blank node from that dataset, it'll use a URI staring with `dweb:/ipfs/QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC`, plus a fragment identifier for the (canonicalized) blank node id.
+
 ```
 {
   "@context": {
