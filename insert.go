@@ -14,30 +14,51 @@ import (
 )
 
 /*
-#  format            value type  prefixes
---------------------------------------
-3  p \t a \t b \t c  SourceList  {a b c}
-6  p \t a \t b       uint64      {i j k l m n}
-3  p \t a            uint64      {x y z}
-----------------------------
-12 total keys.
+In this table, the 'p' that each key starts with is a single byte "prefix"
+from the "prefixes" set. The prefix encodes both the key's type and rotation.
+
+name    #  format         value type  prefixes
+----------------------------------------------
+triple  3  p | a | b | c  SourceList  {a b c}
+major   3  p | a | b      uint64      {i j k}
+minor   3  p | a | b      uint64      {x y z}
+value   3  p | a          Value       {p}
+index   3  p | element    Index       {q}
+----------------------------------------------
+
+The delimiter (shown as a pipe above) is encoded as a tab := byte('\t')
+
+When inserting a triple <|S P O|>, we perform 12-15 operations 😬
+- We first look up each element's index key, if it exists.
+  These are ['p', '\t', S...], ['p', '\t', P...], and ['p', '\t', O...].
+  For each element, we either get a struct Index with a uint64 id, or we
+  create a new one and write that to the index key. We also increment
+  (or set to an initial 1) the Index.<position> counter: this is a count
+  of the total number of times this id occurs in this position (.subject,
+  .predicate, or .object) that we use a heuristic during query planning.
+- We then insert the three triple keys. These are the rotations of the
+	triple [a|s|p|o], [b|p|o|s], and [c|o|s|p], where s, p, and o are the
+	uint64 ids we got from the index keys. The values for each of these keys
+- Next we insert the three clockwise ("major")
 */
 
-// ValuePrefixes address the value indices
-var ValuePrefixes = [3]byte{'a', 'b', 'c'}
-var valuePrefixMap = map[byte]uint8{'a': 0, 'b': 1, 'c': 2}
+// TriplePrefixes address the value indices
+var TriplePrefixes = [3]byte{'a', 'b', 'c'}
+var triplePrefixMap = map[byte]uint8{'a': 0, 'b': 1, 'c': 2}
 
 // MajorPrefixes address the "counter-clockwise" indices {spo, pos, osp}
 var MajorPrefixes = [3]byte{'i', 'j', 'k'}
 var majorPrefixMap = map[byte]uint8{'i': 0, 'j': 1, 'k': 2}
 
 // MinorPrefixes address the "clockwise" indices {sop, pso, ops}
-var MinorPrefixes = [3]byte{'l', 'm', 'n'}
-var minorPrefixMap = map[byte]uint8{'l': 0, 'm': 1, 'n': 2}
+var MinorPrefixes = [3]byte{'x', 'y', 'z'}
+var minorPrefixMap = map[byte]uint8{'x': 0, 'y': 1, 'z': 2}
 
-// IndexPrefixes address the single-element total counts {s, p, o}
-var IndexPrefixes = [3]byte{'x', 'y', 'z'}
-var indexPrefixMap = map[byte]uint8{'x': 0, 'y': 1, 'z': 2}
+// ValuePrefix keys translate uint64 ids to ld.Node values
+var ValuePrefix = byte('p')
+
+// IndexPrefix keys translate ld.Node values to uint64 ids
+var IndexPrefix = byte('q')
 
 var keySizes = map[byte]int{
 	'a': 3, 'b': 3, 'c': 3,
@@ -136,7 +157,7 @@ func insert(origin string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 			// Value & index loop
 			for i := byte(0); i < 3; i++ {
 				a, b, c := permuteMajor(i, s, p, o)
-				valuePrefix := ValuePrefixes[i]
+				valuePrefix := TriplePrefixes[i]
 				// This is the value key.
 				// assembleKey knows to pack all of a, b, and c because of the prefix.
 				valueKey := assembleKey(valuePrefix, a, b, c)
@@ -240,7 +261,7 @@ func assembleKey(prefix byte, a, b, c []byte) []byte {
 		keySize += 1 + len(b)
 	} else if _, has := minorPrefixMap[prefix]; has {
 		keySize += 1 + len(b)
-	} else if _, has := valuePrefixMap[prefix]; has {
+	} else if _, has := triplePrefixMap[prefix]; has {
 		keySize += 1 + len(b) + 1 + len(c)
 	}
 	key := make([]byte, 2, keySize)
@@ -249,7 +270,7 @@ func assembleKey(prefix byte, a, b, c []byte) []byte {
 	if _, has := indexPrefixMap[prefix]; !has {
 		key = append(key, tab)
 		key = append(key, b...)
-		if _, has := valuePrefixMap[prefix]; has {
+		if _, has := triplePrefixMap[prefix]; has {
 			key = append(key, tab)
 			key = append(key, c...)
 		}

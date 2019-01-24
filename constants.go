@@ -23,14 +23,14 @@ const Format = "application/nquads"
 
 // ConstantPermutation is the value we give to all-constant references.
 // We don't even use them for now.
-const ConstantPermutation uint8 = 255
-const PermutationA uint8 = 0
-const PermutationB uint8 = 1
-const PermutationC uint8 = 2
-const PermutationAB uint8 = 3
-const PermutationBC uint8 = 4
-const PermutationCA uint8 = 5
-const PermutationABC uint8 = 9
+const constantPermutation uint8 = 255
+const permutationA uint8 = 0
+const permutationB uint8 = 1
+const permutationC uint8 = 2
+const permutationAB uint8 = 3
+const permutationBC uint8 = 4
+const permutationCA uint8 = 5
+const permutationABC uint8 = 9
 
 // InitialCounter is the first value we write to major, minor, & index keys
 const InitialCounter uint64 = 1

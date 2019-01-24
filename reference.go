@@ -3,29 +3,30 @@ package styx
 import (
 	fmt "fmt"
 
-	"github.com/piprate/json-gold/ld"
+	ld "github.com/piprate/json-gold/ld"
 )
 
-// Reference is a reference in a dataset
+// A Reference to an occurrence of a variable in a dataset
 type Reference struct {
-	Graph       string
-	Index       int
-	Permutation uint8
-	M           ld.Node
-	N           ld.Node
-	Cursor      *Cursor
-	Dual        *Reference
+	Graph       string     // The graph in the dataset
+	Index       int        // The index of the triple within the graph
+	Permutation uint8      // The element (subject/predicate/object) within the triple
+	M           ld.Node    // The next (clockwise) element in the triple
+	N           ld.Node    // The previous (clockwise) element in the triple
+	Cursor      *Cursor    // The
+	Dual        *Reference // If (M or N) is a blank node, this is a pointer to its reference struct
 }
 
 func (ref *Reference) String() string {
-	var count uint64
-	if ref.Cursor != nil {
-		count = ref.Cursor.Count
-	}
-	return fmt.Sprintf("%s/%d:%d %d {%s %s}", ref.Graph, ref.Index, ref.Permutation, count, ref.M.GetValue(), ref.N.GetValue())
+	return fmt.Sprintf(
+		"%s/%d:%d {%s %s} :: %s",
+		ref.Graph, ref.Index, ref.Permutation,
+		ref.M.GetValue(), ref.N.GetValue(),
+		ref.Cursor.String(),
+	)
 }
 
-func (ref *Reference) Close() {
+func (ref *Reference) close() {
 	if ref.Cursor != nil {
 		if ref.Cursor.Iterator != nil {
 			ref.Cursor.Iterator.Close()
@@ -71,15 +72,15 @@ func marshalReferenceNode(node ld.Node, index map[string]*Assignment) []byte {
 }
 
 // A ReferenceSet is any slice of References
-type ReferenceSet []*Reference
+type referenceSet []*Reference
 
 // Sort interface for ReferenceSet
-func (refs ReferenceSet) Len() int                { return len(refs) }
-func (refs ReferenceSet) Swap(a, b int)           { refs[a], refs[b] = refs[b], refs[a] }
-func (refs ReferenceSet) Less(a, b int) bool      { return refs[a].Cursor.Count < refs[b].Cursor.Count }
-func (refs ReferenceSet) getCursor(i int) *Cursor { return refs[i].Cursor }
+func (refs referenceSet) Len() int                { return len(refs) }
+func (refs referenceSet) Swap(a, b int)           { refs[a], refs[b] = refs[b], refs[a] }
+func (refs referenceSet) Less(a, b int) bool      { return refs[a].Cursor.Count < refs[b].Cursor.Count }
+func (refs referenceSet) getCursor(i int) *Cursor { return refs[i].Cursor }
 
-func (refs ReferenceSet) toCursorSet() CursorSet {
+func (refs referenceSet) toCursorSet() CursorSet {
 	cs := CursorSet{}
 	for _, ref := range refs {
 		cs = append(cs, ref.Cursor)
@@ -87,7 +88,7 @@ func (refs ReferenceSet) toCursorSet() CursorSet {
 	return cs
 }
 
-func (refs ReferenceSet) String() string {
+func (refs referenceSet) String() string {
 	s := "[ "
 	for i, ref := range refs {
 		if i > 0 {

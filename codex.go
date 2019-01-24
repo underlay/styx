@@ -22,24 +22,24 @@ type Codex struct {
 
 func (codex *Codex) String() string {
 	var val string
-	val += fmt.Sprintf("Constraint: %s\n", ReferenceSet(codex.Constraint).String())
-	val += fmt.Sprintf("Singles: %s\n", ReferenceSet(codex.Single).String())
+	val += fmt.Sprintf("Constraint: %s\n", referenceSet(codex.Constraint).String())
+	val += fmt.Sprintf("Singles: %s\n", referenceSet(codex.Single).String())
 	val += fmt.Sprintln("Doubles:")
 	for id, refs := range codex.Double {
-		val += fmt.Sprintf("  %s: %s\n", id, ReferenceSet(refs).String())
+		val += fmt.Sprintf("  %s: %s\n", id, referenceSet(refs).String())
 	}
 	val += fmt.Sprintf("Norm: %d\n", codex.Norm)
 	val += fmt.Sprintf("Length: %d\n", codex.Length)
 	return val
 }
 
-func (codex *Codex) Close() {
+func (codex *Codex) close() {
 	for _, ref := range codex.Single {
-		ref.Close()
+		ref.close()
 	}
 	for _, refs := range codex.Double {
 		for _, ref := range refs {
-			ref.Close()
+			ref.close()
 		}
 	}
 }
@@ -155,10 +155,10 @@ func (c *CodexMap) getAssignmentTree(txn *badger.Txn) ([]string, map[string]*Ass
 		codex := c.Index[id]
 
 		index[id] = &Assignment{
-			Constraint: ReferenceSet(codex.Constraint),
-			Present:    ReferenceSet(codex.Single),
+			Constraint: referenceSet(codex.Constraint),
+			Present:    referenceSet(codex.Single),
 			Past:       &Past{},
-			Future:     map[string]ReferenceSet{},
+			Future:     map[string]referenceSet{},
 		}
 
 		deps := map[int]int{}
@@ -211,9 +211,9 @@ func (c *CodexMap) getAssignmentTree(txn *badger.Txn) ([]string, map[string]*Ass
 	return c.Slice, index, nil
 }
 
-func (c *CodexMap) Close() {
+func (c *CodexMap) close() {
 	for _, id := range c.Slice {
-		c.Index[id].Close()
+		c.Index[id].close()
 	}
 }
 
@@ -240,7 +240,7 @@ func getInitalCodexMap(dataset *ld.RDFDataset) ([]*Reference, *CodexMap, error) 
 				c = blankC.Attribute
 			}
 			if !A && !B && !C {
-				ref := makeReference(graph, index, ConstantPermutation, nil, nil)
+				ref := makeReference(graph, index, constantPermutation, nil, nil)
 				constants = append(constants, ref)
 			} else if (A && !B && !C) || (!A && B && !C) || (!A && !B && C) {
 				ref := &Reference{Graph: graph, Index: index}
@@ -262,36 +262,36 @@ func getInitalCodexMap(dataset *ld.RDFDataset) ([]*Reference, *CodexMap, error) 
 				codex.Single = append(codex.Single, ref)
 			} else if A && B && !C {
 				if a == b {
-					ref := makeReference(graph, index, PermutationAB, nil, quad.Object)
+					ref := makeReference(graph, index, permutationAB, nil, quad.Object)
 					codex := codexMap.GetCodex(a)
 					codex.Constraint = append(codex.Constraint, ref)
 				} else {
-					refA := makeReference(graph, index, PermutationA, blankB, quad.Object)
-					refB := makeReference(graph, index, PermutationB, quad.Object, blankA)
+					refA := makeReference(graph, index, permutationA, blankB, quad.Object)
+					refB := makeReference(graph, index, permutationB, quad.Object, blankA)
 					codexMap.InsertDouble(a, b, refA)
 					codexMap.InsertDouble(b, a, refB)
 					refA.Dual, refB.Dual = refB, refA
 				}
 			} else if A && !B && C {
 				if c == a {
-					ref := makeReference(graph, index, PermutationCA, nil, quad.Predicate)
+					ref := makeReference(graph, index, permutationCA, nil, quad.Predicate)
 					codex := codexMap.GetCodex(c)
 					codex.Constraint = append(codex.Constraint, ref)
 				} else {
-					refA := makeReference(graph, index, PermutationA, quad.Predicate, blankC)
-					refC := makeReference(graph, index, PermutationC, blankA, quad.Predicate)
+					refA := makeReference(graph, index, permutationA, quad.Predicate, blankC)
+					refC := makeReference(graph, index, permutationC, blankA, quad.Predicate)
 					codexMap.InsertDouble(a, c, refA)
 					codexMap.InsertDouble(c, a, refC)
 					refA.Dual, refC.Dual = refC, refA
 				}
 			} else if !A && B && C {
 				if b == c {
-					ref := makeReference(graph, index, PermutationBC, nil, quad.Subject)
+					ref := makeReference(graph, index, permutationBC, nil, quad.Subject)
 					codex := codexMap.GetCodex(b)
 					codex.Constraint = append(codex.Constraint, ref)
 				} else {
-					refB := makeReference(graph, index, PermutationB, blankC, quad.Subject)
-					refC := makeReference(graph, index, PermutationC, quad.Subject, blankB)
+					refB := makeReference(graph, index, permutationB, blankC, quad.Subject)
+					refC := makeReference(graph, index, permutationC, quad.Subject, blankB)
 					codexMap.InsertDouble(b, c, refB)
 					codexMap.InsertDouble(c, b, refC)
 					refB.Dual, refC.Dual = refC, refB

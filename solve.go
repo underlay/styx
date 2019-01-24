@@ -14,7 +14,7 @@ func setValue(id string, value []byte, index map[string]*Assignment) error {
 	for dep := range index[id].Future {
 		for _, ref := range index[dep].Past.Index[id] {
 			permutation := (ref.Permutation + 1) % 3
-			prefix := ValuePrefixes[permutation]
+			prefix := TriplePrefixes[permutation]
 			if ld.IsBlankNode(ref.M) {
 				n := marshalReferenceNode(ref.N, index)
 				ref.Cursor.Prefix = assembleKey(prefix, value, n, nil)
@@ -103,7 +103,7 @@ func solveDataset(dataset *ld.RDFDataset, txn *badger.Txn) (map[string]*Assignme
 	fmt.Printf("Constants: %v\n", constants)
 
 	slice, index, err := codexMap.getAssignmentTree(txn)
-	defer codexMap.Close()
+	defer codexMap.close()
 	// fmt.Println("wow here's the slice we got", slice)
 	printAssignments(slice, index)
 	if err != nil {

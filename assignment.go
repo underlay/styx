@@ -12,7 +12,7 @@ import (
 // Past is history
 type Past struct {
 	Slice   []string
-	Index   map[string]ReferenceSet
+	Index   map[string]referenceSet
 	Order   map[string]int
 	Cursors CursorSet
 	Indices map[string]map[int]int
@@ -33,9 +33,9 @@ func (past *Past) String() string {
 }
 
 // Push a dependency into the past
-func (past *Past) Push(dep string, order int, refs ReferenceSet) {
+func (past *Past) Push(dep string, order int, refs referenceSet) {
 	if past.Index == nil {
-		past.Index = map[string]ReferenceSet{dep: refs}
+		past.Index = map[string]referenceSet{dep: refs}
 	} else {
 		past.Index[dep] = refs
 	}
@@ -115,10 +115,10 @@ type Assignment struct {
 	Value        []byte
 	ValueRoot    []byte
 	Sources      []*Source
-	Constraint   ReferenceSet
-	Present      ReferenceSet
+	Constraint   referenceSet
+	Present      referenceSet
 	Past         *Past
-	Future       map[string]ReferenceSet
+	Future       map[string]referenceSet
 	Static       CursorSet
 	Dependencies Dependencies
 }
@@ -168,7 +168,7 @@ func (a *Assignment) setValueRoot(txn *badger.Txn) {
 			m := marshalNode("", ref.M)
 			n := marshalNode("", ref.N)
 			permutation := (ref.Permutation + 1) % 3
-			prefix := ValuePrefixes[permutation]
+			prefix := TriplePrefixes[permutation]
 			ref.Cursor.Prefix = assembleKey(prefix, m, n, nil) // ends in \t
 			cs = append(cs, ref.Cursor)
 		}

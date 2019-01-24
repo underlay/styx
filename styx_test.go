@@ -179,7 +179,7 @@ func TestIngest(t *testing.T) {
 				return err
 			}
 			prefix := key[0]
-			if _, has := valuePrefixMap[prefix]; has {
+			if _, has := triplePrefixMap[prefix]; has {
 				// Value key
 				sourceList := &SourceList{}
 				proto.Unmarshal(val, sourceList)

@@ -29,3 +29,10 @@ message Value {
 		Literal literal = 3;
 	}
 }
+
+message Index {
+	uint64 id = 1;
+	uint64 subject = 2;
+	uint64 predicate = 3;
+	uint64 object = 4;
+}
