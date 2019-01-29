@@ -2,6 +2,10 @@
 
 Home-grown quadstore inspired by [Hexastore](https://dl.acm.org/citation.cfm?id=1453965), tailored for use in the Underlay.
 
+## What's going on?
+
+"Hexastore" is the silly idea that if you really care about your triples, you shouldn't just insert them once: you should actually insert them six times - one for each permutation of the three elements. And even better than regular hexastore, Styx performs 12 (twelve!) writes for every triple you want to insert!
+
 ```golang
 // Open an IPFS Shell
 sh := ipfs.NewShell("localhost:5001")

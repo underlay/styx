@@ -1,4 +1,4 @@
-package styx
+package main
 
 import (
 	"fmt"
@@ -46,6 +46,7 @@ func Query(query interface{}, callback func(result interface{}) error, db *badge
 			result += string(marshalReferenceNode(quad.Object, index))
 			result += " .\n"
 		}
+
 		fmt.Println(result)
 		document, err := proc.FromRDF(result, options)
 		if err != nil {

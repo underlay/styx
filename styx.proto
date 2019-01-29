@@ -1,5 +1,5 @@
 syntax = "proto3";
-package styx;
+package main;
 
 message SourceList {
 	repeated Source sources = 2;
