@@ -1,7 +1,6 @@
-package styx
+package main
 
 import (
-	"encoding/json"
 	fmt "fmt"
 
 	"github.com/dgraph-io/badger"
@@ -37,12 +36,8 @@ func (cursor *Cursor) Next() []byte {
 
 func (cursor *Cursor) Seek(value []byte) []byte {
 	key := append(cursor.Prefix, value...)
-	bytes, _ := json.Marshal(string(key))
-	fmt.Println("seeking to key", string(bytes))
 	cursor.Iterator.Seek(key)
-	fmt.Println("valid", cursor.Iterator.ValidForPrefix(cursor.Prefix))
-	fmt.Println("item", cursor.Iterator.Item().String())
-	return cursor.value()
+	return cursor.Value()
 }
 
 type Seekable interface {

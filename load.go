@@ -1,4 +1,4 @@
-package styx
+package main
 
 import (
 	"net/url"
