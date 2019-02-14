@@ -23,7 +23,7 @@ message Literal {
 }
 
 message Value {
-	oneof value {
+	oneof node {
 		string iri = 1;
 		Blank blank = 2;
 		Literal literal = 3;

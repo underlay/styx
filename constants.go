@@ -18,6 +18,9 @@ const Algorithm = "URDNA2015"
 // Format has to be application/nquads
 const Format = "application/nquads"
 
+// CounterKey to store the id counter
+var CounterKey = []byte{202, 254, 186, 190}
+
 // InitialCounter is the first uint64 value we start counting from.
 // Let's set it to 1 just in case we want to ever use 0 for something special.
 
@@ -74,10 +77,10 @@ func printDataset(dataset *ld.RDFDataset) {
 	}
 }
 
-func printAssignments(slice []string, index map[string]*Assignment) {
+func printAssignments(slice []string, assignmentMap AssignmentMap) {
 	fmt.Println("printing assignments", slice)
 	for _, id := range slice {
-		a := index[id]
+		a := assignmentMap[id]
 		fmt.Printf("id: %s\n", id)
 		fmt.Println(a.String())
 	}

@@ -37,7 +37,7 @@ func (cursor *Cursor) Next() []byte {
 func (cursor *Cursor) Seek(value []byte) []byte {
 	key := append(cursor.Prefix, value...)
 	cursor.Iterator.Seek(key)
-	return cursor.Value()
+	return cursor.value()
 }
 
 type Seekable interface {

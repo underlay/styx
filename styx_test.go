@@ -3,22 +3,21 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"testing"
 
+	"encoding/binary"
 	"encoding/json"
 
 	badger "github.com/dgraph-io/badger"
 	proto "github.com/golang/protobuf/proto"
-	ipfs "github.com/ipfs/go-ipfs-api"
 	ld "github.com/piprate/json-gold/ld"
 )
 
 // Replace at your leisure
-const path = "/tmp/badger"
+// const path = "/tmp/badger"
 
 // Replace at your leisure
-var sh = ipfs.NewShell("localhost:5001")
+// var sh = ipfs.NewShell("localhost:5001")
 var sampleData = []byte(`{
 	"@context": { "@vocab": "http://schema.org/" },
 	"@graph": [
@@ -49,31 +48,31 @@ var sampleQuery = []byte(`{
 	}
 }`)
 
-func openDB(t *testing.T, clean bool) *badger.DB {
-	// Sanity check for the daemon
-	if !sh.IsUp() {
-		t.Error("IPFS Daemon not running")
-	}
+// func openDB(t *testing.T, clean bool) *badger.DB {
+// 	// Sanity check for the daemon
+// 	if !sh.IsUp() {
+// 		t.Error("IPFS Daemon not running")
+// 	}
 
-	// Remove old db
-	if clean {
-		if err := os.RemoveAll(path); err != nil {
-			t.Error(err)
-		}
-	}
+// 	// Remove old db
+// 	if clean {
+// 		if err := os.RemoveAll(path); err != nil {
+// 			t.Error(err)
+// 		}
+// 	}
 
-	// Create DB
-	opts := badger.DefaultOptions
-	opts.Dir = path
-	opts.ValueDir = path
+// 	// Create DB
+// 	opts := badger.DefaultOptions
+// 	opts.Dir = path
+// 	opts.ValueDir = path
 
-	db, err := badger.Open(opts)
-	if err != nil {
-		t.Error(err)
-	}
+// 	db, err := badger.Open(opts)
+// 	if err != nil {
+// 		t.Error(err)
+// 	}
 
-	return db
-}
+// 	return db
+// }
 
 func TestIPFSDocumentLoader(t *testing.T) {
 	data := []byte(`{
@@ -83,6 +82,7 @@ func TestIPFSDocumentLoader(t *testing.T) {
 
 	if !sh.IsUp() {
 		t.Error("IPFS Daemon not running")
+		return
 	}
 
 	checkExpanded := func(result []interface{}) {
@@ -100,16 +100,19 @@ func TestIPFSDocumentLoader(t *testing.T) {
 			}
 		}
 		t.Error("IPFS document loaded did not expand document correctly")
+		return
 	}
 
 	cidIpfs, err := sh.Add(bytes.NewReader(data))
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	cidIpld, err := sh.DagPut(data, "json", "cbor")
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	fmt.Println(cidIpfs, cidIpld)
@@ -122,6 +125,7 @@ func TestIPFSDocumentLoader(t *testing.T) {
 	ipfsResult, err := proc.Expand(ipfsURI, options)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 	checkExpanded(ipfsResult)
 
@@ -131,6 +135,7 @@ func TestIPFSDocumentLoader(t *testing.T) {
 	dwebIpfsResult, err := proc.Expand(dwebIpfsURI, options)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 	checkExpanded(dwebIpfsResult)
 
@@ -138,6 +143,7 @@ func TestIPFSDocumentLoader(t *testing.T) {
 	ipldResult, err := proc.Expand(ipldURI, options)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 	checkExpanded(ipldResult)
 
@@ -145,6 +151,7 @@ func TestIPFSDocumentLoader(t *testing.T) {
 	dwebIpldResult, err := proc.Expand(dwebIpldURI, options)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 	checkExpanded(dwebIpldResult)
 }
@@ -153,7 +160,9 @@ func TestIngest(t *testing.T) {
 	var data map[string]interface{}
 	err := json.Unmarshal(sampleData, &data)
 	if err != nil {
+
 		t.Error(err)
+		return
 	}
 
 	db := openDB(t, true)
@@ -161,7 +170,9 @@ func TestIngest(t *testing.T) {
 
 	origin, err := Ingest(data, db, sh)
 	if err != nil {
+		// db.Close()
 		t.Error(err)
+		return
 	}
 
 	fmt.Printf("Origin: %s\n", origin)
@@ -169,38 +180,75 @@ func TestIngest(t *testing.T) {
 	err = db.View(func(txn *badger.Txn) error {
 		iter := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer iter.Close()
-		var key, val []byte
 		var i int
 		for iter.Seek(nil); iter.Valid(); iter.Next() {
 			item := iter.Item()
-			key = item.KeyCopy(key)
-			val, err := item.ValueCopy(val)
+			key := item.KeyCopy(nil)
+			val, err := item.ValueCopy(nil)
 			if err != nil {
 				return err
 			}
 			prefix := key[0]
-			if _, has := triplePrefixMap[prefix]; has {
+			if string(key) == string(CounterKey) {
+				// Counter!
+				fmt.Printf("Counter: %02d\n", binary.BigEndian.Uint64(val))
+			} else if prefix == IndexPrefix {
+				// Index key
+				index := &Index{}
+				err = proto.Unmarshal(val, index)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("Index entry\n  %s\n  %s\n", string(key), index.String())
+			} else if prefix == ValuePrefix {
+				// Value key
+				value := &Value{}
+				err = proto.Unmarshal(val, value)
+				if err != nil {
+					return err
+				}
+				hmm, err := marshalValue(value)
+				if err != nil {
+					return err
+				}
+				id := binary.BigEndian.Uint64(key[2:])
+				fmt.Printf("Value entry: %02d %s\n", id, hmm)
+			} else if _, has := triplePrefixMap[prefix]; has {
 				// Value key
 				sourceList := &SourceList{}
 				proto.Unmarshal(val, sourceList)
 				// bytes, _ := json.MarshalIndent(sourceList.Sources, "  ", "  ")
-				fmt.Printf("Value entry\n  %s\n  %s\n", string(key), sourcesToString(sourceList.Sources))
+				fmt.Printf("Triple entry: %s %02d | %02d | %02d :: %s\n",
+					string(key[0]),
+					binary.BigEndian.Uint64(key[2:10]),
+					binary.BigEndian.Uint64(key[10:18]),
+					binary.BigEndian.Uint64(key[18:26]),
+					sourcesToString(sourceList.Sources),
+				)
 			} else if _, has := minorPrefixMap[prefix]; has {
 				// Minor key
-				fmt.Printf("Minor entry\n  %s\n  %v\n", string(key), val)
+				fmt.Printf("Minor entry: %s %02d | %02d :: %02d\n",
+					string(key[0]),
+					binary.BigEndian.Uint64(key[2:10]),
+					binary.BigEndian.Uint64(key[10:18]),
+					binary.BigEndian.Uint64(val),
+				)
 			} else if _, has := majorPrefixMap[prefix]; has {
 				// Major key
-				fmt.Printf("Major entry\n  %s\n  %v\n", string(key), val)
-			} else if _, has := indexPrefixMap[prefix]; has {
-				// Index key
-				fmt.Printf("Index entry\n  %s\n  %v\n", string(key), val)
+				fmt.Printf("Major entry: %s %02d | %02d :: %02d\n",
+					string(key[0]),
+					binary.BigEndian.Uint64(key[2:10]),
+					binary.BigEndian.Uint64(key[10:18]),
+					binary.BigEndian.Uint64(val),
+				)
 			}
 			i++
 		}
-		fmt.Printf("Printed %d database entries\n", i)
+		fmt.Printf("Printed %02d database entries\n", i)
 		return nil
 	})
 	if err != nil {
+		// db.Close()
 		t.Error(err)
 	}
 }

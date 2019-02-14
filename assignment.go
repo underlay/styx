@@ -1,18 +1,18 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"sort"
 	"strings"
 
 	badger "github.com/dgraph-io/badger"
-	ld "github.com/piprate/json-gold/ld"
 )
 
 // Past is history
 type Past struct {
 	Slice   []string
-	Index   map[string]referenceSet
+	Index   ReferenceMap
 	Order   map[string]int
 	Cursors CursorSet
 	Indices map[string]map[int]int
@@ -33,9 +33,9 @@ func (past *Past) String() string {
 }
 
 // Push a dependency into the past
-func (past *Past) Push(dep string, order int, refs referenceSet) {
+func (past *Past) Push(dep string, order int, refs ReferenceSet) {
 	if past.Index == nil {
-		past.Index = map[string]referenceSet{dep: refs}
+		past.Index = ReferenceMap{dep: refs}
 	} else {
 		past.Index[dep] = refs
 	}
@@ -112,20 +112,20 @@ func (deps Dependencies) Swap(a, b int)      { deps[a], deps[b] = deps[b], deps[
 
 // An Assignment is a setting of a variable to a value.
 type Assignment struct {
-	Value        []byte
+	Value        uint64
 	ValueRoot    []byte
 	Sources      []*Source
-	Constraint   referenceSet
-	Present      referenceSet
+	Constraint   ReferenceSet
+	Present      ReferenceSet
 	Past         *Past
-	Future       map[string]referenceSet
+	Future       ReferenceMap
 	Static       CursorSet
 	Dependencies Dependencies
 }
 
 func (a *Assignment) String() string {
 	val := fmt.Sprintln("--- assignment ---")
-	val += fmt.Sprintf("Value: %s\n", string(a.Value))
+	val += fmt.Sprintf("Value: %d\n", a.Value)
 	val += fmt.Sprintf("ValueRoot: %s\n", string(a.ValueRoot))
 	val += fmt.Sprintf("Sources: %s\n", sourcesToString(a.Sources))
 	val += fmt.Sprintf("Constraint: %s\n", a.Constraint.String())
@@ -138,88 +138,6 @@ func (a *Assignment) String() string {
 		val += a.Past.String()
 	}
 	return val
-}
-
-// Close all dangling iterators
-// func (a *Assignment) Close() {
-// 	for _, cursor := range a.Static {
-// 		if cursor.Iterator != nil {
-// 			cursor.Iterator.Close()
-// 			cursor.Iterator = nil
-// 		}
-// 	}
-// 	if a.Past != nil {
-// 		for _, cursor := range a.Past.Cursors {
-// 			if cursor.Iterator != nil {
-// 				cursor.Iterator.Close()
-// 				cursor.Iterator = nil
-// 			}
-// 		}
-// 	}
-// }
-
-func (a *Assignment) setValueRoot(txn *badger.Txn) {
-	// fmt.Println("attempting to set the value root")
-	// fmt.Println(a.String())
-	cs := CursorSet{}
-	if a.Present.Len() > 0 {
-		for _, ref := range a.Present {
-			ref.Cursor.Iterator = txn.NewIterator(iteratorOptions)
-			m := marshalNode("", ref.M)
-			n := marshalNode("", ref.N)
-			permutation := (ref.Permutation + 1) % 3
-			prefix := TriplePrefixes[permutation]
-			ref.Cursor.Prefix = assembleKey(prefix, m, n, nil) // ends in \t
-			cs = append(cs, ref.Cursor)
-		}
-	}
-
-	if len(a.Future) > 0 {
-		for _, refs := range a.Future {
-			for _, ref := range refs {
-				ref.Cursor.Iterator = txn.NewIterator(iteratorOptions)
-				m, n := ld.IsBlankNode(ref.M), ld.IsBlankNode(ref.N)
-				if !m && n {
-					permutation := (ref.Permutation + 1) % 3
-					prefix := MinorPrefixes[permutation]
-					ref.Cursor.Prefix = assembleKey(prefix, marshalNode("", ref.M), nil, nil)
-				} else if m && !n {
-					permutation := (ref.Permutation + 2) % 3
-					prefix := MajorPrefixes[permutation]
-					ref.Cursor.Prefix = assembleKey(prefix, marshalNode("", ref.N), nil, nil)
-				}
-				cs = append(cs, ref.Cursor)
-			}
-		}
-	}
-
-	length := len(cs)
-	sort.Stable(cs)
-
-	if len(a.Past.Slice) > 0 {
-		for _, id := range a.Past.Slice {
-			for _, ref := range a.Past.Index[id] {
-				ref.Cursor.Iterator = txn.NewIterator(iteratorOptions)
-				m, n := ld.IsBlankNode(ref.M), ld.IsBlankNode(ref.N)
-				if !m && n {
-					permutation := (ref.Permutation + 1) % 3
-					prefix := MinorPrefixes[permutation]
-					ref.Cursor.Prefix = assembleKey(prefix, marshalNode("", ref.M), nil, nil)
-				} else if m && !n {
-					permutation := (ref.Permutation + 2) % 3
-					prefix := MajorPrefixes[permutation]
-					ref.Cursor.Prefix = assembleKey(prefix, marshalNode("", ref.N), nil, nil)
-				}
-				cs = append(cs, ref.Cursor)
-			}
-		}
-	}
-
-	valueRoot := Seek(cs, nil)
-	a.Static = cs[:length]
-	if valueRoot != nil {
-		a.ValueRoot = valueRoot
-	}
 }
 
 // Seek to the next intersection
@@ -253,31 +171,242 @@ func (a *Assignment) Seek(value []byte) []byte {
 }
 
 // Next value
-func (a *Assignment) Next() []byte {
+func (a *Assignment) Next() uint64 {
 	value := Next(a.Static)
 	if a.Past.Cursors.Len() > 0 {
 		for {
 			next := Seek(a.Past.Cursors, value)
 			if next == nil {
-				return nil
+				return 0
 			} else if string(next) == string(value) {
 				break
 			} else {
 				value = Seek(a.Static, next)
 				if value == nil {
-					return nil
+					return 0
 				}
 			}
 		}
 	}
-	return value
+	return binary.BigEndian.Uint64(value)
 }
 
-// All *badger.Iterators are initialized during getAssignmentTree. Close them all here!
-// func closeAssignments(index map[string]*Assignment) {
-// 	for _, assignment := range index {
-// 		if assignment != nil {
-// 			assignment.Close()
-// 		}
-// 	}
-// }
+func (a *Assignment) setValueRoot(txn *badger.Txn) {
+	// fmt.Println("attempting to set the value root")
+	// fmt.Println(a.String())
+	cursors := CursorSet{}
+	if a.Present.Len() > 0 {
+		for _, ref := range a.Present {
+			ref.Cursor.Iterator = txn.NewIterator(iteratorOptions)
+			permutation := (ref.Place + 1) % 3
+			prefix := TriplePrefixes[permutation]
+			m, n := ref.M.GetValue(nil), ref.N.GetValue(nil)
+			ref.Cursor.Prefix = assembleKey(prefix, m, n, 0)
+			cursors = append(cursors, ref.Cursor)
+		}
+	}
+
+	if len(a.Future) > 0 {
+		for _, refs := range a.Future {
+			for _, ref := range refs {
+				ref.Cursor.Iterator = txn.NewIterator(iteratorOptions)
+				indexM, m := ref.M.(*Index)
+				indexN, n := ref.N.(*Index)
+				if m && !n {
+					permutation := (ref.Place + 1) % 3
+					prefix := MinorPrefixes[permutation]
+					ref.Cursor.Prefix = assembleKey(prefix, indexM.GetId(), 0, 0)
+				} else if !m && n {
+					permutation := (ref.Place + 2) % 3
+					prefix := MajorPrefixes[permutation]
+					ref.Cursor.Prefix = assembleKey(prefix, indexN.GetId(), 0, 0)
+				}
+				cursors = append(cursors, ref.Cursor)
+			}
+		}
+	}
+
+	length := len(cursors)
+	sort.Stable(cursors)
+
+	if len(a.Past.Slice) > 0 {
+		for _, id := range a.Past.Slice {
+			for _, ref := range a.Past.Index[id] {
+				ref.Cursor.Iterator = txn.NewIterator(iteratorOptions)
+				indexM, m := ref.M.(*Index)
+				indexN, n := ref.N.(*Index)
+				if m && !n {
+					permutation := (ref.Place + 1) % 3
+					prefix := MinorPrefixes[permutation]
+					ref.Cursor.Prefix = assembleKey(prefix, indexM.GetId(), 0, 0)
+				} else if !m && n {
+					permutation := (ref.Place + 2) % 3
+					prefix := MajorPrefixes[permutation]
+					ref.Cursor.Prefix = assembleKey(prefix, indexN.GetId(), 0, 0)
+				}
+				cursors = append(cursors, ref.Cursor)
+			}
+		}
+	}
+
+	valueRoot := Seek(cursors, nil)
+	a.Static = cursors[:length]
+	if valueRoot != nil {
+		a.ValueRoot = valueRoot
+	}
+}
+
+// An AssignmentMap is a map of string variable labels to assignments.
+type AssignmentMap map[string]*Assignment
+
+// This is re-used between Major, Minor, and Index keys
+func getCount(key []byte, txn *badger.Txn) (uint64, error) {
+	item, err := txn.Get(key)
+	// KeyNotFound isn't necessarily an "error" - it just means the count is zero.
+	if err == badger.ErrKeyNotFound {
+		return 0, nil
+	} else if err != nil {
+		return 0, err
+	} else if count, err := item.ValueCopy(nil); err != nil {
+		return 0, err
+	} else {
+		return binary.BigEndian.Uint64(count), nil
+	}
+}
+
+func getAssignmentTree(codexMap *CodexMap, txn *badger.Txn) ([]string, AssignmentMap, error) {
+	var err error
+	var key []byte
+	var major bool
+
+	// Update the counts before sorting the codex map
+	for _, codex := range codexMap.Index {
+		codex.Count = 0
+		for _, ref := range codex.Single {
+			_, mIsIndex := ref.M.(*Index)
+			_, nIsIndex := ref.N.(*Index)
+			if mIsIndex && nIsIndex {
+				key, major = ref.assembleSingleCountKey(nil, major)
+			} else {
+				return nil, nil, fmt.Errorf("Single reference has non-index M or N: %s", ref.String())
+			}
+
+			ref.Cursor = &Cursor{}
+			ref.Cursor.Count, err = getCount(key, txn)
+			if err != nil {
+				return nil, nil, err
+			} else if ref.Cursor.Count == 0 {
+				return nil, nil, fmt.Errorf("Zero count single reference in codex: %s", ref.String())
+			}
+			codex.Count += ref.Cursor.Count
+			codex.Norm += ref.Cursor.Count * ref.Cursor.Count
+			codex.Length++
+		}
+
+		for _, refs := range codex.Double {
+			for _, ref := range refs {
+				var place uint8
+				var index *Index
+				ref.Cursor = &Cursor{}
+
+				mIndex, mIsIndex := ref.M.(*Index)
+				nIndex, nIsIndex := ref.N.(*Index)
+
+				if mIsIndex && !nIsIndex {
+					index = mIndex
+					place = (ref.Place + 1) % 3
+				} else if !mIsIndex && nIsIndex {
+					index = nIndex
+					place = (ref.Place + 2) % 3
+				} else {
+					return nil, nil, fmt.Errorf("Invalid double reference in codex: %s", ref.String())
+				}
+
+				if place == 0 {
+					ref.Cursor.Count = index.GetSubject()
+				} else if place == 1 {
+					ref.Cursor.Count = index.GetPredicate()
+				} else if place == 2 {
+					ref.Cursor.Count = index.GetObject()
+				}
+
+				if ref.Cursor.Count == 0 {
+					return nil, nil, fmt.Errorf("Double reference count of zero: %s", ref.String())
+				}
+
+				codex.Count += ref.Cursor.Count
+				codex.Norm += ref.Cursor.Count * ref.Cursor.Count
+				codex.Length++
+			}
+		}
+	}
+
+	// fmt.Println("sorted values:")
+	// printCodexMap(c)
+	// Now sort the codex map
+	sort.Stable(codexMap)
+	// fmt.Println("the codex map has been sorted", c.Slice)
+
+	index := AssignmentMap{}
+	indexMap := map[string]int{}
+	for i, id := range codexMap.Slice {
+		indexMap[id] = i
+
+		codex := codexMap.Index[id]
+
+		index[id] = &Assignment{
+			Constraint: codex.Constraint,
+			Present:    codex.Single,
+			Past:       &Past{},
+			Future:     ReferenceMap{},
+		}
+
+		deps := map[int]int{}
+		past := index[id].Past
+		for dep, refs := range codex.Double {
+			if j, has := indexMap[dep]; has {
+				past.Push(dep, j, refs)
+				for k, ref := range refs {
+					ref.Cursor.ID = dep
+					ref.Cursor.Index = k
+					past.insertIndex(dep, k, len(past.Cursors))
+					past.Cursors = append(past.Cursors, ref.Cursor)
+				}
+				if j > deps[j] {
+					deps[j] = j
+				}
+				for _, k := range index[dep].Dependencies {
+					if j > deps[k] {
+						deps[k] = j
+					}
+				}
+			} else {
+				index[id].Future[dep] = refs
+			}
+		}
+
+		index[id].Past.sortOrder()
+
+		// cursors := make(CursorSet, 0, cursorCount)
+		// fmt.Println(len(index[id].Past.Slice), index[id].Past.Slice)
+		// fmt.Println("and cursorCount", cursorCount)
+		// for _, dep := range index[id].Past.Slice {
+		// 	fmt.Println("trying for id", id)
+		// }
+
+		index[id].Dependencies = make([]int, 0, len(deps))
+		for j := range deps {
+			index[id].Dependencies = append(index[id].Dependencies, j)
+		}
+		sort.Sort(index[id].Dependencies)
+
+		// fmt.Println("about to set value root for", id)
+		index[id].setValueRoot(txn)
+		if index[id].ValueRoot == nil {
+			return nil, nil, fmt.Errorf("Assignment's static intersect is empty: %v", index[id])
+		}
+	}
+	// return slice, index, nil
+	// fmt.Println("returning slice", c.Slice)
+	return codexMap.Slice, index, nil
+}
