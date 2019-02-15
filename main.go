@@ -22,12 +22,14 @@ func openDB(t *testing.T, clean bool) *badger.DB {
 	// Sanity check for the daemon
 	if !sh.IsUp() {
 		t.Error("IPFS Daemon not running")
+		return nil
 	}
 
 	// Remove old db
 	if clean {
 		if err := os.RemoveAll(path); err != nil {
 			t.Error(err)
+			return nil
 		}
 	}
 
@@ -39,6 +41,7 @@ func openDB(t *testing.T, clean bool) *badger.DB {
 	db, err := badger.Open(opts)
 	if err != nil {
 		t.Error(err)
+		return nil
 	}
 
 	return db

@@ -23,9 +23,16 @@ message Literal {
 }
 
 message Value {
-	oneof value {
+	oneof node {
 		string iri = 1;
 		Blank blank = 2;
 		Literal literal = 3;
 	}
+}
+
+message Index {
+	uint64 id = 1;
+	uint64 subject = 2;
+	uint64 predicate = 3;
+	uint64 object = 4;
 }

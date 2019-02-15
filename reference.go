@@ -1,30 +1,33 @@
 package main
 
 import (
-	fmt "fmt"
+	"encoding/binary"
+	"fmt"
 
-	"github.com/piprate/json-gold/ld"
+	badger "github.com/dgraph-io/badger"
 )
 
-// Reference is a reference in a dataset
+// A Reference to an occurrence of a variable in a dataset
 type Reference struct {
-	Graph       string
-	Index       int
-	Permutation uint8
-	M           ld.Node
-	N           ld.Node
-	Cursor      *Cursor
-	Dual        *Reference
+	Graph  string     // The graph in the dataset
+	Index  int        // The index of the triple within the graph
+	Place  uint8      // The element (subject/predicate/object) within the triple
+	M      HasValue   // The next (clockwise) element in the triple
+	N      HasValue   // The previous (clockwise) element in the triple
+	Cursor *Cursor    // The iteration cursor
+	Dual   *Reference // If (M or N) is a blank node, this is a pointer to its reference struct
 }
 
 func (ref *Reference) String() string {
-	var count uint64
-	if ref.Cursor != nil {
-		count = ref.Cursor.Count
-	}
-	return fmt.Sprintf("%s/%d:%d %d {%s %s}", ref.Graph, ref.Index, ref.Permutation, count, ref.M.GetValue(), ref.N.GetValue())
+	return fmt.Sprintf(
+		"%s/%d:%d {%v %v} :: %s",
+		ref.Graph, ref.Index, ref.Place,
+		ref.M, ref.N,
+		ref.Cursor.String(),
+	)
 }
 
+// Close the reference's cursor's iterator, if it exists
 func (ref *Reference) Close() {
 	if ref.Cursor != nil {
 		if ref.Cursor.Iterator != nil {
@@ -34,43 +37,66 @@ func (ref *Reference) Close() {
 	}
 }
 
-func (ref *Reference) assembleCountKey(tree map[string]*Assignment, major bool) ([]byte, bool) {
-	m := marshalReferenceNode(ref.M, tree)
-	n := marshalReferenceNode(ref.N, tree)
-	var key []byte
-	if m != nil && n != nil {
+// Initialize populates cursors and initial count
+func (ref *Reference) Initialize(major bool, txn *badger.Txn) (bool, error) {
+	var err error
+	var count uint64
+	count, major, err = ref.getCount(nil, major, txn)
+	if err != nil {
+		return major, err
+	} else if count == 0 {
+		return major, fmt.Errorf("Initial reference count of zero: %s", ref.String())
+	}
+
+	ref.Cursor = &Cursor{Count: count}
+	return major, nil
+}
+
+func (ref *Reference) getCount(assignmentMap *AssignmentMap, major bool, txn *badger.Txn) (uint64, bool, error) {
+	mIndex, mIsIndex := ref.M.(*Index)
+	nIndex, nIsIndex := ref.N.(*Index)
+	m, n := ref.M.GetValue(assignmentMap), ref.N.GetValue(assignmentMap)
+
+	if m > 0 && n > 0 {
+		// Single reference -> major/minor key
+		var key []byte
 		if major {
-			permutation := (ref.Permutation + 1) % 3
-			prefix := MajorPrefixes[permutation]
-			key = assembleKey(prefix, m, n, nil)
+			place := (ref.Place + 1) % 3
+			key = assembleKey(MajorPrefixes[place], m, n, 0)
 		} else {
-			permutation := (ref.Permutation + 2) % 3
-			prefix := MinorPrefixes[permutation]
-			key = assembleKey(prefix, n, m, nil)
+			place := (ref.Place + 2) % 3
+			key = assembleKey(MinorPrefixes[place], n, m, 0)
 		}
-	} else if m != nil && n == nil {
-		permutation := (ref.Permutation + 1) % 3
-		prefix := IndexPrefixes[permutation]
-		key = assembleKey(prefix, m, nil, nil)
-	} else if m == nil && n != nil {
-		permutation := (ref.Permutation + 2) % 3
-		prefix := IndexPrefixes[permutation]
-		key = assembleKey(prefix, n, nil, nil)
+		item, err := txn.Get(key)
+		if err == badger.ErrKeyNotFound {
+			return 0, !major, nil
+		} else if err != nil {
+			return 0, !major, err
+		} else if count, err := item.ValueCopy(nil); err != nil {
+			return 0, !major, err
+		} else {
+			return binary.BigEndian.Uint64(count), !major, nil
+		}
 	}
-	return key, !major
+
+	// Double reference -> index key
+	var place uint8
+	var index *Index
+	if mIsIndex && !nIsIndex {
+		index = mIndex
+		place = (ref.Place + 1) % 3
+	} else if !mIsIndex && nIsIndex {
+		index = nIndex
+		place = (ref.Place + 2) % 3
+	} else {
+		return 0, false, fmt.Errorf("Invalid reference in codex: %s", ref.String())
+	}
+
+	return index.Get(place), !major, nil
 }
 
-func marshalReferenceNode(node ld.Node, index map[string]*Assignment) []byte {
-	if blank, isBlank := node.(*ld.BlankNode); isBlank {
-		if assignment, has := index[blank.Attribute]; has {
-			return assignment.Value
-		}
-		return nil
-	}
-	return marshalNode("", node)
-}
-
-// A ReferenceSet is any slice of References
+// A ReferenceSet is a slice of References.
+// It's its own type to stress its order-insignificance, and for ease of future refactoring.
 type ReferenceSet []*Reference
 
 // Sort interface for ReferenceSet
@@ -97,3 +123,6 @@ func (refs ReferenceSet) String() string {
 	}
 	return s + " ]"
 }
+
+// A ReferenceMap is a map of string variable labels to reference sets.
+type ReferenceMap map[string]ReferenceSet

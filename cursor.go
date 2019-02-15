@@ -20,7 +20,7 @@ func (cursor *Cursor) String() string {
 	// return fmt.Sprintf("%s/%d: %s | %d", cursor.ID, cursor.Index, string(cursor.Prefix), cursor.Count)
 }
 
-func (cursor *Cursor) Value() []byte {
+func (cursor *Cursor) value() []byte {
 	if cursor.Iterator.ValidForPrefix(cursor.Prefix) {
 		item := cursor.Iterator.Item()
 		key, index := item.Key(), int(item.UserMeta())
@@ -31,13 +31,13 @@ func (cursor *Cursor) Value() []byte {
 
 func (cursor *Cursor) Next() []byte {
 	cursor.Iterator.Next()
-	return cursor.Value()
+	return cursor.value()
 }
 
 func (cursor *Cursor) Seek(value []byte) []byte {
 	key := append(cursor.Prefix, value...)
 	cursor.Iterator.Seek(key)
-	return cursor.Value()
+	return cursor.value()
 }
 
 type Seekable interface {

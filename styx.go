@@ -1,13 +1,40 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"strings"
 
 	badger "github.com/dgraph-io/badger"
+	proto "github.com/golang/protobuf/proto"
 	ipfs "github.com/ipfs/go-ipfs-api"
 	ld "github.com/piprate/json-gold/ld"
 )
+
+func marshalReferenceNode(node ld.Node, assignmentMap *AssignmentMap, txn *badger.Txn) (string, error) {
+	blank, isBlank := node.(*ld.BlankNode)
+	if !isBlank {
+		return marshalNode(nil, node), nil
+	}
+	valueID := assignmentMap.Index[blank.Attribute].Value
+	valueKey := make([]byte, 9)
+	valueKey[0] = ValuePrefix
+	binary.BigEndian.PutUint64(valueKey[1:9], valueID)
+	item, err := txn.Get(valueKey)
+	if err != nil {
+		return "", err
+	}
+	buffer, err := item.ValueCopy(nil)
+	if err != nil {
+		return "", err
+	}
+	value := &Value{}
+	err = proto.Unmarshal(buffer, value)
+	if err != nil {
+		return "", err
+	}
+	return marshalValue(value)
+}
 
 // Query the database
 func Query(query interface{}, callback func(result interface{}) error, db *badger.DB, sh *ipfs.Shell) error {
@@ -39,12 +66,16 @@ func Query(query interface{}, callback func(result interface{}) error, db *badge
 
 		var result string
 		for _, quad := range dataset.Graphs[DefaultGraph] {
-			result += string(marshalReferenceNode(quad.Subject, index))
-			result += " "
-			result += string(marshalReferenceNode(quad.Predicate, index))
-			result += " "
-			result += string(marshalReferenceNode(quad.Object, index))
-			result += " .\n"
+			subject, err := marshalReferenceNode(quad.Subject, index, txn)
+			if err != nil {
+				return err
+			}
+			predicate, err := marshalReferenceNode(quad.Predicate, index, txn)
+			if err != nil {
+				return err
+			}
+			object, err := marshalReferenceNode(quad.Object, index, txn)
+			result += subject + " " + predicate + " " + object + " .\n"
 		}
 
 		fmt.Println(result)
@@ -89,12 +120,12 @@ func Ingest(doc interface{}, db *badger.DB, sh *ipfs.Shell) (string, error) {
 	fmt.Println(normalized)
 
 	reader := strings.NewReader(normalized.(string))
-	cid, err := sh.Add(reader)
+	hash, err := sh.Add(reader)
 	if err != nil {
-		return cid, err
+		return hash, err
 	}
 
-	return cid, db.Update(func(txn *badger.Txn) error {
-		return insert(cid, dataset, txn)
+	return hash, db.Update(func(txn *badger.Txn) error {
+		return insert(hash, dataset, txn)
 	})
 }
