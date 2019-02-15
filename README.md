@@ -52,17 +52,17 @@ So if you wanted to know the father of the mayor of the hometown of the author o
 
 ```json
 {
-	"@context": { "@vocab": "http://example.com/" },
-	"@id": "The_Shining",
-	"author": {
-		"hometown": {
-			"mayor": {
-				"father": {
-					"@id": "The_Father"
-				}
-			}
-		}
-	}
+  "@context": { "@vocab": "http://example.com/" },
+  "@id": "The_Shining",
+  "author": {
+    "hometown": {
+      "mayor": {
+        "father": {
+          "@id": "The_Father"
+        }
+      }
+    }
+  }
 }
 ```
 
@@ -70,13 +70,13 @@ And since there are a million ways of serializing the same graph, you could also
 
 ```json
 {
-	"@context": { "@vocab": "http://example.com/" },
-	"@graph": [
-		{ "@id": "The_Shining", "author": { "@id": "_:author" } },
-		{ "@id": "_:author", "hometown": { "@id": "_:town" } },
-		{ "@id": "_:town", "mayor": { "@id": "_:mayor" } },
-		{ "@id": "_:mayor", "mayor": { "@id": "_:father" } }
-	]
+  "@context": { "@vocab": "http://example.com/" },
+  "@graph": [
+    { "@id": "The_Shining", "author": { "@id": "_:author" } },
+    { "@id": "_:author", "hometown": { "@id": "_:town" } },
+    { "@id": "_:town", "mayor": { "@id": "_:mayor" } },
+    { "@id": "_:mayor", "mayor": { "@id": "_:father" } }
+  ]
 }
 ```
 
