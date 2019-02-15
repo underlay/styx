@@ -11,18 +11,15 @@ import (
 	ld "github.com/piprate/json-gold/ld"
 )
 
-func marshalReferenceNode(node ld.Node, assignmentMap AssignmentMap, txn *badger.Txn) (string, error) {
+func marshalReferenceNode(node ld.Node, assignmentMap *AssignmentMap, txn *badger.Txn) (string, error) {
 	blank, isBlank := node.(*ld.BlankNode)
 	if !isBlank {
 		return marshalNode(nil, node), nil
 	}
-	assignment := assignmentMap[blank.Attribute]
-	valueBytes := make([]byte, 0, 8)
-	binary.BigEndian.PutUint64(valueBytes, assignment.Value)
-
-	valueKey := make([]byte, 2, 2+8)
-	valueKey[0], valueKey[1] = ValuePrefix, tab
-	valueKey = append(valueKey, valueBytes...)
+	valueID := assignmentMap.Index[blank.Attribute].Value
+	valueKey := make([]byte, 9)
+	valueKey[0] = ValuePrefix
+	binary.BigEndian.PutUint64(valueKey[1:9], valueID)
 	item, err := txn.Get(valueKey)
 	if err != nil {
 		return "", err

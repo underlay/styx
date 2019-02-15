@@ -43,6 +43,37 @@ func (codex *Codex) Close() {
 	}
 }
 
+// Update the codex heuristics with the updated reference
+func (codex *Codex) updateHeuristics(ref *Reference) {
+	codex.Count += ref.Cursor.Count
+	codex.Norm += ref.Cursor.Count * ref.Cursor.Count
+	codex.Length++
+}
+
+// Initialize cursors, counts, and heuristics
+func (codex *Codex) Initialize(major bool, txn *badger.Txn) (bool, error) {
+	var err error
+	codex.Count, codex.Norm, codex.Length = 0, 0, 0
+	for _, ref := range codex.Single {
+		major, err = ref.Initialize(major, txn)
+		if err != nil {
+			return major, err
+		}
+		codex.updateHeuristics(ref)
+	}
+
+	for _, refs := range codex.Double {
+		for _, ref := range refs {
+			major, err = ref.Initialize(major, txn)
+			if err != nil {
+				return major, err
+			}
+			codex.updateHeuristics(ref)
+		}
+	}
+	return major, nil
+}
+
 // A CodexMap associates ids with Codex maps.
 type CodexMap struct {
 	IndexMap map[string]*Index
@@ -64,8 +95,8 @@ func (codexMap *CodexMap) Swap(a, b int) {
 }
 func (codexMap *CodexMap) Less(a, b int) bool {
 	A, B := codexMap.Index[codexMap.Slice[a]], codexMap.Index[codexMap.Slice[b]]
-	// return (float32(A.Norm) / float32(A.Length)) < (float32(B.Norm) / float32(B.Length))
-	return A.Count > B.Count
+	return (float32(A.Norm) / float32(A.Length)) < (float32(B.Norm) / float32(B.Length))
+	// return A.Count > B.Count
 }
 
 // GetCodex retrieves an Codex or creates one if it doesn't exist.
@@ -82,8 +113,6 @@ func (codexMap *CodexMap) GetCodex(id string) *Codex {
 	return codex
 }
 
-// insertSingle into codex.Single
-
 // insertDouble into codex.Double
 func (codexMap *CodexMap) insertDouble(a string, b string, ref *Reference) {
 	codex := codexMap.GetCodex(a)
@@ -95,6 +124,20 @@ func (codexMap *CodexMap) insertDouble(a string, b string, ref *Reference) {
 	} else {
 		codex.Double[b] = ReferenceSet{ref}
 	}
+}
+
+// Initialize initializes its children and passes state between them
+func (codexMap *CodexMap) Initialize(txn *badger.Txn) error {
+	var err error
+	var major bool
+	for _, id := range codexMap.Slice {
+		codex := codexMap.Index[id]
+		major, err = codex.Initialize(major, txn)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func getInitalCodexMap(dataset *ld.RDFDataset, txn *badger.Txn) ([]*Reference, *CodexMap, error) {

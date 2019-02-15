@@ -102,25 +102,18 @@ func (past *Past) setCursors() {
 	past.sortCursors()
 }
 
-// Dependencies are a slice of indices of assignments
-// They're sorted high-to-low
-type Dependencies []int
-
-func (deps Dependencies) Len() int           { return len(deps) }
-func (deps Dependencies) Less(a, b int) bool { return deps[a] < deps[b] }
-func (deps Dependencies) Swap(a, b int)      { deps[a], deps[b] = deps[b], deps[a] }
-
 // An Assignment is a setting of a variable to a value.
 type Assignment struct {
-	Value        uint64
-	ValueRoot    []byte
-	Sources      []*Source
-	Constraint   ReferenceSet
-	Present      ReferenceSet
-	Past         *Past
+	Value      uint64
+	ValueRoot  []byte
+	Sources    []*Source
+	Constraint ReferenceSet
+	Present    ReferenceSet
+	// Past         *Past
+	Past         ReferenceMap
 	Future       ReferenceMap
 	Static       CursorSet
-	Dependencies Dependencies
+	Dependencies []int
 }
 
 func (a *Assignment) String() string {
@@ -134,8 +127,12 @@ func (a *Assignment) String() string {
 	for id, refs := range a.Future {
 		val += fmt.Sprintf("  %s: %s\n", id, refs.String())
 	}
-	if a.Past != nil {
-		val += a.Past.String()
+	// if a.Past != nil {
+	// 	val += a.Past.String()
+	// }
+	val += fmt.Sprintln("Past:")
+	for id, refs := range a.Past {
+		val += fmt.Sprintf("  %s: %s\n", id, refs.String())
 	}
 	return val
 }
@@ -257,114 +254,47 @@ func (a *Assignment) setValueRoot(txn *badger.Txn) {
 }
 
 // An AssignmentMap is a map of string variable labels to assignments.
-type AssignmentMap map[string]*Assignment
-
-// This is re-used between Major, Minor, and Index keys
-func getCount(key []byte, txn *badger.Txn) (uint64, error) {
-	item, err := txn.Get(key)
-	// KeyNotFound isn't necessarily an "error" - it just means the count is zero.
-	if err == badger.ErrKeyNotFound {
-		return 0, nil
-	} else if err != nil {
-		return 0, err
-	} else if count, err := item.ValueCopy(nil); err != nil {
-		return 0, err
-	} else {
-		return binary.BigEndian.Uint64(count), nil
-	}
+type AssignmentMap struct {
+	Index map[string]*Assignment
+	Slice []string
 }
 
-func getAssignmentTree(codexMap *CodexMap, txn *badger.Txn) ([]string, AssignmentMap, error) {
-	var err error
-	var key []byte
-	var major bool
-
-	// Update the counts before sorting the codex map
-	for _, codex := range codexMap.Index {
-		codex.Count = 0
-		for _, ref := range codex.Single {
-			_, mIsIndex := ref.M.(*Index)
-			_, nIsIndex := ref.N.(*Index)
-			if mIsIndex && nIsIndex {
-				key, major = ref.assembleSingleCountKey(nil, major)
-			} else {
-				return nil, nil, fmt.Errorf("Single reference has non-index M or N: %s", ref.String())
-			}
-
-			ref.Cursor = &Cursor{}
-			ref.Cursor.Count, err = getCount(key, txn)
-			if err != nil {
-				return nil, nil, err
-			} else if ref.Cursor.Count == 0 {
-				return nil, nil, fmt.Errorf("Zero count single reference in codex: %s", ref.String())
-			}
-			codex.Count += ref.Cursor.Count
-			codex.Norm += ref.Cursor.Count * ref.Cursor.Count
-			codex.Length++
-		}
-
-		for _, refs := range codex.Double {
-			for _, ref := range refs {
-				var place uint8
-				var index *Index
-				ref.Cursor = &Cursor{}
-
-				mIndex, mIsIndex := ref.M.(*Index)
-				nIndex, nIsIndex := ref.N.(*Index)
-
-				if mIsIndex && !nIsIndex {
-					index = mIndex
-					place = (ref.Place + 1) % 3
-				} else if !mIsIndex && nIsIndex {
-					index = nIndex
-					place = (ref.Place + 2) % 3
-				} else {
-					return nil, nil, fmt.Errorf("Invalid double reference in codex: %s", ref.String())
-				}
-
-				if place == 0 {
-					ref.Cursor.Count = index.GetSubject()
-				} else if place == 1 {
-					ref.Cursor.Count = index.GetPredicate()
-				} else if place == 2 {
-					ref.Cursor.Count = index.GetObject()
-				}
-
-				if ref.Cursor.Count == 0 {
-					return nil, nil, fmt.Errorf("Double reference count of zero: %s", ref.String())
-				}
-
-				codex.Count += ref.Cursor.Count
-				codex.Norm += ref.Cursor.Count * ref.Cursor.Count
-				codex.Length++
-			}
-		}
-	}
-
+func getAssignmentTree(codexMap *CodexMap, txn *badger.Txn) (*AssignmentMap, error) {
 	// fmt.Println("sorted values:")
 	// printCodexMap(c)
+
+	// Update the counts before sorting the codex map
+	err := codexMap.Initialize(txn)
+	if err != nil {
+		return nil, err
+	}
+
 	// Now sort the codex map
 	sort.Stable(codexMap)
 	// fmt.Println("the codex map has been sorted", c.Slice)
 
-	index := AssignmentMap{}
-	indexMap := map[string]int{}
+	index := map[string]*Assignment{}
+	indexMap := map[string]int{} // temp dict, only used for sorting here
 	for i, id := range codexMap.Slice {
 		indexMap[id] = i
 
 		codex := codexMap.Index[id]
 
+		// past := &Past{}
+
 		index[id] = &Assignment{
 			Constraint: codex.Constraint,
 			Present:    codex.Single,
-			Past:       &Past{},
-			Future:     ReferenceMap{},
+			// Past:       past,
+			Past:   ReferenceMap{},
+			Future: ReferenceMap{},
 		}
 
 		deps := map[int]int{}
-		past := index[id].Past
+
 		for dep, refs := range codex.Double {
 			if j, has := indexMap[dep]; has {
+				// j is the index of dep in codexMap.Slice
 				past.Push(dep, j, refs)
 				for k, ref := range refs {
 					ref.Cursor.ID = dep
@@ -372,9 +302,11 @@ func getAssignmentTree(codexMap *CodexMap, txn *badger.Txn) ([]string, Assignmen
 					past.insertIndex(dep, k, len(past.Cursors))
 					past.Cursors = append(past.Cursors, ref.Cursor)
 				}
+
 				if j > deps[j] {
 					deps[j] = j
 				}
+
 				for _, k := range index[dep].Dependencies {
 					if j > deps[k] {
 						deps[k] = j
@@ -398,15 +330,15 @@ func getAssignmentTree(codexMap *CodexMap, txn *badger.Txn) ([]string, Assignmen
 		for j := range deps {
 			index[id].Dependencies = append(index[id].Dependencies, j)
 		}
-		sort.Sort(index[id].Dependencies)
+		sort.Ints(index[id].Dependencies)
 
 		// fmt.Println("about to set value root for", id)
 		index[id].setValueRoot(txn)
 		if index[id].ValueRoot == nil {
-			return nil, nil, fmt.Errorf("Assignment's static intersect is empty: %v", index[id])
+			return nil, fmt.Errorf("Assignment's static intersect is empty: %v", index[id])
 		}
 	}
 	// return slice, index, nil
 	// fmt.Println("returning slice", c.Slice)
-	return codexMap.Slice, index, nil
+	return &AssignmentMap{Index: index, Slice: codexMap.Slice}, nil
 }

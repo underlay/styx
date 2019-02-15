@@ -40,36 +40,6 @@ When inserting a triple <|S P O|>, we perform 12-15 operations 😬
 	prefixes {xyz}
 */
 
-// TriplePrefixes address the value indices
-var TriplePrefixes = [3]byte{'a', 'b', 'c'}
-var triplePrefixMap = map[byte]uint8{'a': 0, 'b': 1, 'c': 2}
-
-// MajorPrefixes address the "counter-clockwise" indices {spo, pos, osp}
-var MajorPrefixes = [3]byte{'i', 'j', 'k'}
-var majorPrefixMap = map[byte]uint8{'i': 0, 'j': 1, 'k': 2}
-
-// MinorPrefixes address the "clockwise" indices {sop, pso, ops}
-var MinorPrefixes = [3]byte{'x', 'y', 'z'}
-var minorPrefixMap = map[byte]uint8{'x': 0, 'y': 1, 'z': 2}
-
-// ValuePrefix keys translate uint64 ids to ld.Node values
-var ValuePrefix = byte('p')
-
-// IndexPrefix keys translate ld.Node values to uint64 ids
-var IndexPrefix = byte('q')
-
-var keySizes = map[byte]int{
-	'a': 3, 'b': 3, 'c': 3,
-	'i': 2, 'j': 2, 'k': 2,
-	'l': 2, 'm': 2, 'n': 2,
-	'x': 1, 'y': 1, 'z': 1,
-}
-
-// Our delimiter of choice
-// The "tab" is such a cute concept; idk why she's not more popular
-const tab = byte('\t')
-const newline = byte('\n')
-
 func insertValue(
 	origin *cid.Cid,
 	node ld.Node,
@@ -87,12 +57,12 @@ func insertValue(
 
 	value := marshalNode(origin, node)
 	if index, has := indexMap[value]; has {
-		index.incrementIndex(position)
+		index.Increment(position)
 		return index.GetId(), nil
 	}
 
-	indexKey := make([]byte, 2, len(value)+2)
-	indexKey[0], indexKey[1] = IndexPrefix, tab
+	indexKey := make([]byte, 1, len(value)+1)
+	indexKey[0] = IndexPrefix
 	indexKey = append(indexKey, []byte(value)...)
 	indexItem, err := txn.Get(indexKey)
 	if err == badger.ErrKeyNotFound {
@@ -100,7 +70,7 @@ func insertValue(
 		// Create and write both keys
 		id := counter + uint64(len(valueMap))
 		index := &Index{Id: id}
-		index.incrementIndex(position)
+		index.Increment(position)
 		indexMap[value] = index
 		valueMap[id] = nodeToValue(node, origin)
 		return id, nil
@@ -115,7 +85,7 @@ func insertValue(
 			return 0, err
 		}
 		indexMap[value] = index
-		index.incrementIndex(position)
+		index.Increment(position)
 		return index.GetId(), nil
 	} else {
 		return 0, err
@@ -191,7 +161,7 @@ func insert(hash string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 		counter = binary.BigEndian.Uint64(counterBytes)
 	}
 
-	for index, quad := range dataset.Graphs["@default"] {
+	for index, quad := range dataset.Graphs[DefaultGraph] {
 		source := &Source{
 			Cid:   c.Bytes(),
 			Index: int32(index),
@@ -289,9 +259,10 @@ func insert(hash string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 		}
 	}
 
+	// Write back the index keys we incremented
 	for value, index := range indexMap {
-		key := make([]byte, 2, 2+len(value))
-		key[0], key[1] = IndexPrefix, tab
+		key := make([]byte, 1, len(value)+1)
+		key[0] = IndexPrefix
 		key = append(key, []byte(value)...)
 		val, err := proto.Marshal(index)
 		if err != nil {
@@ -303,16 +274,16 @@ func insert(hash string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 		}
 	}
 
+	// Write any value keys we created
 	for id, value := range valueMap {
-		key := make([]byte, 2, 10)
-		key[0], key[1] = ValuePrefix, tab
-		bytes := make([]byte, 8)
-		binary.BigEndian.PutUint64(bytes, id)
-		key = append(key, bytes...)
 		val, err := proto.Marshal(value)
 		if err != nil {
 			return err
 		}
+
+		key := make([]byte, 9)
+		key[0] = ValuePrefix
+		binary.BigEndian.PutUint64(key[1:], id)
 		err = txn.SetWithMeta(key, val, ValuePrefix)
 		if err != nil {
 			return err

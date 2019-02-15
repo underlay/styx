@@ -1,7 +1,10 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
+
+	badger "github.com/dgraph-io/badger"
 )
 
 // A Reference to an occurrence of a variable in a dataset
@@ -34,20 +37,62 @@ func (ref *Reference) Close() {
 	}
 }
 
-func (ref *Reference) assembleSingleCountKey(assignmentMap AssignmentMap, major bool) ([]byte, bool) {
-	var key []byte
-	m := ref.M.GetValue(assignmentMap)
-	n := ref.N.GetValue(assignmentMap)
-	if major {
-		place := (ref.Place + 1) % 3
-		prefix := MajorPrefixes[place]
-		key = assembleKey(prefix, m, n, 0)
-	} else {
-		place := (ref.Place + 2) % 3
-		prefix := MinorPrefixes[place]
-		key = assembleKey(prefix, n, m, 0)
+// Initialize populates cursors and initial count
+func (ref *Reference) Initialize(major bool, txn *badger.Txn) (bool, error) {
+	var err error
+	var count uint64
+	count, major, err = ref.getCount(nil, major, txn)
+	if err != nil {
+		return major, err
+	} else if count == 0 {
+		return major, fmt.Errorf("Initial reference count of zero: %s", ref.String())
 	}
-	return key, !major
+
+	ref.Cursor = &Cursor{Count: count}
+	return major, nil
+}
+
+func (ref *Reference) getCount(assignmentMap *AssignmentMap, major bool, txn *badger.Txn) (uint64, bool, error) {
+	mIndex, mIsIndex := ref.M.(*Index)
+	nIndex, nIsIndex := ref.N.(*Index)
+	m, n := ref.M.GetValue(assignmentMap), ref.N.GetValue(assignmentMap)
+
+	if m > 0 && n > 0 {
+		// Single reference -> major/minor key
+		var key []byte
+		if major {
+			place := (ref.Place + 1) % 3
+			key = assembleKey(MajorPrefixes[place], m, n, 0)
+		} else {
+			place := (ref.Place + 2) % 3
+			key = assembleKey(MinorPrefixes[place], n, m, 0)
+		}
+		item, err := txn.Get(key)
+		if err == badger.ErrKeyNotFound {
+			return 0, !major, nil
+		} else if err != nil {
+			return 0, !major, err
+		} else if count, err := item.ValueCopy(nil); err != nil {
+			return 0, !major, err
+		} else {
+			return binary.BigEndian.Uint64(count), !major, nil
+		}
+	}
+
+	// Double reference -> index key
+	var place uint8
+	var index *Index
+	if mIsIndex && !nIsIndex {
+		index = mIndex
+		place = (ref.Place + 1) % 3
+	} else if !mIsIndex && nIsIndex {
+		index = nIndex
+		place = (ref.Place + 2) % 3
+	} else {
+		return 0, false, fmt.Errorf("Invalid reference in codex: %s", ref.String())
+	}
+
+	return index.Get(place), !major, nil
 }
 
 // A ReferenceSet is a slice of References.

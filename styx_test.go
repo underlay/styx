@@ -199,7 +199,7 @@ func TestIngest(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				fmt.Printf("Index entry\n  %s\n  %s\n", string(key), index.String())
+				fmt.Printf("Index entry\n  %s\n  %s\n", string(key[1:]), index.String())
 			} else if prefix == ValuePrefix {
 				// Value key
 				value := &Value{}
@@ -211,7 +211,7 @@ func TestIngest(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				id := binary.BigEndian.Uint64(key[2:])
+				id := binary.BigEndian.Uint64(key[1:])
 				fmt.Printf("Value entry: %02d %s\n", id, hmm)
 			} else if _, has := triplePrefixMap[prefix]; has {
 				// Value key
@@ -220,25 +220,25 @@ func TestIngest(t *testing.T) {
 				// bytes, _ := json.MarshalIndent(sourceList.Sources, "  ", "  ")
 				fmt.Printf("Triple entry: %s %02d | %02d | %02d :: %s\n",
 					string(key[0]),
-					binary.BigEndian.Uint64(key[2:10]),
-					binary.BigEndian.Uint64(key[10:18]),
-					binary.BigEndian.Uint64(key[18:26]),
+					binary.BigEndian.Uint64(key[1:9]),
+					binary.BigEndian.Uint64(key[9:17]),
+					binary.BigEndian.Uint64(key[17:25]),
 					sourcesToString(sourceList.Sources),
 				)
 			} else if _, has := minorPrefixMap[prefix]; has {
 				// Minor key
 				fmt.Printf("Minor entry: %s %02d | %02d :: %02d\n",
 					string(key[0]),
-					binary.BigEndian.Uint64(key[2:10]),
-					binary.BigEndian.Uint64(key[10:18]),
+					binary.BigEndian.Uint64(key[1:9]),
+					binary.BigEndian.Uint64(key[9:17]),
 					binary.BigEndian.Uint64(val),
 				)
 			} else if _, has := majorPrefixMap[prefix]; has {
 				// Major key
 				fmt.Printf("Major entry: %s %02d | %02d :: %02d\n",
 					string(key[0]),
-					binary.BigEndian.Uint64(key[2:10]),
-					binary.BigEndian.Uint64(key[10:18]),
+					binary.BigEndian.Uint64(key[1:9]),
+					binary.BigEndian.Uint64(key[9:17]),
 					binary.BigEndian.Uint64(val),
 				)
 			}
