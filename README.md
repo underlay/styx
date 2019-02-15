@@ -18,16 +18,8 @@ Prior work on graph queries is scattered, and no existing languages have found t
 - Generalization is hard. Graphs are both harder to represent with computers and harder to reason about as humans.
 - "Query languages" don't exist. _(what?)_ Our everyday use of "query langauge" ends up either meaning "stuff you want to do with databases" or "the things that SQL can do" without any reified grounding of what those things actually are. It's not clear that there even is an idea to generalize in the first place.
 
-frequently inventing abstractions
-
-All of this contributes to a sense of openness and 'pre-Newtonian-ness' - that graphs and their interfaces are waiting for a stronger rigorous theoretic framework to clear up this
-
-category theoretic vibes
-
-This jibes with recent approaches to the space of data structures, It's weird to say something like "we don't really understand
-
 An incremental step toward understanding graphs better is building higher-level primitives and exploring the conceptual space they create.
-Styx takes the stance that one **natural first-order interface to graph storage is subgraph matching**. These terms were carefully chosen:
+Styx takes the stance that one **natural first-order interface to graph storage** is **subgraph matching**. These terms were carefully chosen:
 
 - _graph storage_ as the abstract role of a graph database
 - _interface_ as the abstract role of a query language or API
@@ -38,23 +30,14 @@ Styx takes the stance that one **natural first-order interface to graph storage 
 
 It's a (limited) way of querying graphs. It's similar to the idea behind GraphQL - that "an easy and useful way of asking for things is by structing your question as isomorphic to the answers you expect". It means you can give the database a "pattern" subgraph that has some blank variables in it, and the database will give you back a "result" subgraph, _serialized the exact same way_, that has all the variables filled in with values. It's a generalization of both path traversal and constraint satisfaction.
 
-More concretely,
-
 This thing I'm calling "subgraph matching" is related to [subgraph isomorphism](https://en.wikipedia.org/wiki/Subgraph_isomorphism_problem), a well-studied problem in graph theory, except that in most application contexts we want to allow two different variables (in the pattern subgraph) to resolve to the same value (from the target graph). This technically breaks isomorphism, so it's really _surjective subgraph homomorphism_, or **_subgraph epimorphism_** if you really took notes in class.
-
-## So... what's subgraph matching?
-
-### Just give me some examples already
 
 So if you wanted to know the father of the mayor of the hometown of the author of The Shining, you could query (in JSON-LD!) like the:
 
-skos
-ckos (computational knowledge organization system)
-
 ```json
 {
-  "@context": { "@vocab": "ex": "http://example.com/" },
-  "@id": "ex:The_Shining",
+  "@context": { "@vocab": "http://example.com/" },
+  "@id": "The_Shining",
   "author": {
     "hometown": {
       "mayor": {
@@ -70,12 +53,12 @@ ckos (computational knowledge organization system)
 ```json
 {
 	"@context": { "@vocab": "http://example.com/" },
-	"@id": "ex:The_Shining",
+	"@id": "The_Shining",
 	"author": {
 		"hometown": {
 			"mayor": {
 				"father": {
-					"@id": "ex:The_Father"
+					"@id": "The_Father"
 				}
 			}
 		}
@@ -89,7 +72,7 @@ And since there are a million ways of serializing the same graph, you could also
 {
 	"@context": { "@vocab": "http://example.com/" },
 	"@graph": [
-		{ "@id": "ex:The_Shining", "author": { "@id": "_:author" } },
+		{ "@id": "The_Shining", "author": { "@id": "_:author" } },
 		{ "@id": "_:author", "hometown": { "@id": "_:town" } },
 		{ "@id": "_:town", "mayor": { "@id": "_:mayor" } },
 		{ "@id": "_:mayor", "mayor": { "@id": "_:father" } }
@@ -98,14 +81,6 @@ And since there are a million ways of serializing the same graph, you could also
 ```
 
 **Subgraph matching is more like a graph analog of a key-value store** than a query language itself: a reliable, conceptually clean intermediate interface that more specialized DSLs should build off. This is the purpose of the Styx project: to be an abstract graph store that exposes natural high-level graph primitives while minimizing loss of generality.
-
-It has some great properties! It's provably general: the operation is defined for every pair of graphs (usually returning the empty graph)
-
-Yes but that's _silly_, nobody wants to learn a new language and _worse_, it can't be assembled by computers. What does that mean? It means thta
-
-## Query Processing
-
-## Dynamism and beyond
 
 ```golang
 // Open an IPFS Shell
