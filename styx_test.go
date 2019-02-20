@@ -13,11 +13,6 @@ import (
 	ld "github.com/piprate/json-gold/ld"
 )
 
-// Replace at your leisure
-// const path = "/tmp/badger"
-
-// Replace at your leisure
-// var sh = ipfs.NewShell("localhost:5001")
 var sampleData = []byte(`{
 	"@context": { "@vocab": "http://schema.org/" },
 	"@graph": [
@@ -47,32 +42,6 @@ var sampleQuery = []byte(`{
 		"name": "Joel"
 	}
 }`)
-
-// func openDB(t *testing.T, clean bool) *badger.DB {
-// 	// Sanity check for the daemon
-// 	if !sh.IsUp() {
-// 		t.Error("IPFS Daemon not running")
-// 	}
-
-// 	// Remove old db
-// 	if clean {
-// 		if err := os.RemoveAll(path); err != nil {
-// 			t.Error(err)
-// 		}
-// 	}
-
-// 	// Create DB
-// 	opts := badger.DefaultOptions
-// 	opts.Dir = path
-// 	opts.ValueDir = path
-
-// 	db, err := badger.Open(opts)
-// 	if err != nil {
-// 		t.Error(err)
-// 	}
-
-// 	return db
-// }
 
 func TestIPFSDocumentLoader(t *testing.T) {
 	data := []byte(`{
@@ -129,8 +98,6 @@ func TestIPFSDocumentLoader(t *testing.T) {
 	}
 	checkExpanded(ipfsResult)
 
-	fmt.Println("check passed")
-
 	dwebIpfsURI := "dweb:/ipfs/" + cidIpfs
 	dwebIpfsResult, err := proc.Expand(dwebIpfsURI, options)
 	if err != nil {
@@ -160,7 +127,6 @@ func TestIngest(t *testing.T) {
 	var data map[string]interface{}
 	err := json.Unmarshal(sampleData, &data)
 	if err != nil {
-
 		t.Error(err)
 		return
 	}
@@ -170,7 +136,6 @@ func TestIngest(t *testing.T) {
 
 	origin, err := Ingest(data, db, sh)
 	if err != nil {
-		// db.Close()
 		t.Error(err)
 		return
 	}
@@ -189,7 +154,7 @@ func TestIngest(t *testing.T) {
 				return err
 			}
 			prefix := key[0]
-			if string(key) == string(CounterKey) {
+			if bytes.Equal(key, CounterKey) {
 				// Counter!
 				fmt.Printf("Counter: %02d\n", binary.BigEndian.Uint64(val))
 			} else if prefix == IndexPrefix {
@@ -207,17 +172,12 @@ func TestIngest(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				hmm, err := marshalValue(value)
-				if err != nil {
-					return err
-				}
 				id := binary.BigEndian.Uint64(key[1:])
-				fmt.Printf("Value entry: %02d %s\n", id, hmm)
+				fmt.Printf("Value entry: %02d %s\n", id, value.String())
 			} else if _, has := triplePrefixMap[prefix]; has {
 				// Value key
 				sourceList := &SourceList{}
 				proto.Unmarshal(val, sourceList)
-				// bytes, _ := json.MarshalIndent(sourceList.Sources, "  ", "  ")
 				fmt.Printf("Triple entry: %s %02d | %02d | %02d :: %s\n",
 					string(key[0]),
 					binary.BigEndian.Uint64(key[1:9]),
@@ -248,7 +208,6 @@ func TestIngest(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		// db.Close()
 		t.Error(err)
 	}
 }
@@ -280,11 +239,11 @@ func TestQuery(t *testing.T) {
 	}
 
 	callback := func(result interface{}) error {
-		bytes, err := json.MarshalIndent(result, "", "\t")
+		buf, err := json.MarshalIndent(result, "", "\t")
 		if err != nil {
 			return err
 		}
-		fmt.Println(string(bytes))
+		fmt.Println(string(buf))
 		return nil
 	}
 

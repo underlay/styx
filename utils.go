@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/binary"
-	fmt "fmt"
+	"fmt"
 	"log"
 	"strings"
 
@@ -27,7 +27,7 @@ func (variable Variable) GetValue(assignmentMap *AssignmentMap) uint64 {
 	if assignmentMap != nil {
 		id := string(variable)
 		if assignment, has := assignmentMap.Index[id]; has {
-			return assignment.Value
+			return binary.BigEndian.Uint64(assignment.Value[:])
 		}
 	}
 	return 0
@@ -125,6 +125,26 @@ func nodeToValue(node ld.Node, origin *cid.Cid) *Value {
 	return nil
 }
 
+func valueToNode(value *Value) (ld.Node, error) {
+	if blank, isBlank := value.Node.(*Value_Blank); isBlank {
+		c, err := cid.Cast(blank.Blank.Cid)
+		if err != nil {
+			return nil, err
+		}
+		iri := fmt.Sprintf("<dweb:/ipfs/%s#%s>", c.String(), blank.Blank.Id)
+		return &ld.IRI{Value: iri}, nil
+	} else if iri, isIri := value.Node.(*Value_Iri); isIri {
+		return &ld.IRI{Value: iri.Iri}, nil
+	} else if literal, isLiteral := value.Node.(*Value_Literal); isLiteral {
+		return &ld.Literal{
+			Value:    literal.Literal.Value,
+			Datatype: literal.Literal.Datatype,
+			Language: literal.Literal.Language,
+		}, nil
+	}
+	return nil, nil
+}
+
 func marshalLiteral(value, datatype, language string) string {
 	result := escape(value)
 	if datatype == ld.RDFLangString {
@@ -142,22 +162,6 @@ func marshalBlank(origin *cid.Cid, id string) string {
 	return fmt.Sprintf("<dweb:/ipfs/%s#%s>", origin.String(), id)
 }
 
-func marshalValue(value *Value) (string, error) {
-	if iri, isIri := value.Node.(*Value_Iri); isIri {
-		return "<" + escape(iri.Iri) + ">", nil
-	} else if blank, isBlank := value.Node.(*Value_Blank); isBlank {
-		c, err := cid.Cast(blank.Blank.Cid)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		return marshalBlank(&c, blank.Blank.Id), nil
-	} else if literal, isLiteral := value.Node.(*Value_Literal); isLiteral {
-		l := literal.Literal
-		return marshalLiteral(l.Value, l.Datatype, l.Language), nil
-	}
-	return "", fmt.Errorf("Invalid value struct")
-}
-
 func marshalNode(origin *cid.Cid, node ld.Node) string {
 	if iri, isIRI := node.(*ld.IRI); isIRI {
 		return "<" + escape(iri.Value) + ">"
@@ -169,38 +173,40 @@ func marshalNode(origin *cid.Cid, node ld.Node) string {
 	return ""
 }
 
+func getValueFromKey(prefix byte, key []byte) []byte {
+	if _, has := triplePrefixMap[prefix]; has {
+		return key[17:25]
+	} else if _, has := majorPrefixMap[prefix]; has {
+		return key[9:17]
+	} else if _, has := minorPrefixMap[prefix]; has {
+		return key[9:17]
+	} else {
+		return key[1:9] // Should never happen?
+	}
+}
+
 // assembleKey will look at the prefix byte to determine
 // how many of the elements {abc} to pack into the key.
 // This is important because we ofter deliberately "short"
 // a key so to make an iteration prefix.
-func assembleKey(prefix byte, a, b, c uint64) []byte {
-	keySize := 1 + 8
-	if _, has := majorPrefixMap[prefix]; has {
-		keySize += 8
-	} else if _, has := minorPrefixMap[prefix]; has {
-		keySize += 8
-	} else if _, has := triplePrefixMap[prefix]; has {
-		keySize += 8 + 8
-	}
-
+func assembleKey(prefix byte, a, b, c []byte) []byte {
+	A, B, C := len(a), len(b), len(c)
+	keySize := 1 + A + B + C
 	key := make([]byte, keySize)
 	key[0] = prefix
-
-	binary.BigEndian.PutUint64(key[1:9], a)
-	if prefix == ValuePrefix {
-		return key
+	if A > 0 {
+		copy(key[1:1+A], a)
+		if B > 0 {
+			copy(key[1+A:1+A+B], b)
+			if C > 0 {
+				copy(key[1+A+B:1+A+B+C], c)
+			}
+		}
 	}
-
-	binary.BigEndian.PutUint64(key[9:17], b)
-	if _, has := triplePrefixMap[prefix]; !has {
-		return key
-	}
-
-	binary.BigEndian.PutUint64(key[17:25], c)
 	return key
 }
 
-func permuteMajor(permutation uint8, s, p, o uint64) (uint64, uint64, uint64) {
+func permuteMajor(permutation uint8, s, p, o []byte) ([]byte, []byte, []byte) {
 	if permutation == 0 {
 		return s, p, o
 	} else if permutation == 1 {
@@ -209,10 +215,10 @@ func permuteMajor(permutation uint8, s, p, o uint64) (uint64, uint64, uint64) {
 		return o, s, p
 	}
 	log.Fatalln("Invalid major permutation")
-	return 0, 0, 0
+	return nil, nil, nil
 }
 
-func permuteMinor(permutation uint8, s, p, o uint64) (uint64, uint64, uint64) {
+func permuteMinor(permutation uint8, s, p, o []byte) ([]byte, []byte, []byte) {
 	if permutation == 0 {
 		return s, o, p
 	} else if permutation == 1 {
@@ -221,16 +227,7 @@ func permuteMinor(permutation uint8, s, p, o uint64) (uint64, uint64, uint64) {
 		return o, p, s
 	}
 	log.Fatalln("Invalid minor permutation")
-	return 0, 0, 0
-}
-
-func unescape(str string) string {
-	str = strings.Replace(str, "\\\\", "\\", -1)
-	str = strings.Replace(str, "\\\"", "\"", -1)
-	str = strings.Replace(str, "\\n", "\n", -1)
-	str = strings.Replace(str, "\\r", "\r", -1)
-	str = strings.Replace(str, "\\t", "\t", -1)
-	return str
+	return nil, nil, nil
 }
 
 func escape(str string) string {

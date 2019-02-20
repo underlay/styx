@@ -57,9 +57,9 @@ func handleQuery(db *badger.DB, w http.ResponseWriter, r *http.Request) {
 		fmt.Println(query)
 		if err == nil {
 			Query(query, func(result interface{}) error {
-				bytes, _ := json.Marshal(result)
-				fmt.Println("got result", string(bytes))
-				fmt.Fprintf(w, "%s\n", string(bytes))
+				buf, _ := json.Marshal(result)
+				fmt.Println("got result", string(buf))
+				fmt.Fprintf(w, "%s\n", string(buf))
 				return nil
 			}, db, sh)
 		}
@@ -78,11 +78,11 @@ func handleIngest(db *badger.DB, w http.ResponseWriter, r *http.Request) {
 			result, err := Ingest(doc, db, sh)
 			fmt.Println("got result", result)
 			if err != nil {
-				bytes, _ := json.Marshal(map[string]string{"error": err.Error()})
-				fmt.Fprintf(w, "%s\n", string(bytes))
+				buf, _ := json.Marshal(map[string]string{"error": err.Error()})
+				fmt.Fprintf(w, "%s\n", string(buf))
 			} else {
-				bytes, _ := json.Marshal(map[string]string{"result": result})
-				fmt.Fprintf(w, "%s\n", string(bytes))
+				buf, _ := json.Marshal(map[string]string{"result": result})
+				fmt.Fprintf(w, "%s\n", string(buf))
 			}
 		}
 	}

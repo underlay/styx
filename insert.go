@@ -48,17 +48,20 @@ func insertValue(
 	indexMap IndexMap,
 	valueMap ValueMap,
 	txn *badger.Txn,
-) (uint64, error) {
+) ([]byte, error) {
 	// The indexMap holds all of the (modified) Index structs that
 	// we need to write back to the db at the end of insertion, and
-	// valueMap holds all of the Value structs that we've *created*
+	// valueMap holds all of the Vaflue structs that we've *created*
 	// (and incremented the counter for). Returns the uint64 id
 	// (newly created or otherwise) for the node.
+
+	ID := make([]byte, 8)
 
 	value := marshalNode(origin, node)
 	if index, has := indexMap[value]; has {
 		index.Increment(position)
-		return index.GetId(), nil
+		binary.BigEndian.PutUint64(ID, index.GetId())
+		return ID, nil
 	}
 
 	indexKey := make([]byte, 1, len(value)+1)
@@ -73,29 +76,31 @@ func insertValue(
 		index.Increment(position)
 		indexMap[value] = index
 		valueMap[id] = nodeToValue(node, origin)
-		return id, nil
+		binary.BigEndian.PutUint64(ID, id)
+		return ID, nil
 	} else if err != nil {
-		bytes, err := indexItem.ValueCopy(nil)
+		buf, err := indexItem.ValueCopy(nil)
 		if err != nil {
-			return 0, err
+			return nil, err
 		}
 		index := &Index{}
-		err = proto.Unmarshal(bytes, index)
+		err = proto.Unmarshal(buf, index)
 		if err != nil {
-			return 0, err
+			return nil, err
 		}
 		indexMap[value] = index
 		index.Increment(position)
-		return index.GetId(), nil
+		binary.BigEndian.PutUint64(ID, index.GetId())
+		return ID, nil
 	} else {
-		return 0, err
+		return nil, err
 	}
 }
 
-func insertCount(major bool, s, p, o uint64, txn *badger.Txn) ([3]uint64, error) {
+func insertCount(major bool, s, p, o []byte, txn *badger.Txn) ([3]uint64, error) {
 	var countValues [3]uint64
 	for i := byte(0); i < 3; i++ {
-		var a, b uint64
+		var a, b []byte
 		var prefix byte
 		if major {
 			a, b, _ = permuteMajor(i, s, p, o)
@@ -104,7 +109,7 @@ func insertCount(major bool, s, p, o uint64, txn *badger.Txn) ([3]uint64, error)
 			a, b, _ = permuteMinor(i, s, p, o)
 			prefix = MinorPrefixes[i]
 		}
-		key := assembleKey(prefix, a, b, 0)
+		key := assembleKey(prefix, a, b, nil)
 		item, err := txn.Get(key)
 		count := make([]byte, 8)
 		if err == badger.ErrKeyNotFound {
@@ -219,12 +224,12 @@ func insert(hash string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 			if err == badger.ErrKeyNotFound {
 				// Create a new SourceList container and write our source to it.
 				sourceList := &SourceList{Sources: []*Source{source}}
-				bytes, err := proto.Marshal(sourceList)
+				buf, err := proto.Marshal(sourceList)
 				if err != nil {
 					return err
 				}
 
-				err = txn.SetWithMeta(tripleKey, bytes, triplePrefix)
+				err = txn.SetWithMeta(tripleKey, buf, triplePrefix)
 				if err != nil {
 					return err
 				}
@@ -233,25 +238,25 @@ func insert(hash string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 			} else if tripleItem.UserMeta() != triplePrefix {
 				return fmt.Errorf("Meta byte does not match the key prefix: %d %d", tripleItem.UserMeta(), triplePrefix)
 			} else {
-				bytes, err := tripleItem.ValueCopy(nil)
+				buf, err := tripleItem.ValueCopy(nil)
 				if err != nil {
 					return err
 				}
 
 				sourceList := &SourceList{}
-				err = proto.Unmarshal(bytes, sourceList)
+				err = proto.Unmarshal(buf, sourceList)
 				if err != nil {
 					return err
 				}
 
 				sources := sourceList.GetSources()
 				sourceList.Sources = append(sources, source)
-				bytes, err = proto.Marshal(sourceList)
+				buf, err = proto.Marshal(sourceList)
 				if err != nil {
 					return err
 				}
 
-				err = txn.SetWithMeta(tripleKey, bytes, triplePrefix)
+				err = txn.SetWithMeta(tripleKey, buf, triplePrefix)
 				if err != nil {
 					return err
 				}

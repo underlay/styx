@@ -13,7 +13,9 @@ type Reference struct {
 	Index  int        // The index of the triple within the graph
 	Place  uint8      // The element (subject/predicate/object) within the triple
 	M      HasValue   // The next (clockwise) element in the triple
+	m      []byte     // a convience slot for the []byte of M
 	N      HasValue   // The previous (clockwise) element in the triple
+	n      []byte     // a convience slot for the []byte of N
 	Cursor *Cursor    // The iteration cursor
 	Dual   *Reference // If (M or N) is a blank node, this is a pointer to its reference struct
 }
@@ -37,62 +39,71 @@ func (ref *Reference) Close() {
 	}
 }
 
-// Initialize populates cursors and initial count
+// Initialize cursors and initial count
 func (ref *Reference) Initialize(major bool, txn *badger.Txn) (bool, error) {
-	var err error
-	var count uint64
-	count, major, err = ref.getCount(nil, major, txn)
-	if err != nil {
-		return major, err
-	} else if count == 0 {
-		return major, fmt.Errorf("Initial reference count of zero: %s", ref.String())
-	}
+	iterator := txn.NewIterator(iteratorOptions)
+	ref.Cursor = &Cursor{Iterator: iterator}
 
-	ref.Cursor = &Cursor{Count: count}
-	return major, nil
-}
-
-func (ref *Reference) getCount(assignmentMap *AssignmentMap, major bool, txn *badger.Txn) (uint64, bool, error) {
 	mIndex, mIsIndex := ref.M.(*Index)
 	nIndex, nIsIndex := ref.N.(*Index)
-	m, n := ref.M.GetValue(assignmentMap), ref.N.GetValue(assignmentMap)
 
-	if m > 0 && n > 0 {
+	if mIsIndex && nIsIndex {
 		// Single reference -> major/minor key
+		m, n := ref.m, ref.n
+
+		// Set count
 		var key []byte
 		if major {
 			place := (ref.Place + 1) % 3
-			key = assembleKey(MajorPrefixes[place], m, n, 0)
+			key = assembleKey(MajorPrefixes[place], m, n, nil)
 		} else {
 			place := (ref.Place + 2) % 3
-			key = assembleKey(MinorPrefixes[place], n, m, 0)
+			key = assembleKey(MinorPrefixes[place], n, m, nil)
 		}
 		item, err := txn.Get(key)
 		if err == badger.ErrKeyNotFound {
-			return 0, !major, nil
+			return !major, fmt.Errorf("Initial reference count of zero: %s", ref.String())
 		} else if err != nil {
-			return 0, !major, err
-		} else if count, err := item.ValueCopy(nil); err != nil {
-			return 0, !major, err
+			return !major, err
+		} else if value, err := item.ValueCopy(nil); err != nil {
+			return !major, err
 		} else {
-			return binary.BigEndian.Uint64(count), !major, nil
+			ref.Cursor.Count = binary.BigEndian.Uint64(value)
 		}
-	}
 
-	// Double reference -> index key
-	var place uint8
-	var index *Index
-	if mIsIndex && !nIsIndex {
-		index = mIndex
-		place = (ref.Place + 1) % 3
-	} else if !mIsIndex && nIsIndex {
-		index = nIndex
-		place = (ref.Place + 2) % 3
+		// Set Cursor Prefix
+		place := (ref.Place + 1) % 3
+		prefix := TriplePrefixes[place]
+		ref.Cursor.Prefix = assembleKey(prefix, m, n, nil)
 	} else {
-		return 0, false, fmt.Errorf("Invalid reference in codex: %s", ref.String())
+		// Double reference -> index key
+		var indexBytes []byte
+		var prefix byte
+
+		if mIsIndex && !nIsIndex {
+			indexBytes = ref.m
+			place := (ref.Place + 1) % 3
+			prefix = MinorPrefixes[place]
+			ref.Cursor.Count = mIndex.Get(place)
+		} else if !mIsIndex && nIsIndex {
+			indexBytes = ref.n
+			place := (ref.Place + 2) % 3
+			prefix = MajorPrefixes[place]
+			ref.Cursor.Count = nIndex.Get(place)
+		} else {
+			return !major, fmt.Errorf("Invalid reference in codex: %s", ref.String())
+		}
+
+		// Set Count
+		if ref.Cursor.Count == 0 {
+			return !major, fmt.Errorf("Initial reference count of zero: %s", ref.String())
+		}
+
+		// Set Cursor Prefix
+		ref.Cursor.Prefix = assembleKey(prefix, indexBytes, nil, nil)
 	}
 
-	return index.Get(place), !major, nil
+	return major, nil
 }
 
 // A ReferenceSet is a slice of References.

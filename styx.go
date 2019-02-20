@@ -1,8 +1,6 @@
 package main
 
 import (
-	"encoding/binary"
-	"fmt"
 	"strings"
 
 	badger "github.com/dgraph-io/badger"
@@ -11,34 +9,41 @@ import (
 	ld "github.com/piprate/json-gold/ld"
 )
 
-func marshalReferenceNode(node ld.Node, assignmentMap *AssignmentMap, txn *badger.Txn) (string, error) {
+func setValues(node ld.Node, assignmentMap *AssignmentMap, values map[[8]byte]*Value, txn *badger.Txn) (ld.Node, error) {
 	blank, isBlank := node.(*ld.BlankNode)
 	if !isBlank {
-		return marshalNode(nil, node), nil
+		return node, nil
 	}
-	valueID := assignmentMap.Index[blank.Attribute].Value
-	valueKey := make([]byte, 9)
-	valueKey[0] = ValuePrefix
-	binary.BigEndian.PutUint64(valueKey[1:9], valueID)
-	item, err := txn.Get(valueKey)
-	if err != nil {
-		return "", err
+	assignment := assignmentMap.Index[blank.Attribute]
+	if value, has := values[assignment.Value]; has {
+		return valueToNode(value)
 	}
-	buffer, err := item.ValueCopy(nil)
+
+	key := make([]byte, 9)
+	key[0] = ValuePrefix
+	copy(key[1:9], assignment.Value[:])
+	item, err := txn.Get(key)
 	if err != nil {
-		return "", err
+		return nil, err
+	}
+	buf, err := item.ValueCopy(nil)
+	if err != nil {
+		return nil, err
 	}
 	value := &Value{}
-	err = proto.Unmarshal(buffer, value)
+	err = proto.Unmarshal(buf, value)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return marshalValue(value)
+	values[assignment.Value] = value
+	return valueToNode(value)
 }
 
 // Query the database
 func Query(query interface{}, callback func(result interface{}) error, db *badger.DB, sh *ipfs.Shell) error {
 	proc := ld.NewJsonLdProcessor()
+	api := ld.NewJsonLdApi()
+
 	options := ld.NewJsonLdOptions("")
 	options.DocumentLoader = NewIPFSDocumentLoader(sh)
 	options.ProcessingMode = ld.JsonLd_1_1
@@ -57,34 +62,35 @@ func Query(query interface{}, callback func(result interface{}) error, db *badge
 	}
 
 	dataset := rdf.(*ld.RDFDataset)
-	printDataset(dataset)
+
 	return db.View(func(txn *badger.Txn) error {
-		index, err := solveDataset(dataset, txn)
+		assignmentMap, err := solveDataset(dataset, txn)
 		if err != nil {
 			return err
 		}
 
-		var result string
+		values := map[[8]byte]*Value{}
 		for _, quad := range dataset.Graphs[DefaultGraph] {
-			subject, err := marshalReferenceNode(quad.Subject, index, txn)
+			quad.Subject, err = setValues(quad.Subject, assignmentMap, values, txn)
 			if err != nil {
 				return err
 			}
-			predicate, err := marshalReferenceNode(quad.Predicate, index, txn)
+			quad.Predicate, err = setValues(quad.Predicate, assignmentMap, values, txn)
 			if err != nil {
 				return err
 			}
-			object, err := marshalReferenceNode(quad.Object, index, txn)
-			result += subject + " " + predicate + " " + object + " .\n"
+			quad.Object, err = setValues(quad.Object, assignmentMap, values, txn)
+			if err != nil {
+				return err
+			}
 		}
 
-		fmt.Println(result)
-		document, err := proc.FromRDF(result, options)
+		doc, err := api.FromRDF(dataset, options)
 		if err != nil {
 			return err
 		}
 
-		framed, err := proc.Frame(document, query, options)
+		framed, err := proc.Frame(doc, query, options)
 		if err != nil {
 			return err
 		}
@@ -115,9 +121,6 @@ func Ingest(doc interface{}, db *badger.DB, sh *ipfs.Shell) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
-	fmt.Println("normalized")
-	fmt.Println(normalized)
 
 	reader := strings.NewReader(normalized.(string))
 	hash, err := sh.Add(reader)

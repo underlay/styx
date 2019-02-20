@@ -32,16 +32,16 @@ It's a (limited) way of querying graphs. It's similar to the idea behind GraphQL
 
 This thing I'm calling "subgraph matching" is related to [subgraph isomorphism](https://en.wikipedia.org/wiki/Subgraph_isomorphism_problem), a well-studied problem in graph theory, except that in most application contexts we want to allow two different variables (in the pattern subgraph) to resolve to the same value (from the target graph). This technically breaks isomorphism, so it's really _surjective subgraph homomorphism_, or **_subgraph epimorphism_** if you really took notes in class.
 
-So if you wanted to know the father of the mayor of the hometown of the author of The Shining, you could query (in JSON-LD!) like the:
+So if you wanted to know the father of the mayor of the hometown of the author of The Shining, you could query (in JSON-LD!) like this:
 
 ```json
 {
-  "@context": { "@vocab": "http://example.com/" },
-  "@id": "The_Shining",
-  "author": {
-    "hometown": {
-      "mayor": {
-        "father": {}
+  "@context": { "ex": "http://example.com/" },
+  "@id": "ex:The_Shining",
+  "ex:author": {
+    "ex:hometown": {
+      "ex:mayor": {
+        "ex:father": {}
       }
     }
   }
@@ -52,13 +52,16 @@ So if you wanted to know the father of the mayor of the hometown of the author o
 
 ```json
 {
-  "@context": { "@vocab": "http://example.com/" },
-  "@id": "The_Shining",
-  "author": {
-    "hometown": {
-      "mayor": {
-        "father": {
-          "@id": "The_Father"
+  "@context": { "ex": "http://example.com/" },
+  "@id": "ex:The_Shining",
+  "ex:author": {
+    "@id": "ex:Stephen_King",
+    "ex:hometown": {
+      "@id": "ex:Portland,_Maine",
+      "ex:mayor": {
+        "@id": "Ethan_Strimling",
+        "ex:father": {
+          "@id": "ex:Ethan_Strimling_Sr"
         }
       }
     }
@@ -70,12 +73,26 @@ And since there are a million ways of serializing the same graph, you could also
 
 ```json
 {
-  "@context": { "@vocab": "http://example.com/" },
+  "@context": { "ex": "http://example.com/" },
   "@graph": [
-    { "@id": "The_Shining", "author": { "@id": "_:author" } },
-    { "@id": "_:author", "hometown": { "@id": "_:town" } },
-    { "@id": "_:town", "mayor": { "@id": "_:mayor" } },
-    { "@id": "_:mayor", "mayor": { "@id": "_:father" } }
+    { "@id": "ex:The_Shining", "ex:author": { "@id": "_:author" } },
+    { "@id": "_:author", "ex:hometown": { "@id": "_:town" } },
+    { "@id": "_:town", "ex:mayor": { "@id": "_:mayor" } },
+    { "@id": "_:mayor", "ex:mayor": { "@id": "_:father" } }
+  ]
+}
+```
+
+and you would have gotten
+
+```json
+{
+  "@context": { "ex": "http://example.com/" },
+  "@graph": [
+    { "@id": "ex:The_Shining", "ex:author": { "@id": "ex:Stephen_King" } },
+    { "@id": "ex:Stephen_King", "ex:hometown": { "@id": "ex:Portland,_Maine" } },
+    { "@id": "ex:Portland,_Maine", "ex:mayor": { "@id": "ex:Ethan_Strimling" } },
+    { "@id": "ex:Ethan_Strimling", "ex:mayor": { "@id": "ex:Ethan_Strimling_Sr" } }
   ]
 }
 ```
@@ -137,8 +154,8 @@ json.Unmarshal(queryBytes, &query)
 Query(query, func(result interface{}) error {
   // The result will be framed by the query,
   // as per https://w3c.github.io/json-ld-framing
-  bytes, _ := json.MarshalIndent(result, "", "\t")
-  fmt.Println(string(bytes))
+  buf, _ := json.MarshalIndent(result, "", "\t")
+  fmt.Println(string(buf))
   return nil
 }, db, sh)
 ```

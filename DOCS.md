@@ -1,6 +1,8 @@
+# Data Structures
+
 ## Insertion
 
-Styx flaunts five types of keys in eleven total tables. Our underlying key-value store Badger doesn't have a concept of a table, so instead we prefix every key with two bytes to indicate its type.
+Styx surrenders to five types of keys in eleven total tables. The underlying key-value store [Badger](https://github.com/dgraph-io/badger) doesn't have a concept of a table, so instead we prefix every key with two bytes to indicate its type.
 
 ### Index keys
 An Index keys starts with `q` and maps an RDF term (serialized per the [n-quads spec](https://www.w3.org/TR/n-quads/#n-quads-language)) to a protobuf-encoded `Index` struct containing the term's uint64 ID and three uint64 counters for the number of times it occurs in the database as a subject, predicate, and object.

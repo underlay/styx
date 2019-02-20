@@ -4,7 +4,7 @@ import (
 	fmt "fmt"
 	"log"
 
-	"github.com/dgraph-io/badger"
+	badger "github.com/dgraph-io/badger"
 	cid "github.com/ipfs/go-cid"
 	ld "github.com/piprate/json-gold/ld"
 )
