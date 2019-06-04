@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"log"
+	"time"
 
 	badger "github.com/dgraph-io/badger"
 	proto "github.com/golang/protobuf/proto"
@@ -123,8 +125,7 @@ func insertCount(major bool, s, p, o []byte, txn *badger.Txn) ([3]uint64, error)
 		}
 
 		binary.BigEndian.PutUint64(count, countValues[i])
-		err = txn.SetWithMeta(key, count, prefix)
-		if err != nil {
+		if err = txn.Set(key, count); err != nil {
 			return countValues, err
 		}
 	}
@@ -134,14 +135,37 @@ func insertCount(major bool, s, p, o []byte, txn *badger.Txn) ([3]uint64, error)
 // This does all sixteen db operations! :-)
 // For now we only operate on the @default graph of the dataset
 func insert(hash string, dataset *ld.RDFDataset, txn *badger.Txn) error {
-	// re-use the counter slice throughout iteration; yah?
-	initialCount := make([]byte, 8)
-	binary.BigEndian.PutUint64(initialCount, InitialCounter)
 
 	c, err := cid.Decode(hash)
 	if err != nil {
 		return err
 	}
+
+	cBytes := c.Bytes()
+
+	// Check to see if this document is already in the database
+	documentKey := make([]byte, len(cBytes)+1)
+	documentKey[0] = DocumentPrefix
+	copy(documentKey[1:], cBytes)
+	item, err := txn.Get(documentKey)
+	if err == badger.ErrKeyNotFound {
+		// Great!
+		dateBytes := []byte(time.Now().Format(time.RFC3339))
+		err = txn.Set(documentKey, dateBytes)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Database already has this document!
+		return item.Value(func(val []byte) error {
+			log.Println("Duplicate document inserted previously:", string(val))
+			return nil
+		})
+	}
+
+	// re-use the counter slice throughout iteration; yah?
+	initialCount := make([]byte, 8)
+	binary.BigEndian.PutUint64(initialCount, InitialCounter)
 
 	origin := &c
 
@@ -168,7 +192,7 @@ func insert(hash string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 
 	for index, quad := range dataset.Graphs[DefaultGraph] {
 		source := &Source{
-			Cid:   c.Bytes(),
+			Cid:   cBytes,
 			Index: int32(index),
 		}
 
@@ -195,6 +219,7 @@ func insert(hash string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 		// Update the major index
 		majorValues, err := insertCount(true, s, p, o, txn)
 		if err != nil {
+			fmt.Println("error from major")
 			return err
 		}
 
@@ -229,14 +254,12 @@ func insert(hash string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 					return err
 				}
 
-				err = txn.SetWithMeta(tripleKey, buf, triplePrefix)
+				err = txn.Set(tripleKey, buf)
 				if err != nil {
 					return err
 				}
 			} else if err != nil {
 				return err
-			} else if tripleItem.UserMeta() != triplePrefix {
-				return fmt.Errorf("Meta byte does not match the key prefix: %d %d", tripleItem.UserMeta(), triplePrefix)
 			} else {
 				buf, err := tripleItem.ValueCopy(nil)
 				if err != nil {
@@ -256,7 +279,7 @@ func insert(hash string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 					return err
 				}
 
-				err = txn.SetWithMeta(tripleKey, buf, triplePrefix)
+				err = txn.Set(tripleKey, buf)
 				if err != nil {
 					return err
 				}
@@ -273,7 +296,7 @@ func insert(hash string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 		if err != nil {
 			return err
 		}
-		err = txn.SetWithMeta(key, val, IndexPrefix)
+		err = txn.Set(key, val)
 		if err != nil {
 			return err
 		}
@@ -289,7 +312,7 @@ func insert(hash string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 		key := make([]byte, 9)
 		key[0] = ValuePrefix
 		binary.BigEndian.PutUint64(key[1:], id)
-		err = txn.SetWithMeta(key, val, ValuePrefix)
+		err = txn.Set(key, val)
 		if err != nil {
 			return err
 		}

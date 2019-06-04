@@ -5,9 +5,10 @@
 		<title>styx</title>
 		<link href="jsoneditor.min.css" rel="stylesheet" type="text/css" />
 		<script src="jsoneditor.min.js"></script>
+		<script defer src="index.js"></script>
 	</head>
 	<style>
-		main {
+		section {
 			display: flex;
 			flex-direction: row;
 		}
@@ -21,51 +22,16 @@
 		}
 	</style>
 	<body>
-		<h1>Styx</h1>
-		<h2>Query</h2>
 		<main>
-			<div id="query" style="width: 420px; height: 420px;"></div>
-			<button id="execute">query</button>
-			<div id="result" style="width: 840px; height: 420px;"></div>
+			<section>
+				<div id="query" style="width: 420px; height: 420px;"></div>
+				<button id="execute-query">query</button>
+				<div id="result" style="width: 840px; height: 420px;"></div>
+			</section>
+			<section>
+				<div id="ingest" style="width: 420px; height: 420px;"></div>
+				<button id="execute-ingest">ingest</button>
+			</section>
 		</main>
-		<script>
-			// create the editor
-			const queryContainer = document.getElementById("query")
-			const queryEditor = new JSONEditor(queryContainer, {
-				mode: "code",
-				modes: [],
-			})
-
-			// set json
-			queryEditor.set({
-				"@context": {
-					"@vocab": "http://schema.org/",
-					parent: { "@reverse": "children" },
-				},
-				"@type": "Person",
-				birthDate: {},
-				parent: {
-					name: "Joel",
-				},
-			})
-
-			const resultContainer = document.getElementById("result")
-			const resultEditor = new JSONEditor(resultContainer, {
-				mode: "view",
-				modes: [],
-			})
-
-			const button = document.getElementById("execute")
-			button.addEventListener("click", () => {
-				const body = JSON.stringify(queryEditor.get())
-				console.log("got body", body)
-				fetch("/query", { method: "POST", body })
-					.then(res => res.json())
-					.then(json => {
-						resultEditor.set(json)
-						resultEditor.expandAll()
-					})
-			})
-		</script>
 	</body>
 </html>

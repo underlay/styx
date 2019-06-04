@@ -106,15 +106,7 @@ func TestIPFSDocumentLoader(t *testing.T) {
 	}
 	checkExpanded(dwebIpfsResult)
 
-	ipldURI := "ipfs://" + cidIpld
-	ipldResult, err := proc.Expand(ipldURI, options)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	checkExpanded(ipldResult)
-
-	dwebIpldURI := "dweb:/ipfs/" + cidIpld
+	dwebIpldURI := "dweb:/ipld/" + cidIpld
 	dwebIpldResult, err := proc.Expand(dwebIpldURI, options)
 	if err != nil {
 		t.Error(err)

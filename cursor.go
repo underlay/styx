@@ -24,8 +24,8 @@ func (cursor *Cursor) String() string {
 func (cursor *Cursor) value() []byte {
 	if cursor.Iterator.ValidForPrefix(cursor.Prefix) {
 		item := cursor.Iterator.Item()
-		value := getValueFromKey(item.UserMeta(), item.Key())
-		return value
+		key := item.Key()
+		return getValueFromKey(key[0], key)
 	}
 	return nil
 }
@@ -72,7 +72,6 @@ func (cs CursorSet) Less(a, b int) bool { return cs[a].Count < cs[b].Count }
 func (cs CursorSet) Seek(value []byte) []byte {
 	var count int
 	l := cs.Len()
-	fmt.Println("seekable length", l)
 	for i := 0; count < l; i = (i + 1) % l {
 		cursor := cs[i]
 		// fmt.Println("got cursor", cursor, cursor.Prefix, value)

@@ -1,12 +1,11 @@
 package main
 
 import (
-	"strings"
-
 	badger "github.com/dgraph-io/badger"
 	proto "github.com/golang/protobuf/proto"
 	ipfs "github.com/ipfs/go-ipfs-api"
 	ld "github.com/piprate/json-gold/ld"
+	"strings"
 )
 
 func setValues(node ld.Node, assignmentMap *AssignmentMap, values map[[8]byte]*Value, txn *badger.Txn) (ld.Node, error) {

@@ -131,7 +131,7 @@ func valueToNode(value *Value) (ld.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		iri := fmt.Sprintf("<dweb:/ipfs/%s#%s>", c.String(), blank.Blank.Id)
+		iri := fmt.Sprintf("ul:/ipfs/%s#%s", c.String(), blank.Blank.Id)
 		return &ld.IRI{Value: iri}, nil
 	} else if iri, isIri := value.Node.(*Value_Iri); isIri {
 		return &ld.IRI{Value: iri.Iri}, nil
@@ -159,7 +159,7 @@ func marshalBlank(origin *cid.Cid, id string) string {
 	if origin == nil {
 		return ""
 	}
-	return fmt.Sprintf("<dweb:/ipfs/%s#%s>", origin.String(), id)
+	return fmt.Sprintf("<ul:/ipfs/%s#%s>", origin.String(), id)
 }
 
 func marshalNode(origin *cid.Cid, node ld.Node) string {

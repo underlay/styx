@@ -2,7 +2,7 @@ syntax = "proto3";
 package main;
 
 message SourceList {
-	repeated Source sources = 2;
+	repeated Source sources = 1;
 }
 
 message Source {

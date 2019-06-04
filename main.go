@@ -63,6 +63,8 @@ func handleQuery(db *badger.DB, w http.ResponseWriter, r *http.Request) {
 				return nil
 			}, db, sh)
 		}
+	} else {
+		http.Error(w, "Method Not Allowed", 405)
 	}
 }
 
@@ -75,21 +77,23 @@ func handleIngest(db *badger.DB, w http.ResponseWriter, r *http.Request) {
 		fmt.Println("doc", err)
 		fmt.Println(doc)
 		if err == nil {
-			result, err := Ingest(doc, db, sh)
-			fmt.Println("got result", result)
+			hash, err := Ingest(doc, db, sh)
+			fmt.Println("got result", hash)
 			if err != nil {
 				buf, _ := json.Marshal(map[string]string{"error": err.Error()})
 				fmt.Fprintf(w, "%s\n", string(buf))
 			} else {
-				buf, _ := json.Marshal(map[string]string{"result": result})
+				buf, _ := json.Marshal(map[string]string{"cid": hash})
 				fmt.Fprintf(w, "%s\n", string(buf))
 			}
 		}
+	} else {
+		http.Error(w, "Method Not Allowed", 405)
 	}
 }
 
 func main() {
-	db := openDB(nil, true)
+	db := openDB(nil, false)
 	http.Handle("/", http.FileServer(http.Dir("./static")))
 	http.HandleFunc("/ingest", func(w http.ResponseWriter, r *http.Request) { handleIngest(db, w, r) })
 	http.HandleFunc("/query", func(w http.ResponseWriter, r *http.Request) { handleQuery(db, w, r) })

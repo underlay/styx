@@ -32,19 +32,25 @@ It's a (limited) way of querying graphs. It's similar to the idea behind GraphQL
 
 This thing I'm calling "subgraph matching" is related to [subgraph isomorphism](https://en.wikipedia.org/wiki/Subgraph_isomorphism_problem), a well-studied problem in graph theory, except that in most application contexts we want to allow two different variables (in the pattern subgraph) to resolve to the same value (from the target graph). This technically breaks isomorphism, so it's really _surjective subgraph homomorphism_, or **_subgraph epimorphism_** if you really took notes in class.
 
+## Implicit Existential Quantification
+
+Another way of looking at subgraph matching is as a collection of existential quantifications.
+
+### Path Traversal
+
 So if you wanted to know the father of the mayor of the hometown of the author of The Shining, you could query (in JSON-LD!) like this:
 
 ```json
 {
-  "@context": { "ex": "http://example.com/" },
-  "@id": "ex:The_Shining",
-  "ex:author": {
-    "ex:hometown": {
-      "ex:mayor": {
-        "ex:father": {}
-      }
-    }
-  }
+	"@context": { "ex": "http://example.com/" },
+	"@id": "ex:The_Shining_(film)",
+	"ex:author": {
+		"ex:hometown": {
+			"ex:mayor": {
+				"ex:father": {}
+			}
+		}
+	}
 }
 ```
 
@@ -52,20 +58,20 @@ So if you wanted to know the father of the mayor of the hometown of the author o
 
 ```json
 {
-  "@context": { "ex": "http://example.com/" },
-  "@id": "ex:The_Shining",
-  "ex:author": {
-    "@id": "ex:Stephen_King",
-    "ex:hometown": {
-      "@id": "ex:Portland,_Maine",
-      "ex:mayor": {
-        "@id": "Ethan_Strimling",
-        "ex:father": {
-          "@id": "ex:Ethan_Strimling_Sr"
-        }
-      }
-    }
-  }
+	"@context": { "ex": "http://example.com/" },
+	"@id": "ex:The_Shining_(film)",
+	"ex:author": {
+		"@id": "ex:Stephen_King",
+		"ex:hometown": {
+			"@id": "ex:Portland,_Maine",
+			"ex:mayor": {
+				"@id": "Ethan_Strimling",
+				"ex:father": {
+					"@id": "ex:Ethan_Strimling_Sr"
+				}
+			}
+		}
+	}
 }
 ```
 
@@ -73,13 +79,13 @@ And since there are a million ways of serializing the same graph, you could also
 
 ```json
 {
-  "@context": { "ex": "http://example.com/" },
-  "@graph": [
-    { "@id": "ex:The_Shining", "ex:author": { "@id": "_:author" } },
-    { "@id": "_:author", "ex:hometown": { "@id": "_:town" } },
-    { "@id": "_:town", "ex:mayor": { "@id": "_:mayor" } },
-    { "@id": "_:mayor", "ex:mayor": { "@id": "_:father" } }
-  ]
+	"@context": { "ex": "http://example.com/" },
+	"@graph": [
+		{ "@id": "ex:The_Shining_(film)", "ex:author": { "@id": "_:author" } },
+		{ "@id": "_:author", "ex:hometown": { "@id": "_:town" } },
+		{ "@id": "_:town", "ex:mayor": { "@id": "_:mayor" } },
+		{ "@id": "_:mayor", "ex:mayor": { "@id": "_:father" } }
+	]
 }
 ```
 
@@ -87,17 +93,61 @@ and you would have gotten
 
 ```json
 {
-  "@context": { "ex": "http://example.com/" },
-  "@graph": [
-    { "@id": "ex:The_Shining", "ex:author": { "@id": "ex:Stephen_King" } },
-    { "@id": "ex:Stephen_King", "ex:hometown": { "@id": "ex:Portland,_Maine" } },
-    { "@id": "ex:Portland,_Maine", "ex:mayor": { "@id": "ex:Ethan_Strimling" } },
-    { "@id": "ex:Ethan_Strimling", "ex:mayor": { "@id": "ex:Ethan_Strimling_Sr" } }
-  ]
+	"@context": { "ex": "http://example.com/" },
+	"@graph": [
+		{
+			"@id": "ex:The_Shining_(film)",
+			"ex:author": { "@id": "ex:Stephen_King" }
+		},
+		{
+			"@id": "ex:Stephen_King",
+			"ex:hometown": { "@id": "ex:Portland,_Maine" }
+		},
+		{
+			"@id": "ex:Portland,_Maine",
+			"ex:mayor": { "@id": "ex:Ethan_Strimling" }
+		},
+		{
+			"@id": "ex:Ethan_Strimling",
+			"ex:mayor": { "@id": "ex:Ethan_Strimling_Sr" }
+		}
+	]
+}
+```
+
+### Constraint Satisfaction
+
+Alternatively, maybe you didn't know an exact URI for the book _The Shining_, but you wanted to know if any of the crew members of the Kubrick film were named McDonald:
+
+```json
+{
+	"@context": { "@vocab": "http://schema.org/", "ex": "http://example.com/" },
+	"@type": "Movie",
+	"isBasedOn": {
+		"@type": "Book",
+		"name": "The Shining"
+	},
+	"director": { "familyName": "Kubrick" },
+	"contributor": { "familyName": "McDonald ", "givenName": {} }
+}
+```
+
+```json
+{
+	"@context": { "@vocab": "http://schema.org/" },
+	"@id": "http://example.com/The_Shining_(film)",
+	"isBasedOn": { "@id": "http://example.com/The_Shining_(novel)" },
+	"director": { "@id": "http://schema.org/Stanley_Kubrick" },
+	"contributor": {
+		"@id": "http://example.com/Philip_McDonald",
+		"givenName": "Philip "
+	}
 }
 ```
 
 **Subgraph matching is more like a graph analog of a key-value store** than a query language itself: a reliable, conceptually clean intermediate interface that more specialized DSLs should build off. This is the purpose of the Styx project: to be an abstract graph store that exposes natural high-level graph primitives while minimizing loss of generality.
+
+## Usage
 
 ```golang
 // Open an IPFS Shell
@@ -172,7 +222,7 @@ _:c14n0 <http://schema.org/name> "Joel" .
 _:c14n0 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://schema.org/Person> .
 ```
 
-This (canonicalized) dataset has an IPFS CID of `QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC` (you can view it from [any gateway](https://gateway.underlay.store/ipfs/QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC) or in the [Underlay explorer](https://underlay.github.io/explore/#QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC)!). So when the query processor wants to reference a blank node from that dataset, it'll use a URI staring with `dweb:/ipfs/QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC`, plus a fragment identifier for the (canonicalized) blank node id.
+This (canonicalized) dataset has an IPFS CID of `QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC` (you can view it from [any gateway](https://gateway.underlay.store/ipfs/QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC) or in the [Underlay explorer](https://underlay.github.io/explore/#QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC)!). So when the query processor wants to reference a blank node from that dataset, it'll use a URI staring with `ul:/ipfs/QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC`, plus a fragment identifier for the (canonicalized) blank node id.
 
 ```
 {
@@ -186,7 +236,7 @@ This (canonicalized) dataset has an IPFS CID of `QmWMwTL4GZSEsAaNYUo7Co24HkAkVCS
   "@type": "Person",
   "birthDate": "2030-11-10",
   "parent": {
-    "@id": "dweb:/ipfs/QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC#_:c14n0",
+    "@id": "ul:/ipfs/QmWMwTL4GZSEsAaNYUo7Co24HkAkVCSdPgMwGJmrH5TwMC#_:c14n0",
     "name": "Joel"
   }
 }

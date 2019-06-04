@@ -37,6 +37,9 @@ const permutationABC uint8 = 9
 // CounterKey to store the id counter
 var CounterKey = []byte{202, 254, 186, 190}
 
+// DocumentPrefix keys track the CIDs of the documents in the database
+const DocumentPrefix = byte('d')
+
 // ValuePrefix keys translate uint64 ids to ld.Node values
 const ValuePrefix = byte('p')
 
