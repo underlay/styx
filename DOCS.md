@@ -14,7 +14,7 @@ A Value key starts with `p` and maps a (big-endian) uint64 ID to a protobuf-enco
 
 ### Triple keys
 
-A triple key starts with one of `a`, `b`, or `c`, depending on the
+A triple key starts with one of `a`, `b`, or `c`.
 
 ## Querying
 

@@ -1,9 +1,29 @@
-// create the editor
-const queryContainer = document.getElementById("query")
-const queryEditor = new JSONEditor(queryContainer, {
+const options = {
 	mode: "code",
 	modes: [],
-})
+	colorPicker: false,
+	timestampTag: false,
+	enableTransform: false,
+	statusBar: false,
+	autocomplete: {
+		caseSensitive: true,
+		getOptions: (text, path, input, editor) => [
+			"@id",
+			"@type",
+			"@graph",
+			"@list",
+			"@set",
+			"@context",
+			"@vocab",
+			"@container",
+			"@version",
+		],
+	},
+}
+
+// create the editor
+const queryContainer = document.getElementById("query")
+const queryEditor = new JSONEditor(queryContainer, options)
 
 // set json
 queryEditor.set({
@@ -26,20 +46,22 @@ const resultEditor = new JSONEditor(resultContainer, {
 
 document.getElementById("execute-query").addEventListener("click", () => {
 	const body = JSON.stringify(queryEditor.get())
-	console.log("got body", body)
 	fetch("/query", { method: "POST", body })
-		.then(res => res.json())
-		.then(json => {
-			resultEditor.set(json)
-			resultEditor.expandAll()
+		.then(async res => {
+			if (res.status === 200) {
+				const json = await res.json()
+				resultEditor.set(json)
+				resultEditor.expandAll()
+			} else {
+				const text = await res.text()
+				console.error(`${res.statusText}: ${text}`)
+			}
 		})
+		.catch(err => console.error(err))
 })
 
 const ingestContainer = document.getElementById("ingest")
-const ingestEditor = new JSONEditor(ingestContainer, {
-	mode: "code",
-	modes: [],
-})
+const ingestEditor = new JSONEditor(ingestContainer, options)
 
 // set json
 ingestEditor.set({

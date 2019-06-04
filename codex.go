@@ -257,6 +257,7 @@ func getInitalCodexMap(dataset *ld.RDFDataset, txn *badger.Txn) ([]*Reference, *
 				} else {
 					refA, err := makeReference(graph, index, permutationA, quad.Predicate, blankC, indexMap, txn)
 					if err != nil {
+						fmt.Println("wow 5")
 						return nil, nil, err
 					}
 					refC, err := makeReference(graph, index, permutationC, blankA, quad.Predicate, indexMap, txn)
@@ -308,7 +309,9 @@ func makeReference(graph string, index int, place byte, m ld.Node, n ld.Node, in
 			M = Variable(asBlank.Attribute)
 		} else {
 			mIndex, err := indexMap.GetIndex(m, txn)
-			if err != nil {
+			if err == badger.ErrKeyNotFound {
+				return nil, err
+			} else if err != nil {
 				return nil, err
 			}
 			M = mIndex
@@ -322,7 +325,9 @@ func makeReference(graph string, index int, place byte, m ld.Node, n ld.Node, in
 			N = Variable(asBlank.Attribute)
 		} else {
 			nIndex, err := indexMap.GetIndex(n, txn)
-			if err != nil {
+			if err == badger.ErrKeyNotFound {
+				return nil, err
+			} else if err != nil {
 				return nil, err
 			}
 			N = nIndex

@@ -48,37 +48,34 @@ func openDB(t *testing.T, clean bool) *badger.DB {
 }
 
 func handleQuery(db *badger.DB, w http.ResponseWriter, r *http.Request) {
-	fmt.Println("handling query")
 	if r.Method == http.MethodPost {
 		decoder := json.NewDecoder(r.Body)
 		var query interface{}
 		err := decoder.Decode(&query)
-		fmt.Println("query", err)
-		fmt.Println(query)
 		if err == nil {
-			Query(query, func(result interface{}) error {
-				buf, _ := json.Marshal(result)
-				fmt.Println("got result", string(buf))
-				fmt.Fprintf(w, "%s\n", string(buf))
+			err := Query(query, func(result interface{}) error {
+				bytes, _ := json.Marshal(result)
+				fmt.Fprintf(w, "%s\n", string(bytes))
 				return nil
 			}, db, sh)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+		} else {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
 	} else {
-		http.Error(w, "Method Not Allowed", 405)
+		http.Error(w, r.Method, http.StatusMethodNotAllowed)
 	}
 }
 
 func handleIngest(db *badger.DB, w http.ResponseWriter, r *http.Request) {
-	fmt.Println("handling ingest")
 	if r.Method == http.MethodPost {
 		decoder := json.NewDecoder(r.Body)
 		var doc interface{}
 		err := decoder.Decode(&doc)
-		fmt.Println("doc", err)
-		fmt.Println(doc)
 		if err == nil {
 			hash, err := Ingest(doc, db, sh)
-			fmt.Println("got result", hash)
 			if err != nil {
 				buf, _ := json.Marshal(map[string]string{"error": err.Error()})
 				fmt.Fprintf(w, "%s\n", string(buf))
@@ -93,7 +90,7 @@ func handleIngest(db *badger.DB, w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	db := openDB(nil, false)
+	db := openDB(nil, true)
 	http.Handle("/", http.FileServer(http.Dir("./static")))
 	http.HandleFunc("/ingest", func(w http.ResponseWriter, r *http.Request) { handleIngest(db, w, r) })
 	http.HandleFunc("/query", func(w http.ResponseWriter, r *http.Request) { handleQuery(db, w, r) })
