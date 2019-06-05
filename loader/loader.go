@@ -1,4 +1,4 @@
-package main
+package loader
 
 import (
 	cid "github.com/ipfs/go-cid"
@@ -11,12 +11,12 @@ import (
 // DefaultShellAddress is the default shell address
 const DefaultShellAddress = "localhost:5001"
 
-// IPFSDocumentLoader is an implementation of DocumentLoader for ipfs:// and dweb:/ipfs/ URIs
-type IPFSDocumentLoader struct {
+// DwebDocumentLoader is an implementation of DocumentLoader for ipfs:// and dweb:/ipfs/ URIs
+type DwebDocumentLoader struct {
 	shell *ipfs.Shell
 }
 
-func (dl *IPFSDocumentLoader) loadDocumentIPLD(uri string, contextURL string, origin string) (*ld.RemoteDocument, error) {
+func (dl *DwebDocumentLoader) loadDocumentIPLD(uri string, contextURL string, origin string) (*ld.RemoteDocument, error) {
 	if c, err := cid.Decode(origin); err != nil {
 		return nil, err
 	} else if c.Type() == cid.DagCBOR {
@@ -32,7 +32,7 @@ func (dl *IPFSDocumentLoader) loadDocumentIPLD(uri string, contextURL string, or
 	}
 }
 
-func (dl *IPFSDocumentLoader) loadDocumentIPFS(uri string, contextURL string, origin string, path string) (*ld.RemoteDocument, error) {
+func (dl *DwebDocumentLoader) loadDocumentIPFS(uri string, contextURL string, origin string, path string) (*ld.RemoteDocument, error) {
 	if c, err := cid.Decode(origin); err != nil {
 		return nil, err
 	} else if c.Version() == 0 {
@@ -54,7 +54,7 @@ func (dl *IPFSDocumentLoader) loadDocumentIPFS(uri string, contextURL string, or
 
 // LoadDocument returns a RemoteDocument containing the contents of the
 // JSON-LD resource from the given URL.
-func (dl *IPFSDocumentLoader) LoadDocument(uri string) (*ld.RemoteDocument, error) {
+func (dl *DwebDocumentLoader) LoadDocument(uri string) (*ld.RemoteDocument, error) {
 	parsedURL, err := url.Parse(uri)
 	if err != nil {
 		return nil, ld.NewJsonLdError(ld.LoadingDocumentFailed, err)
@@ -89,9 +89,9 @@ func (dl *IPFSDocumentLoader) LoadDocument(uri string) (*ld.RemoteDocument, erro
 	}
 }
 
-// NewIPFSDocumentLoader creates a new instance of IPFSDocumentLoader
-func NewIPFSDocumentLoader(shell *ipfs.Shell) *IPFSDocumentLoader {
-	loader := &IPFSDocumentLoader{shell: shell}
+// NewDwebDocumentLoader creates a new instance of DwebDocumentLoader
+func NewDwebDocumentLoader(shell *ipfs.Shell) *DwebDocumentLoader {
+	loader := &DwebDocumentLoader{shell: shell}
 	if loader.shell == nil {
 		loader.shell = ipfs.NewShell(DefaultShellAddress)
 	}

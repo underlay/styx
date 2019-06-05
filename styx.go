@@ -1,6 +1,7 @@
 package main
 
 import (
+	"./loader"
 	badger "github.com/dgraph-io/badger"
 	proto "github.com/golang/protobuf/proto"
 	ipfs "github.com/ipfs/go-ipfs-api"
@@ -44,7 +45,7 @@ func Query(query interface{}, callback func(result interface{}) error, db *badge
 	api := ld.NewJsonLdApi()
 
 	options := ld.NewJsonLdOptions("")
-	options.DocumentLoader = NewIPFSDocumentLoader(sh)
+	options.DocumentLoader = loader.NewDwebDocumentLoader(sh)
 	options.ProcessingMode = ld.JsonLd_1_1
 	options.UseNativeTypes = true
 	options.Explicit = true
@@ -102,7 +103,7 @@ func Query(query interface{}, callback func(result interface{}) error, db *badge
 func Ingest(doc interface{}, db *badger.DB, sh *ipfs.Shell) (string, error) {
 	proc := ld.NewJsonLdProcessor()
 	options := ld.NewJsonLdOptions("")
-	options.DocumentLoader = NewIPFSDocumentLoader(sh)
+	options.DocumentLoader = loader.NewDwebDocumentLoader(sh)
 
 	// Convert to RDF
 	rdf, err := proc.ToRDF(doc, options)

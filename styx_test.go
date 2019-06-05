@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"./loader"
 	"encoding/binary"
 	"encoding/json"
 
@@ -88,7 +89,7 @@ func TestIPFSDocumentLoader(t *testing.T) {
 
 	proc := ld.NewJsonLdProcessor()
 	options := ld.NewJsonLdOptions("")
-	options.DocumentLoader = NewIPFSDocumentLoader(sh)
+	options.DocumentLoader = loader.NewDwebDocumentLoader(sh)
 
 	ipfsURI := "ipfs://" + cidIpfs
 	ipfsResult, err := proc.Expand(ipfsURI, options)
