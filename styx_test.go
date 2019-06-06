@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"./loader"
+	"./types"
 	"encoding/binary"
 	"encoding/json"
 
@@ -147,38 +148,39 @@ func TestIngest(t *testing.T) {
 				return err
 			}
 			prefix := key[0]
-			if bytes.Equal(key, CounterKey) {
+			if bytes.Equal(key, types.CounterKey) {
 				// Counter!
 				fmt.Printf("Counter: %02d\n", binary.BigEndian.Uint64(val))
-			} else if prefix == IndexPrefix {
+			} else if prefix == types.IndexPrefix {
 				// Index key
-				index := &Index{}
+				index := &types.Index{}
 				err = proto.Unmarshal(val, index)
 				if err != nil {
 					return err
 				}
 				fmt.Printf("Index entry\n  %s\n  %s\n", string(key[1:]), index.String())
-			} else if prefix == ValuePrefix {
+			} else if prefix == types.ValuePrefix {
 				// Value key
-				value := &Value{}
+				value := &types.Value{}
 				err = proto.Unmarshal(val, value)
 				if err != nil {
 					return err
 				}
 				id := binary.BigEndian.Uint64(key[1:])
 				fmt.Printf("Value entry: %02d %s\n", id, value.String())
-			} else if _, has := triplePrefixMap[prefix]; has {
+			} else if _, has := types.TriplePrefixMap[prefix]; has {
 				// Value key
-				sourceList := &SourceList{}
+				sourceList := &types.SourceList{}
 				proto.Unmarshal(val, sourceList)
 				fmt.Printf("Triple entry: %s %02d | %02d | %02d :: %s\n",
 					string(key[0]),
 					binary.BigEndian.Uint64(key[1:9]),
 					binary.BigEndian.Uint64(key[9:17]),
 					binary.BigEndian.Uint64(key[17:25]),
-					sourcesToString(sourceList.Sources),
+					types.Sources(sourceList.Sources).String(),
+					// sourcesToString(sourceList.Sources),
 				)
-			} else if _, has := minorPrefixMap[prefix]; has {
+			} else if _, has := types.MinorPrefixMap[prefix]; has {
 				// Minor key
 				fmt.Printf("Minor entry: %s %02d | %02d :: %02d\n",
 					string(key[0]),
@@ -186,7 +188,7 @@ func TestIngest(t *testing.T) {
 					binary.BigEndian.Uint64(key[9:17]),
 					binary.BigEndian.Uint64(val),
 				)
-			} else if _, has := majorPrefixMap[prefix]; has {
+			} else if _, has := types.MajorPrefixMap[prefix]; has {
 				// Major key
 				fmt.Printf("Major entry: %s %02d | %02d :: %02d\n",
 					string(key[0]),

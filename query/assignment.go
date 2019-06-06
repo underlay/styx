@@ -1,18 +1,21 @@
-package main
+package query
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"sort"
 
 	badger "github.com/dgraph-io/badger"
+
+	"../types"
 )
 
 // An Assignment is a setting of a variable to a value.
 type Assignment struct {
 	Value        [8]byte
 	ValueRoot    [8]byte
-	Sources      []*Source
+	Sources      types.Sources
 	Constraint   ReferenceSet
 	Past         ReferenceMap
 	Present      ReferenceSet
@@ -27,7 +30,7 @@ func (a *Assignment) String() string {
 	val := fmt.Sprintln("--- assignment ---")
 	val += fmt.Sprintf("Value: %d\n", a.Value)
 	val += fmt.Sprintf("ValueRoot: %v\n", a.ValueRoot)
-	val += fmt.Sprintf("Sources: %s\n", sourcesToString(a.Sources))
+	val += fmt.Sprintf("Sources: %s\n", a.Sources.String())
 	val += fmt.Sprintf("Constraint: %s\n", a.Constraint.String())
 	val += fmt.Sprintf("Present: %s\n", a.Present.String())
 	val += fmt.Sprintln("Future:")
@@ -67,7 +70,7 @@ func (a *Assignment) Seek(value []byte) []byte {
 	return value
 }
 
-// Next value ?????
+// Next value
 func (a *Assignment) Next() []byte {
 	value := a.Static.Next()
 	if a.Dynamic.Len() > 0 {
@@ -202,4 +205,34 @@ func getAssignmentMap(codexMap *CodexMap, txn *badger.Txn) (*AssignmentMap, erro
 	}
 
 	return &AssignmentMap{Index: index, Slice: codexMap.Slice, Map: inverse}, nil
+}
+
+func printAssignments(assignmentMap *AssignmentMap) {
+	fmt.Println("printing assignments", assignmentMap.Slice)
+	for _, id := range assignmentMap.Slice {
+		a := assignmentMap.Index[id]
+		fmt.Printf("id: %s\n", id)
+		fmt.Println(a.String())
+	}
+}
+
+// HasValue is either a string representing a variable reference,
+// or an Index representing an absolute value from the database
+type HasValue interface {
+	GetValue(param interface{}) uint64
+}
+
+// A Variable is a string with a GetValue method
+type Variable string
+
+// GetValue satisfies the HasValue interface for variables by looking up the
+// variable's value in the assignmentMap.
+func (variable Variable) GetValue(param interface{}) uint64 {
+	if assignmentMap, isAssignmentMap := param.(*AssignmentMap); isAssignmentMap {
+		id := string(variable)
+		if assignment, has := assignmentMap.Index[id]; has {
+			return binary.BigEndian.Uint64(assignment.Value[:])
+		}
+	}
+	return 0
 }

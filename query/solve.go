@@ -1,4 +1,4 @@
-package main
+package query
 
 import (
 	"encoding/binary"
@@ -7,19 +7,21 @@ import (
 
 	badger "github.com/dgraph-io/badger"
 	ld "github.com/piprate/json-gold/ld"
+
+	"../types"
 )
 
 func setRef(ref *Reference, value []byte) error {
 	dual := ref.Dual
 	place := (dual.Place + 1) % 3
-	prefix := TriplePrefixes[place]
+	prefix := types.TriplePrefixes[place]
 
-	_, mIsIndex := dual.M.(*Index)
-	_, nIsIndex := dual.N.(*Index)
+	_, mIsIndex := dual.M.(*types.Index)
+	_, nIsIndex := dual.N.(*types.Index)
 	if mIsIndex && !nIsIndex {
-		dual.Cursor.Prefix = assembleKey(prefix, dual.m, value, nil)
+		dual.Cursor.Prefix = types.AssembleKey(prefix, dual.BytesM, value, nil)
 	} else if !mIsIndex && nIsIndex {
-		dual.Cursor.Prefix = assembleKey(prefix, value, dual.n, nil)
+		dual.Cursor.Prefix = types.AssembleKey(prefix, value, dual.BytesN, nil)
 	}
 
 	item := ref.Cursor.Iterator.Item()
@@ -140,7 +142,8 @@ func setInterim(index int, dep string, value []byte, assignmentMap *AssignmentMa
 	return nil
 }
 
-func solveDataset(dataset *ld.RDFDataset, txn *badger.Txn) (*AssignmentMap, error) {
+// SolveDataset solves the dataset
+func SolveDataset(dataset *ld.RDFDataset, txn *badger.Txn) (*AssignmentMap, error) {
 	_, codexMap, err := getInitalCodexMap(dataset, txn)
 	defer codexMap.Close()
 	if err != nil {

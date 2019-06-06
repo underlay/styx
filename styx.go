@@ -1,15 +1,19 @@
 package main
 
 import (
-	"./loader"
+	"strings"
+
 	badger "github.com/dgraph-io/badger"
 	proto "github.com/golang/protobuf/proto"
 	ipfs "github.com/ipfs/go-ipfs-api"
 	ld "github.com/piprate/json-gold/ld"
-	"strings"
+
+	"./loader"
+	"./query"
+	"./types"
 )
 
-func setValues(node ld.Node, assignmentMap *AssignmentMap, values map[[8]byte]*Value, txn *badger.Txn) (ld.Node, error) {
+func setValues(node ld.Node, assignmentMap *query.AssignmentMap, values map[[8]byte]*types.Value, txn *badger.Txn) (ld.Node, error) {
 	blank, isBlank := node.(*ld.BlankNode)
 	if !isBlank {
 		return node, nil
@@ -20,7 +24,7 @@ func setValues(node ld.Node, assignmentMap *AssignmentMap, values map[[8]byte]*V
 	}
 
 	key := make([]byte, 9)
-	key[0] = ValuePrefix
+	key[0] = types.ValuePrefix
 	copy(key[1:9], assignment.Value[:])
 	item, err := txn.Get(key)
 	if err != nil {
@@ -30,7 +34,7 @@ func setValues(node ld.Node, assignmentMap *AssignmentMap, values map[[8]byte]*V
 	if err != nil {
 		return nil, err
 	}
-	value := &Value{}
+	value := &types.Value{}
 	err = proto.Unmarshal(buf, value)
 	if err != nil {
 		return nil, err
@@ -40,7 +44,7 @@ func setValues(node ld.Node, assignmentMap *AssignmentMap, values map[[8]byte]*V
 }
 
 // Query the database
-func Query(query interface{}, callback func(result interface{}) error, db *badger.DB, sh *ipfs.Shell) error {
+func Query(q interface{}, callback func(result interface{}) error, db *badger.DB, sh *ipfs.Shell) error {
 	proc := ld.NewJsonLdProcessor()
 	api := ld.NewJsonLdApi()
 
@@ -50,13 +54,13 @@ func Query(query interface{}, callback func(result interface{}) error, db *badge
 	options.UseNativeTypes = true
 	options.Explicit = true
 
-	if asMap, isMap := query.(map[string]interface{}); isMap {
+	if asMap, isMap := q.(map[string]interface{}); isMap {
 		_, hasGraph := asMap["@graph"]
 		options.OmitGraph = !hasGraph
 	}
 
 	// Convert to RDF
-	rdf, err := proc.Normalize(query, options)
+	rdf, err := proc.Normalize(q, options)
 	if err != nil {
 		return err
 	}
@@ -64,13 +68,13 @@ func Query(query interface{}, callback func(result interface{}) error, db *badge
 	dataset := rdf.(*ld.RDFDataset)
 
 	return db.View(func(txn *badger.Txn) error {
-		assignmentMap, err := solveDataset(dataset, txn)
+		assignmentMap, err := query.SolveDataset(dataset, txn)
 		if err != nil {
 			return err
 		}
 
-		values := map[[8]byte]*Value{}
-		for _, quad := range dataset.Graphs[DefaultGraph] {
+		values := map[[8]byte]*types.Value{}
+		for _, quad := range dataset.Graphs[types.DefaultGraph] {
 			quad.Subject, err = setValues(quad.Subject, assignmentMap, values, txn)
 			if err != nil {
 				return err
@@ -90,7 +94,7 @@ func Query(query interface{}, callback func(result interface{}) error, db *badge
 			return err
 		}
 
-		framed, err := proc.Frame(doc, query, options)
+		framed, err := proc.Frame(doc, q, options)
 		if err != nil {
 			return err
 		}
@@ -114,8 +118,8 @@ func Ingest(doc interface{}, db *badger.DB, sh *ipfs.Shell) (string, error) {
 	dataset := rdf.(*ld.RDFDataset)
 
 	// Normalize and add to IFPS
-	options.Format = Format
-	options.Algorithm = Algorithm
+	options.Format = types.Format
+	options.Algorithm = types.Algorithm
 	api := ld.NewJsonLdApi()
 	normalized, err := api.Normalize(dataset, options)
 	if err != nil {

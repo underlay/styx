@@ -1,10 +1,12 @@
-package main
+package query
 
 import (
 	"bytes"
-	fmt "fmt"
+	"fmt"
 
 	badger "github.com/dgraph-io/badger"
+
+	"../types"
 )
 
 // A Cursor is an Iterator and a Prefix
@@ -18,14 +20,22 @@ type Cursor struct {
 
 func (cursor *Cursor) String() string {
 	return fmt.Sprintf("%s/%d", cursor.ID, cursor.Index)
-	// return fmt.Sprintf("%s/%d: %s | %d", cursor.ID, cursor.Index, string(cursor.Prefix), cursor.Count)
 }
 
 func (cursor *Cursor) value() []byte {
 	if cursor.Iterator.ValidForPrefix(cursor.Prefix) {
 		item := cursor.Iterator.Item()
 		key := item.Key()
-		return getValueFromKey(key[0], key)
+		prefix := key[0]
+		if _, has := types.TriplePrefixMap[prefix]; has {
+			return key[17:25]
+		} else if _, has := types.MajorPrefixMap[prefix]; has {
+			return key[9:17]
+		} else if _, has := types.MinorPrefixMap[prefix]; has {
+			return key[9:17]
+		} else {
+			return key[1:9] // Should never happen?
+		}
 	}
 	return nil
 }
@@ -74,9 +84,7 @@ func (cs CursorSet) Seek(value []byte) []byte {
 	l := cs.Len()
 	for i := 0; count < l; i = (i + 1) % l {
 		cursor := cs[i]
-		// fmt.Println("got cursor", cursor, cursor.Prefix, value)
 		next := cursor.Seek(value)
-		// fmt.Println("got cursor next", next)
 		if next == nil {
 			return nil
 		} else if bytes.Equal(next, value) {

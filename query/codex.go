@@ -1,4 +1,4 @@
-package main
+package query
 
 import (
 	"encoding/binary"
@@ -8,7 +8,18 @@ import (
 
 	badger "github.com/dgraph-io/badger"
 	ld "github.com/piprate/json-gold/ld"
+
+	"../types"
 )
+
+const constantPermutation uint8 = 255
+const permutationA uint8 = 0
+const permutationB uint8 = 1
+const permutationC uint8 = 2
+const permutationAB uint8 = 3
+const permutationBC uint8 = 4
+const permutationCA uint8 = 5
+const permutationABC uint8 = 9
 
 // Codex is a map of references. A codex is always relative to a specific variable.
 type Codex struct {
@@ -93,7 +104,7 @@ func (codex *Codex) Initialize(major bool, txn *badger.Txn) (bool, error) {
 
 // A CodexMap associates ids with Codex maps.
 type CodexMap struct {
-	Value map[uint64]*Index
+	Value map[uint64]*types.Index
 	Index map[string]*Codex
 	Slice []string
 }
@@ -112,6 +123,14 @@ func (codexMap *CodexMap) Close() {
 func (codexMap *CodexMap) Len() int { return len(codexMap.Slice) }
 func (codexMap *CodexMap) Swap(a, b int) {
 	codexMap.Slice[a], codexMap.Slice[b] = codexMap.Slice[b], codexMap.Slice[a]
+}
+
+func printCodexMap(c *CodexMap) {
+	fmt.Println("----- Codex Map -----")
+	for _, id := range c.Slice {
+		fmt.Printf("---- %s ----\n%s\n", id, c.Index[id].String())
+	}
+	fmt.Println("----- End of Codex Map -----")
 }
 
 // TODO: put more thought into the sorting heuristic.
@@ -154,8 +173,8 @@ func (codexMap *CodexMap) Initialize(txn *badger.Txn) error {
 
 func getInitalCodexMap(dataset *ld.RDFDataset, txn *badger.Txn) ([]*Reference, *CodexMap, error) {
 	var err error
-	indexMap := IndexMap{}
-	valueMap := map[uint64]*Index{}
+	indexMap := types.IndexMap{}
+	valueMap := map[uint64]*types.Index{}
 	constants := []*Reference{}
 	codexMap := &CodexMap{Value: valueMap}
 	for graph, quads := range dataset.Graphs {
@@ -181,9 +200,9 @@ func getInitalCodexMap(dataset *ld.RDFDataset, txn *badger.Txn) ([]*Reference, *
 				constants = append(constants, ref)
 			} else if (A && !B && !C) || (!A && B && !C) || (!A && !B && C) {
 				ref := &Reference{Graph: graph, Index: index}
-				var mIndex, nIndex *Index
-				ref.m = make([]byte, 8)
-				ref.n = make([]byte, 8)
+				var mIndex, nIndex *types.Index
+				ref.BytesM = make([]byte, 8)
+				ref.BytesN = make([]byte, 8)
 				if A {
 					ref.Place = 0
 					mIndex, err = indexMap.GetIndex(quad.Predicate, txn)
@@ -217,10 +236,10 @@ func getInitalCodexMap(dataset *ld.RDFDataset, txn *badger.Txn) ([]*Reference, *
 				}
 
 				ref.M = mIndex
-				binary.BigEndian.PutUint64(ref.m, mIndex.GetId())
+				binary.BigEndian.PutUint64(ref.BytesM, mIndex.GetId())
 
 				ref.N = nIndex
-				binary.BigEndian.PutUint64(ref.n, nIndex.GetId())
+				binary.BigEndian.PutUint64(ref.BytesN, nIndex.GetId())
 
 				pivot := a + b + c
 				codex := codexMap.GetCodex(pivot)
@@ -300,7 +319,7 @@ func getInitalCodexMap(dataset *ld.RDFDataset, txn *badger.Txn) ([]*Reference, *
 	return constants, codexMap, nil
 }
 
-func makeReference(graph string, index int, place byte, m ld.Node, n ld.Node, indexMap IndexMap, txn *badger.Txn) (*Reference, error) {
+func makeReference(graph string, index int, place byte, m ld.Node, n ld.Node, indexMap types.IndexMap, txn *badger.Txn) (*Reference, error) {
 	var M, N HasValue
 	var mBytes, nBytes []byte
 
@@ -341,9 +360,9 @@ func makeReference(graph string, index int, place byte, m ld.Node, n ld.Node, in
 		Index:  index,
 		Place:  place,
 		M:      M,
-		m:      mBytes,
+		BytesM: mBytes,
 		N:      N,
-		n:      nBytes,
+		BytesN: nBytes,
 		Cursor: &Cursor{},
 		Dual:   nil,
 	}, nil

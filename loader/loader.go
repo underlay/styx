@@ -1,11 +1,12 @@
 package loader
 
 import (
+	"net/url"
+	"strings"
+
 	cid "github.com/ipfs/go-cid"
 	ipfs "github.com/ipfs/go-ipfs-api"
 	ld "github.com/piprate/json-gold/ld"
-	"net/url"
-	"strings"
 )
 
 // DefaultShellAddress is the default shell address
@@ -47,7 +48,7 @@ func (dl *DwebDocumentLoader) loadDocumentIPFS(uri string, contextURL string, or
 		}
 		return &ld.RemoteDocument{DocumentURL: uri, Document: document, ContextURL: contextURL}, nil
 	} else {
-		err := "Invalid IFPS origin CID: " + origin
+		err := "Invalid IPFS origin CID: " + origin
 		return nil, ld.NewJsonLdError(ld.LoadingDocumentFailed, err)
 	}
 }

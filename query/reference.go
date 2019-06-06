@@ -1,11 +1,17 @@
-package main
+package query
 
 import (
 	"encoding/binary"
 	"fmt"
 
 	badger "github.com/dgraph-io/badger"
+
+	"../types"
 )
+
+var iteratorOptions = badger.IteratorOptions{
+	PrefetchValues: false,
+}
 
 // A Reference to an occurrence of a variable in a dataset
 type Reference struct {
@@ -13,9 +19,9 @@ type Reference struct {
 	Index  int        // The index of the triple within the graph
 	Place  uint8      // The element (subject/predicate/object) within the triple
 	M      HasValue   // The next (clockwise) element in the triple
-	m      []byte     // a convience slot for the []byte of M
+	BytesM []byte     // a convience slot for the []byte of M
 	N      HasValue   // The previous (clockwise) element in the triple
-	n      []byte     // a convience slot for the []byte of N
+	BytesN []byte     // a convience slot for the []byte of N
 	Cursor *Cursor    // The iteration cursor
 	Dual   *Reference // If (M or N) is a blank node, this is a pointer to its reference struct
 }
@@ -44,21 +50,21 @@ func (ref *Reference) Initialize(major bool, txn *badger.Txn) (bool, error) {
 	iterator := txn.NewIterator(iteratorOptions)
 	ref.Cursor = &Cursor{Iterator: iterator}
 
-	mIndex, mIsIndex := ref.M.(*Index)
-	nIndex, nIsIndex := ref.N.(*Index)
+	mIndex, mIsIndex := ref.M.(*types.Index)
+	nIndex, nIsIndex := ref.N.(*types.Index)
 
 	if mIsIndex && nIsIndex {
 		// Single reference -> major/minor key
-		m, n := ref.m, ref.n
+		m, n := ref.BytesM, ref.BytesN
 
 		// Set count
 		var key []byte
 		if major {
 			place := (ref.Place + 1) % 3
-			key = assembleKey(MajorPrefixes[place], m, n, nil)
+			key = types.AssembleKey(types.MajorPrefixes[place], m, n, nil)
 		} else {
 			place := (ref.Place + 2) % 3
-			key = assembleKey(MinorPrefixes[place], n, m, nil)
+			key = types.AssembleKey(types.MinorPrefixes[place], n, m, nil)
 		}
 		item, err := txn.Get(key)
 		if err == badger.ErrKeyNotFound {
@@ -73,22 +79,22 @@ func (ref *Reference) Initialize(major bool, txn *badger.Txn) (bool, error) {
 
 		// Set Cursor Prefix
 		place := (ref.Place + 1) % 3
-		prefix := TriplePrefixes[place]
-		ref.Cursor.Prefix = assembleKey(prefix, m, n, nil)
+		prefix := types.TriplePrefixes[place]
+		ref.Cursor.Prefix = types.AssembleKey(prefix, m, n, nil)
 	} else {
 		// Double reference -> index key
 		var indexBytes []byte
 		var prefix byte
 
 		if mIsIndex && !nIsIndex {
-			indexBytes = ref.m
+			indexBytes = ref.BytesM
 			place := (ref.Place + 1) % 3
-			prefix = MinorPrefixes[place]
+			prefix = types.MinorPrefixes[place]
 			ref.Cursor.Count = mIndex.Get(place)
 		} else if !mIsIndex && nIsIndex {
-			indexBytes = ref.n
+			indexBytes = ref.BytesN
 			place := (ref.Place + 2) % 3
-			prefix = MajorPrefixes[place]
+			prefix = types.MajorPrefixes[place]
 			ref.Cursor.Count = nIndex.Get(place)
 		} else {
 			return !major, fmt.Errorf("Invalid reference in codex: %s", ref.String())
@@ -100,7 +106,7 @@ func (ref *Reference) Initialize(major bool, txn *badger.Txn) (bool, error) {
 		}
 
 		// Set Cursor Prefix
-		ref.Cursor.Prefix = assembleKey(prefix, indexBytes, nil, nil)
+		ref.Cursor.Prefix = types.AssembleKey(prefix, indexBytes, nil, nil)
 	}
 
 	return major, nil

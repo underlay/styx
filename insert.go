@@ -10,6 +10,8 @@ import (
 	proto "github.com/golang/protobuf/proto"
 	cid "github.com/ipfs/go-cid"
 	ld "github.com/piprate/json-gold/ld"
+
+	"./types"
 )
 
 /*
@@ -47,8 +49,8 @@ func insertValue(
 	node ld.Node,
 	position uint8,
 	counter uint64,
-	indexMap IndexMap,
-	valueMap ValueMap,
+	indexMap types.IndexMap,
+	valueMap types.ValueMap,
 	txn *badger.Txn,
 ) ([]byte, error) {
 	// The indexMap holds all of the (modified) Index structs that
@@ -59,7 +61,7 @@ func insertValue(
 
 	ID := make([]byte, 8)
 
-	value := marshalNode(origin, node)
+	value := types.MarshalNode(origin, node)
 	if index, has := indexMap[value]; has {
 		index.Increment(position)
 		binary.BigEndian.PutUint64(ID, index.GetId())
@@ -67,14 +69,14 @@ func insertValue(
 	}
 
 	indexKey := make([]byte, 1, len(value)+1)
-	indexKey[0] = IndexPrefix
+	indexKey[0] = types.IndexPrefix
 	indexKey = append(indexKey, []byte(value)...)
 	indexItem, err := txn.Get(indexKey)
 	if err == badger.ErrKeyNotFound {
 		// The node does not exist in the database; we have to
 		// Create and write both keys
 		id := counter + uint64(len(valueMap))
-		index := &Index{Id: id}
+		index := &types.Index{Id: id}
 		index.Increment(position)
 		indexMap[value] = index
 		valueMap[id] = nodeToValue(node, origin)
@@ -85,7 +87,7 @@ func insertValue(
 		if err != nil {
 			return nil, err
 		}
-		index := &Index{}
+		index := &types.Index{}
 		err = proto.Unmarshal(buf, index)
 		if err != nil {
 			return nil, err
@@ -106,16 +108,16 @@ func insertCount(major bool, s, p, o []byte, txn *badger.Txn) ([3]uint64, error)
 		var prefix byte
 		if major {
 			a, b, _ = permuteMajor(i, s, p, o)
-			prefix = MajorPrefixes[i]
+			prefix = types.MajorPrefixes[i]
 		} else {
 			a, b, _ = permuteMinor(i, s, p, o)
-			prefix = MinorPrefixes[i]
+			prefix = types.MinorPrefixes[i]
 		}
-		key := assembleKey(prefix, a, b, nil)
+		key := types.AssembleKey(prefix, a, b, nil)
 		item, err := txn.Get(key)
 		count := make([]byte, 8)
 		if err == badger.ErrKeyNotFound {
-			countValues[i] = InitialCounter
+			countValues[i] = types.InitialCounter
 		} else if err != nil {
 			return countValues, err
 		} else if count, err = item.ValueCopy(count); err != nil {
@@ -145,7 +147,7 @@ func insert(hash string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 
 	// Check to see if this document is already in the database
 	documentKey := make([]byte, len(cBytes)+1)
-	documentKey[0] = DocumentPrefix
+	documentKey[0] = types.DocumentPrefix
 	copy(documentKey[1:], cBytes)
 	item, err := txn.Get(documentKey)
 	if err == badger.ErrKeyNotFound {
@@ -165,18 +167,18 @@ func insert(hash string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 
 	// re-use the counter slice throughout iteration; yah?
 	initialCount := make([]byte, 8)
-	binary.BigEndian.PutUint64(initialCount, InitialCounter)
+	binary.BigEndian.PutUint64(initialCount, types.InitialCounter)
 
 	origin := &c
 
-	valueMap := ValueMap{}
-	indexMap := IndexMap{}
+	valueMap := types.ValueMap{}
+	indexMap := types.IndexMap{}
 
 	var counter uint64
-	if counterItem, err := txn.Get(CounterKey); err == badger.ErrKeyNotFound {
+	if counterItem, err := txn.Get(types.CounterKey); err == badger.ErrKeyNotFound {
 		// No counter yet! Let's make one.
-		counter = InitialCounter
-		err = txn.Set(CounterKey, initialCount)
+		counter = types.InitialCounter
+		err = txn.Set(types.CounterKey, initialCount)
 		if err != nil {
 			return err
 		}
@@ -190,8 +192,8 @@ func insert(hash string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 		counter = binary.BigEndian.Uint64(counterBytes)
 	}
 
-	for index, quad := range dataset.Graphs[DefaultGraph] {
-		source := &Source{
+	for index, quad := range dataset.Graphs[types.DefaultGraph] {
+		source := &types.Source{
 			Cid:   cBytes,
 			Index: int32(index),
 		}
@@ -240,15 +242,15 @@ func insert(hash string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 		// Triple loop
 		for i := byte(0); i < 3; i++ {
 			a, b, c := permuteMajor(i, s, p, o)
-			triplePrefix := TriplePrefixes[i]
+			triplePrefix := types.TriplePrefixes[i]
 
 			// This is the value key.
 			// assembleKey knows to pack all of a, b, and c because of the prefix.
-			tripleKey := assembleKey(triplePrefix, a, b, c)
+			tripleKey := types.AssembleKey(triplePrefix, a, b, c)
 			tripleItem, err := txn.Get(tripleKey)
 			if err == badger.ErrKeyNotFound {
 				// Create a new SourceList container and write our source to it.
-				sourceList := &SourceList{Sources: []*Source{source}}
+				sourceList := &types.SourceList{Sources: []*types.Source{source}}
 				buf, err := proto.Marshal(sourceList)
 				if err != nil {
 					return err
@@ -266,7 +268,7 @@ func insert(hash string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 					return err
 				}
 
-				sourceList := &SourceList{}
+				sourceList := &types.SourceList{}
 				err = proto.Unmarshal(buf, sourceList)
 				if err != nil {
 					return err
@@ -290,7 +292,7 @@ func insert(hash string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 	// Write back the index keys we incremented
 	for value, index := range indexMap {
 		key := make([]byte, 1, len(value)+1)
-		key[0] = IndexPrefix
+		key[0] = types.IndexPrefix
 		key = append(key, []byte(value)...)
 		val, err := proto.Marshal(index)
 		if err != nil {
@@ -310,7 +312,7 @@ func insert(hash string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 		}
 
 		key := make([]byte, 9)
-		key[0] = ValuePrefix
+		key[0] = types.ValuePrefix
 		binary.BigEndian.PutUint64(key[1:], id)
 		err = txn.Set(key, val)
 		if err != nil {
@@ -323,7 +325,7 @@ func insert(hash string, dataset *ld.RDFDataset, txn *badger.Txn) error {
 		counterVal := make([]byte, 8)
 		newCounter := counter + uint64(len(valueMap))
 		binary.BigEndian.PutUint64(counterVal, newCounter)
-		err = txn.Set(CounterKey, counterVal)
+		err = txn.Set(types.CounterKey, counterVal)
 		if err != nil {
 			return err
 		}
