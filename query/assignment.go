@@ -11,6 +11,12 @@ import (
 	"../types"
 )
 
+// HasValue is either a string representing a variable reference,
+// or an Index representing an absolute value from the database
+type HasValue interface {
+	GetValue(param interface{}) uint64
+}
+
 // An Assignment is a setting of a variable to a value.
 type Assignment struct {
 	Value        [8]byte
@@ -96,6 +102,16 @@ type AssignmentMap struct {
 	Index map[string]*Assignment
 	Slice []string
 	Map   map[string]int
+}
+
+func (assignmentMap *AssignmentMap) String() string {
+	var s string
+	for _, id := range assignmentMap.Slice {
+		a := assignmentMap.Index[id]
+		s += fmt.Sprintf("id: %s\n", id)
+		s += fmt.Sprintln(a.String())
+	}
+	return s
 }
 
 func getAssignmentMap(codexMap *CodexMap, txn *badger.Txn) (*AssignmentMap, error) {
@@ -205,21 +221,6 @@ func getAssignmentMap(codexMap *CodexMap, txn *badger.Txn) (*AssignmentMap, erro
 	}
 
 	return &AssignmentMap{Index: index, Slice: codexMap.Slice, Map: inverse}, nil
-}
-
-func printAssignments(assignmentMap *AssignmentMap) {
-	fmt.Println("printing assignments", assignmentMap.Slice)
-	for _, id := range assignmentMap.Slice {
-		a := assignmentMap.Index[id]
-		fmt.Printf("id: %s\n", id)
-		fmt.Println(a.String())
-	}
-}
-
-// HasValue is either a string representing a variable reference,
-// or an Index representing an absolute value from the database
-type HasValue interface {
-	GetValue(param interface{}) uint64
 }
 
 // A Variable is a string with a GetValue method

@@ -13,34 +13,38 @@ import (
 	"./types"
 )
 
-func setValues(node ld.Node, assignmentMap *query.AssignmentMap, values map[[8]byte]*types.Value, txn *badger.Txn) (ld.Node, error) {
-	blank, isBlank := node.(*ld.BlankNode)
-	if !isBlank {
-		return node, nil
-	}
-	assignment := assignmentMap.Index[blank.Attribute]
-	if value, has := values[assignment.Value]; has {
-		return valueToNode(value)
+// Ingest a document
+func Ingest(doc interface{}, db *badger.DB, sh *ipfs.Shell) (string, error) {
+	proc := ld.NewJsonLdProcessor()
+	options := ld.NewJsonLdOptions("")
+	options.DocumentLoader = loader.NewDwebDocumentLoader(sh)
+
+	// Convert to RDF
+	rdf, err := proc.ToRDF(doc, options)
+	if err != nil {
+		return "", err
 	}
 
-	key := make([]byte, 9)
-	key[0] = types.ValuePrefix
-	copy(key[1:9], assignment.Value[:])
-	item, err := txn.Get(key)
+	dataset := rdf.(*ld.RDFDataset)
+
+	// Normalize and add to IFPS
+	options.Format = types.Format
+	options.Algorithm = types.Algorithm
+	api := ld.NewJsonLdApi()
+	normalized, err := api.Normalize(dataset, options)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	buf, err := item.ValueCopy(nil)
+
+	reader := strings.NewReader(normalized.(string))
+	hash, err := sh.Add(reader)
 	if err != nil {
-		return nil, err
+		return hash, err
 	}
-	value := &types.Value{}
-	err = proto.Unmarshal(buf, value)
-	if err != nil {
-		return nil, err
-	}
-	values[assignment.Value] = value
-	return valueToNode(value)
+
+	return hash, db.Update(func(txn *badger.Txn) error {
+		return insert(hash, dataset, txn)
+	})
 }
 
 // Query the database
@@ -103,36 +107,32 @@ func Query(q interface{}, callback func(result interface{}) error, db *badger.DB
 	})
 }
 
-// Ingest a document
-func Ingest(doc interface{}, db *badger.DB, sh *ipfs.Shell) (string, error) {
-	proc := ld.NewJsonLdProcessor()
-	options := ld.NewJsonLdOptions("")
-	options.DocumentLoader = loader.NewDwebDocumentLoader(sh)
-
-	// Convert to RDF
-	rdf, err := proc.ToRDF(doc, options)
-	if err != nil {
-		return "", err
+func setValues(node ld.Node, assignmentMap *query.AssignmentMap, values map[[8]byte]*types.Value, txn *badger.Txn) (ld.Node, error) {
+	blank, isBlank := node.(*ld.BlankNode)
+	if !isBlank {
+		return node, nil
+	}
+	assignment := assignmentMap.Index[blank.Attribute]
+	if value, has := values[assignment.Value]; has {
+		return valueToNode(value)
 	}
 
-	dataset := rdf.(*ld.RDFDataset)
-
-	// Normalize and add to IFPS
-	options.Format = types.Format
-	options.Algorithm = types.Algorithm
-	api := ld.NewJsonLdApi()
-	normalized, err := api.Normalize(dataset, options)
+	key := make([]byte, 9)
+	key[0] = types.ValuePrefix
+	copy(key[1:9], assignment.Value[:])
+	item, err := txn.Get(key)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-
-	reader := strings.NewReader(normalized.(string))
-	hash, err := sh.Add(reader)
+	buf, err := item.ValueCopy(nil)
 	if err != nil {
-		return hash, err
+		return nil, err
 	}
-
-	return hash, db.Update(func(txn *badger.Txn) error {
-		return insert(hash, dataset, txn)
-	})
+	value := &types.Value{}
+	err = proto.Unmarshal(buf, value)
+	if err != nil {
+		return nil, err
+	}
+	values[assignment.Value] = value
+	return valueToNode(value)
 }

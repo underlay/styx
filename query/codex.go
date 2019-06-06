@@ -33,16 +33,16 @@ type Codex struct {
 }
 
 func (codex *Codex) String() string {
-	var val string
-	val += fmt.Sprintf("Constraint: %s\n", codex.Constraint.String())
-	val += fmt.Sprintf("Singles: %s\n", codex.Single.String())
-	val += fmt.Sprintln("Doubles:")
+	var s string
+	s += fmt.Sprintf("Constraint: %s\n", codex.Constraint.String())
+	s += fmt.Sprintf("Singles: %s\n", codex.Single.String())
+	s += fmt.Sprintln("Doubles:")
 	for id, refs := range codex.Double {
-		val += fmt.Sprintf("  %s: %s\n", id, refs.String())
+		s += fmt.Sprintf("  %s: %s\n", id, refs.String())
 	}
-	val += fmt.Sprintf("Norm: %d\n", codex.Norm)
-	val += fmt.Sprintf("Length: %d\n", codex.Length)
-	return val
+	s += fmt.Sprintf("Norm: %d\n", codex.Norm)
+	s += fmt.Sprintf("Length: %d\n", codex.Length)
+	return s
 }
 
 // Close calls reference.Close on its children
@@ -109,6 +109,15 @@ type CodexMap struct {
 	Slice []string
 }
 
+func (codexMap *CodexMap) String() string {
+	s := "----- Codex Map -----"
+	for _, id := range codexMap.Slice {
+		s += fmt.Sprintf("---- %s ----\n%s\n", id, codexMap.Index[id].String())
+	}
+	s += fmt.Sprintln("----- End of Codex Map -----")
+	return s
+}
+
 // Close calls codex.close() on its children
 func (codexMap *CodexMap) Close() {
 	if codexMap == nil {
@@ -123,14 +132,6 @@ func (codexMap *CodexMap) Close() {
 func (codexMap *CodexMap) Len() int { return len(codexMap.Slice) }
 func (codexMap *CodexMap) Swap(a, b int) {
 	codexMap.Slice[a], codexMap.Slice[b] = codexMap.Slice[b], codexMap.Slice[a]
-}
-
-func printCodexMap(c *CodexMap) {
-	fmt.Println("----- Codex Map -----")
-	for _, id := range c.Slice {
-		fmt.Printf("---- %s ----\n%s\n", id, c.Index[id].String())
-	}
-	fmt.Println("----- End of Codex Map -----")
 }
 
 // TODO: put more thought into the sorting heuristic.

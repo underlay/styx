@@ -11,137 +11,6 @@ import (
 	"../types"
 )
 
-func setRef(ref *Reference, value []byte) error {
-	dual := ref.Dual
-	place := (dual.Place + 1) % 3
-	prefix := types.TriplePrefixes[place]
-
-	_, mIsIndex := dual.M.(*types.Index)
-	_, nIsIndex := dual.N.(*types.Index)
-	if mIsIndex && !nIsIndex {
-		dual.Cursor.Prefix = types.AssembleKey(prefix, dual.BytesM, value, nil)
-	} else if !mIsIndex && nIsIndex {
-		dual.Cursor.Prefix = types.AssembleKey(prefix, value, dual.BytesN, nil)
-	}
-
-	item := ref.Cursor.Iterator.Item()
-	count, err := item.ValueCopy(nil)
-	if err != nil {
-		return err
-	}
-
-	dual.Cursor.Count = binary.BigEndian.Uint64(count)
-	return nil
-}
-
-func setValue(id string, value []byte, assignmentMap *AssignmentMap) error {
-	assignment := assignmentMap.Index[id]
-	copy(assignment.Value[:], value)
-	for _, refs := range assignment.Future {
-		for _, ref := range refs {
-			err := setRef(ref, value)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func resetValue(
-	index int,
-	dep string,
-	oldValues map[string][]byte,
-	oldCounts map[[2]string][]uint64,
-	oldPrefixes map[[2]string][][]byte,
-	assignmentMap *AssignmentMap,
-) {
-	value := oldValues[dep]
-	dependency := assignmentMap.Index[dep]
-
-	sort.Stable(dependency.Dynamic)
-
-	for _, cursor := range dependency.Static {
-		key := append(cursor.Prefix, value...)
-		cursor.Iterator.Seek(key)
-	}
-
-	for _, cursor := range dependency.Dynamic {
-		key := append(cursor.Prefix, value...)
-		cursor.Iterator.Seek(key)
-	}
-
-	for f, refs := range dependency.Future {
-		if assignmentMap.Map[f] > index {
-			continue
-		}
-		key := [2]string{dep, f}
-		counts := oldCounts[key]
-		prefixes := oldPrefixes[key]
-		for i, ref := range refs {
-			ref.Dual.Cursor.Count = counts[i]
-			ref.Dual.Cursor.Prefix = prefixes[i]
-		}
-	}
-}
-
-func inventFuture(index int, dep string, assignmentMap *AssignmentMap) ([][]byte, error) {
-	dependency := assignmentMap.Index[dep]
-	value := dependency.Next()
-	if value == nil {
-		return nil, nil
-	}
-
-	err := setInterim(index, dep, value, assignmentMap)
-	if err != nil {
-		return nil, err
-	}
-
-	results := [][]byte{}
-
-	for _, j := range dependency.Dependents {
-		if j >= index {
-			break
-		}
-
-		intern := assignmentMap.Slice[j]
-		sort.Stable(assignmentMap.Index[intern].Dynamic)
-
-		next := assignmentMap.Index[intern].Seek(nil)
-		if next == nil {
-			return nil, nil
-		}
-
-		err := setInterim(index, intern, next, assignmentMap)
-		if err != nil {
-			return nil, err
-		}
-
-		results = append(results, next)
-	}
-
-	return results, nil
-}
-
-func setInterim(index int, dep string, value []byte, assignmentMap *AssignmentMap) error {
-	dependency := assignmentMap.Index[dep]
-
-	for f, refs := range dependency.Future {
-		if assignmentMap.Map[f] > index {
-			continue
-		}
-
-		for _, ref := range refs {
-			err := setRef(ref, value)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
 // SolveDataset solves the dataset
 func SolveDataset(dataset *ld.RDFDataset, txn *badger.Txn) (*AssignmentMap, error) {
 	_, codexMap, err := getInitalCodexMap(dataset, txn)
@@ -255,4 +124,135 @@ func solveAssignment(index int, id string, assignmentMap *AssignmentMap) ([]byte
 	}
 
 	return nil, nil
+}
+
+func inventFuture(index int, dep string, assignmentMap *AssignmentMap) ([][]byte, error) {
+	dependency := assignmentMap.Index[dep]
+	value := dependency.Next()
+	if value == nil {
+		return nil, nil
+	}
+
+	err := setInterim(index, dep, value, assignmentMap)
+	if err != nil {
+		return nil, err
+	}
+
+	results := [][]byte{}
+
+	for _, j := range dependency.Dependents {
+		if j >= index {
+			break
+		}
+
+		intern := assignmentMap.Slice[j]
+		sort.Stable(assignmentMap.Index[intern].Dynamic)
+
+		next := assignmentMap.Index[intern].Seek(nil)
+		if next == nil {
+			return nil, nil
+		}
+
+		err := setInterim(index, intern, next, assignmentMap)
+		if err != nil {
+			return nil, err
+		}
+
+		results = append(results, next)
+	}
+
+	return results, nil
+}
+
+func setInterim(index int, dep string, value []byte, assignmentMap *AssignmentMap) error {
+	dependency := assignmentMap.Index[dep]
+
+	for f, refs := range dependency.Future {
+		if assignmentMap.Map[f] > index {
+			continue
+		}
+
+		for _, ref := range refs {
+			err := setRef(ref, value)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func resetValue(
+	index int,
+	dep string,
+	oldValues map[string][]byte,
+	oldCounts map[[2]string][]uint64,
+	oldPrefixes map[[2]string][][]byte,
+	assignmentMap *AssignmentMap,
+) {
+	value := oldValues[dep]
+	dependency := assignmentMap.Index[dep]
+
+	sort.Stable(dependency.Dynamic)
+
+	for _, cursor := range dependency.Static {
+		key := append(cursor.Prefix, value...)
+		cursor.Iterator.Seek(key)
+	}
+
+	for _, cursor := range dependency.Dynamic {
+		key := append(cursor.Prefix, value...)
+		cursor.Iterator.Seek(key)
+	}
+
+	for f, refs := range dependency.Future {
+		if assignmentMap.Map[f] > index {
+			continue
+		}
+		key := [2]string{dep, f}
+		counts := oldCounts[key]
+		prefixes := oldPrefixes[key]
+		for i, ref := range refs {
+			ref.Dual.Cursor.Count = counts[i]
+			ref.Dual.Cursor.Prefix = prefixes[i]
+		}
+	}
+}
+
+func setRef(ref *Reference, value []byte) error {
+	dual := ref.Dual
+	place := (dual.Place + 1) % 3
+	prefix := types.TriplePrefixes[place]
+
+	_, mIsIndex := dual.M.(*types.Index)
+	_, nIsIndex := dual.N.(*types.Index)
+	if mIsIndex && !nIsIndex {
+		dual.Cursor.Prefix = types.AssembleKey(prefix, dual.BytesM, value, nil)
+	} else if !mIsIndex && nIsIndex {
+		dual.Cursor.Prefix = types.AssembleKey(prefix, value, dual.BytesN, nil)
+	}
+
+	item := ref.Cursor.Iterator.Item()
+	count, err := item.ValueCopy(nil)
+	if err != nil {
+		return err
+	}
+
+	dual.Cursor.Count = binary.BigEndian.Uint64(count)
+	return nil
+}
+
+func setValue(id string, value []byte, assignmentMap *AssignmentMap) error {
+	assignment := assignmentMap.Index[id]
+	copy(assignment.Value[:], value)
+	for _, refs := range assignment.Future {
+		for _, ref := range refs {
+			err := setRef(ref, value)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

@@ -17,42 +17,6 @@ type DwebDocumentLoader struct {
 	shell *ipfs.Shell
 }
 
-func (dl *DwebDocumentLoader) loadDocumentIPLD(uri string, contextURL string, origin string) (*ld.RemoteDocument, error) {
-	if c, err := cid.Decode(origin); err != nil {
-		return nil, err
-	} else if c.Type() == cid.DagCBOR {
-		var document interface{}
-		err := dl.shell.DagGet(origin, &document)
-		if err != nil {
-			return nil, err
-		}
-		return &ld.RemoteDocument{DocumentURL: uri, Document: document, ContextURL: contextURL}, nil
-	} else {
-		err := "Unsupported IPLD CID format: " + origin
-		return nil, ld.NewJsonLdError(ld.LoadingDocumentFailed, err)
-	}
-}
-
-func (dl *DwebDocumentLoader) loadDocumentIPFS(uri string, contextURL string, origin string, path string) (*ld.RemoteDocument, error) {
-	if c, err := cid.Decode(origin); err != nil {
-		return nil, err
-	} else if c.Version() == 0 {
-		result, err := dl.shell.Cat(origin + path)
-		if err != nil {
-			return nil, ld.NewJsonLdError(ld.LoadingDocumentFailed, err)
-		}
-		defer result.Close()
-		document, err := ld.DocumentFromReader(result)
-		if err != nil {
-			return nil, err
-		}
-		return &ld.RemoteDocument{DocumentURL: uri, Document: document, ContextURL: contextURL}, nil
-	} else {
-		err := "Invalid IPFS origin CID: " + origin
-		return nil, ld.NewJsonLdError(ld.LoadingDocumentFailed, err)
-	}
-}
-
 // LoadDocument returns a RemoteDocument containing the contents of the
 // JSON-LD resource from the given URL.
 func (dl *DwebDocumentLoader) LoadDocument(uri string) (*ld.RemoteDocument, error) {
@@ -86,6 +50,42 @@ func (dl *DwebDocumentLoader) LoadDocument(uri string) (*ld.RemoteDocument, erro
 		}
 	} else {
 		err := "Unsupported URI scheme: " + parsedURL.Scheme
+		return nil, ld.NewJsonLdError(ld.LoadingDocumentFailed, err)
+	}
+}
+
+func (dl *DwebDocumentLoader) loadDocumentIPLD(uri string, contextURL string, origin string) (*ld.RemoteDocument, error) {
+	if c, err := cid.Decode(origin); err != nil {
+		return nil, err
+	} else if c.Type() == cid.DagCBOR {
+		var document interface{}
+		err := dl.shell.DagGet(origin, &document)
+		if err != nil {
+			return nil, err
+		}
+		return &ld.RemoteDocument{DocumentURL: uri, Document: document, ContextURL: contextURL}, nil
+	} else {
+		err := "Unsupported IPLD CID format: " + origin
+		return nil, ld.NewJsonLdError(ld.LoadingDocumentFailed, err)
+	}
+}
+
+func (dl *DwebDocumentLoader) loadDocumentIPFS(uri string, contextURL string, origin string, path string) (*ld.RemoteDocument, error) {
+	if c, err := cid.Decode(origin); err != nil {
+		return nil, err
+	} else if c.Version() == 0 {
+		result, err := dl.shell.Cat(origin + path)
+		if err != nil {
+			return nil, ld.NewJsonLdError(ld.LoadingDocumentFailed, err)
+		}
+		defer result.Close()
+		document, err := ld.DocumentFromReader(result)
+		if err != nil {
+			return nil, err
+		}
+		return &ld.RemoteDocument{DocumentURL: uri, Document: document, ContextURL: contextURL}, nil
+	} else {
+		err := "Invalid IPFS origin CID: " + origin
 		return nil, ld.NewJsonLdError(ld.LoadingDocumentFailed, err)
 	}
 }

@@ -18,6 +18,15 @@ const path = "/tmp/badger"
 // Replace at your leisure
 var sh = ipfs.NewShell("localhost:5001")
 
+func main() {
+	db := openDB(nil, true)
+	http.Handle("/", http.FileServer(http.Dir("./static")))
+	http.HandleFunc("/ingest", func(w http.ResponseWriter, r *http.Request) { handleIngest(db, w, r) })
+	http.HandleFunc("/query", func(w http.ResponseWriter, r *http.Request) { handleQuery(db, w, r) })
+	fmt.Println("Listening on port 8000")
+	log.Fatal(http.ListenAndServe(":8000", nil))
+}
+
 func openDB(t *testing.T, clean bool) *badger.DB {
 	// Sanity check for the daemon
 	if !sh.IsUp() {
@@ -47,28 +56,6 @@ func openDB(t *testing.T, clean bool) *badger.DB {
 	return db
 }
 
-func handleQuery(db *badger.DB, w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodPost {
-		decoder := json.NewDecoder(r.Body)
-		var query interface{}
-		err := decoder.Decode(&query)
-		if err == nil {
-			err := Query(query, func(result interface{}) error {
-				bytes, _ := json.Marshal(result)
-				fmt.Fprintf(w, "%s\n", string(bytes))
-				return nil
-			}, db, sh)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-		} else {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-		}
-	} else {
-		http.Error(w, r.Method, http.StatusMethodNotAllowed)
-	}
-}
-
 func handleIngest(db *badger.DB, w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
 		decoder := json.NewDecoder(r.Body)
@@ -89,11 +76,24 @@ func handleIngest(db *badger.DB, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func main() {
-	db := openDB(nil, true)
-	http.Handle("/", http.FileServer(http.Dir("./static")))
-	http.HandleFunc("/ingest", func(w http.ResponseWriter, r *http.Request) { handleIngest(db, w, r) })
-	http.HandleFunc("/query", func(w http.ResponseWriter, r *http.Request) { handleQuery(db, w, r) })
-	fmt.Println("Listening on port 8000")
-	log.Fatal(http.ListenAndServe(":8000", nil))
+func handleQuery(db *badger.DB, w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		decoder := json.NewDecoder(r.Body)
+		var query interface{}
+		err := decoder.Decode(&query)
+		if err == nil {
+			err := Query(query, func(result interface{}) error {
+				bytes, _ := json.Marshal(result)
+				fmt.Fprintf(w, "%s\n", string(bytes))
+				return nil
+			}, db, sh)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+		} else {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+	} else {
+		http.Error(w, r.Method, http.StatusMethodNotAllowed)
+	}
 }
