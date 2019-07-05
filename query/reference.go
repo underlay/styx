@@ -4,9 +4,9 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	badger "github.com/dgraph-io/badger"
+	badger "github.com/dgraph-io/badger/v2"
 
-	"../types"
+	types "github.com/underlay/styx/types"
 )
 
 var iteratorOptions = badger.IteratorOptions{

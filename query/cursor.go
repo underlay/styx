@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"fmt"
 
-	badger "github.com/dgraph-io/badger"
+	badger "github.com/dgraph-io/badger/v2"
 
-	"../types"
+	types "github.com/underlay/styx/types"
 )
 
 // A Cursor is an Iterator and a Prefix

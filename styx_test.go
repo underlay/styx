@@ -2,17 +2,18 @@ package main
 
 import (
 	"bytes"
-	"fmt"
-	"testing"
-
-	"./loader"
-	"./types"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
+	"log"
+	"testing"
 
-	badger "github.com/dgraph-io/badger"
+	badger "github.com/dgraph-io/badger/v2"
 	proto "github.com/golang/protobuf/proto"
 	ld "github.com/piprate/json-gold/ld"
+
+	loader "github.com/underlay/styx/loader"
+	types "github.com/underlay/styx/types"
 )
 
 var sampleData = []byte(`{
@@ -90,7 +91,7 @@ func TestIPFSDocumentLoader(t *testing.T) {
 
 	proc := ld.NewJsonLdProcessor()
 	options := ld.NewJsonLdOptions("")
-	options.DocumentLoader = loader.NewDwebDocumentLoader(sh)
+	options.DocumentLoader = loader.NewShellDocumentLoader(sh)
 
 	ipfsURI := "ipfs://" + cidIpfs
 	ipfsResult, err := proc.Expand(ipfsURI, options)
@@ -134,7 +135,7 @@ func TestIngest(t *testing.T) {
 		return
 	}
 
-	fmt.Printf("Origin: %s\n", origin)
+	log.Printf("Origin: %s\n", origin)
 
 	err = db.View(func(txn *badger.Txn) error {
 		iter := txn.NewIterator(badger.DefaultIteratorOptions)
@@ -150,7 +151,7 @@ func TestIngest(t *testing.T) {
 			prefix := key[0]
 			if bytes.Equal(key, types.CounterKey) {
 				// Counter!
-				fmt.Printf("Counter: %02d\n", binary.BigEndian.Uint64(val))
+				log.Printf("Counter: %02d\n", binary.BigEndian.Uint64(val))
 			} else if prefix == types.IndexPrefix {
 				// Index key
 				index := &types.Index{}
@@ -158,7 +159,7 @@ func TestIngest(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				fmt.Printf("Index entry\n  %s\n  %s\n", string(key[1:]), index.String())
+				log.Printf("Index entry\n  %s\n  %s\n", string(key[1:]), index.String())
 			} else if prefix == types.ValuePrefix {
 				// Value key
 				value := &types.Value{}
@@ -167,12 +168,12 @@ func TestIngest(t *testing.T) {
 					return err
 				}
 				id := binary.BigEndian.Uint64(key[1:])
-				fmt.Printf("Value entry: %02d %s\n", id, value.String())
+				log.Printf("Value entry: %02d %s\n", id, value.String())
 			} else if _, has := types.TriplePrefixMap[prefix]; has {
 				// Value key
 				sourceList := &types.SourceList{}
 				proto.Unmarshal(val, sourceList)
-				fmt.Printf("Triple entry: %s %02d | %02d | %02d :: %s\n",
+				log.Printf("Triple entry: %s %02d | %02d | %02d :: %s\n",
 					string(key[0]),
 					binary.BigEndian.Uint64(key[1:9]),
 					binary.BigEndian.Uint64(key[9:17]),
@@ -182,7 +183,7 @@ func TestIngest(t *testing.T) {
 				)
 			} else if _, has := types.MinorPrefixMap[prefix]; has {
 				// Minor key
-				fmt.Printf("Minor entry: %s %02d | %02d :: %02d\n",
+				log.Printf("Minor entry: %s %02d | %02d :: %02d\n",
 					string(key[0]),
 					binary.BigEndian.Uint64(key[1:9]),
 					binary.BigEndian.Uint64(key[9:17]),
@@ -190,7 +191,7 @@ func TestIngest(t *testing.T) {
 				)
 			} else if _, has := types.MajorPrefixMap[prefix]; has {
 				// Major key
-				fmt.Printf("Major entry: %s %02d | %02d :: %02d\n",
+				log.Printf("Major entry: %s %02d | %02d :: %02d\n",
 					string(key[0]),
 					binary.BigEndian.Uint64(key[1:9]),
 					binary.BigEndian.Uint64(key[9:17]),
@@ -199,7 +200,7 @@ func TestIngest(t *testing.T) {
 			}
 			i++
 		}
-		fmt.Printf("Printed %02d database entries\n", i)
+		log.Printf("Printed %02d database entries\n", i)
 		return nil
 	})
 	if err != nil {
@@ -224,7 +225,7 @@ func TestQuery(t *testing.T) {
 		return
 	}
 
-	fmt.Printf("Origin: %s\n", origin)
+	log.Printf("Origin: %s\n", origin)
 
 	var queryData map[string]interface{}
 	err = json.Unmarshal(sampleQuery, &queryData)

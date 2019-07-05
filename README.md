@@ -2,6 +2,14 @@
 
 > Home-grown graph database inspired by [Hexastore](https://dl.acm.org/citation.cfm?id=1453965), tailored for use in the [Underlay](https://underlay.mit.edu).
 
+Build the plugin with
+
+```
+go build -buildmode=plugin -i -o styx.so plugin/plugin.go
+mv styx.so ~/.ipfs/plugins/.
+sudo chmod +x ~/.ipfs/plugins/styx.so
+```
+
 ## What's going on here?
 
 "Hexastore" is a name for an indexing scheme for RDF Triples (a triple is a `<subject | predicate | object>` statement), and it's based on the silly idea that if you really care about indexing your triples in some key/value-ish store, you shouldn't just insert them once: you should actually insert them six times - one for each permutation of the three elements (spo, pos, osp, sop, pso, ops). Even sillier, Styx goes ahead and performs 12 (twelve!) database writes (holy shit!) for every triple you want to insert, but these upfront space- and insertion-time- costs pay for a fast & general query interface based on subgraph matching.
@@ -205,7 +213,7 @@ Query(query, func(result interface{}) error {
   // The result will be framed by the query,
   // as per https://w3c.github.io/json-ld-framing
   buf, _ := json.MarshalIndent(result, "", "\t")
-  fmt.Println(string(buf))
+  log.Println(string(buf))
   return nil
 }, db, sh)
 ```

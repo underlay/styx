@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"sort"
 
-	badger "github.com/dgraph-io/badger"
+	badger "github.com/dgraph-io/badger/v2"
 	ld "github.com/piprate/json-gold/ld"
 
-	"../types"
+	types "github.com/underlay/styx/types"
 )
 
-// SolveDataset solves the dataset
-func SolveDataset(dataset *ld.RDFDataset, txn *badger.Txn) (*AssignmentMap, error) {
-	_, codexMap, err := getInitalCodexMap(dataset, txn)
+// SolveGraph solves the graph
+func SolveGraph(graph string, quads []*ld.Quad, txn *badger.Txn) (*AssignmentMap, error) {
+	_, codexMap, err := getInitalCodexMap(graph, quads, txn)
 	defer codexMap.Close()
 	if err != nil {
 		return nil, err

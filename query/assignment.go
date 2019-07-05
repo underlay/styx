@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"sort"
 
-	badger "github.com/dgraph-io/badger"
+	badger "github.com/dgraph-io/badger/v2"
 
-	"../types"
+	types "github.com/underlay/styx/types"
 )
 
 // HasValue is either a string representing a variable reference,

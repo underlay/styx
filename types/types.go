@@ -2,10 +2,9 @@ package types
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
-	badger "github.com/dgraph-io/badger"
+	badger "github.com/dgraph-io/badger/v2"
 	proto "github.com/golang/protobuf/proto"
 	cid "github.com/ipfs/go-cid"
 	ld "github.com/piprate/json-gold/ld"
@@ -151,9 +150,6 @@ func (sources Sources) String() string {
 }
 
 func (source *Source) toCompactString() string {
-	c, err := cid.Parse(source.Cid)
-	if err != nil {
-		log.Fatalln(err)
-	}
+	c, _ := cid.Parse(source.Cid)
 	return fmt.Sprintf("%s#%s[%d]", c.String(), source.Graph, source.Index)
 }

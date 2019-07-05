@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"sort"
 
-	badger "github.com/dgraph-io/badger"
+	badger "github.com/dgraph-io/badger/v2"
 	ld "github.com/piprate/json-gold/ld"
 
-	"../types"
+	types "github.com/underlay/styx/types"
 )
 
 const constantPermutation uint8 = 255
@@ -172,143 +172,140 @@ func (codexMap *CodexMap) Initialize(txn *badger.Txn) error {
 	return nil
 }
 
-func getInitalCodexMap(dataset *ld.RDFDataset, txn *badger.Txn) ([]*Reference, *CodexMap, error) {
+func getInitalCodexMap(graph string, quads []*ld.Quad, txn *badger.Txn) ([]*Reference, *CodexMap, error) {
 	var err error
 	indexMap := types.IndexMap{}
 	valueMap := map[uint64]*types.Index{}
 	constants := []*Reference{}
 	codexMap := &CodexMap{Value: valueMap}
-	for graph, quads := range dataset.Graphs {
-		for index, quad := range quads {
-			var a, b, c string
-			blankA, A := quad.Subject.(*ld.BlankNode)
+	for index, quad := range quads {
+		var a, b, c string
+		blankA, A := quad.Subject.(*ld.BlankNode)
+		if A {
+			a = blankA.Attribute
+		}
+		blankB, B := quad.Predicate.(*ld.BlankNode)
+		if B {
+			b = blankB.Attribute
+		}
+		blankC, C := quad.Object.(*ld.BlankNode)
+		if C {
+			c = blankC.Attribute
+		}
+		if !A && !B && !C {
+			ref, err := makeReference(graph, index, constantPermutation, nil, nil, indexMap, txn)
+			if err != nil {
+				return nil, nil, err
+			}
+			constants = append(constants, ref)
+		} else if (A && !B && !C) || (!A && B && !C) || (!A && !B && C) {
+			ref := &Reference{Graph: graph, Index: index}
+			var mIndex, nIndex *types.Index
+			ref.BytesM = make([]byte, 8)
+			ref.BytesN = make([]byte, 8)
 			if A {
-				a = blankA.Attribute
-			}
-			blankB, B := quad.Predicate.(*ld.BlankNode)
-			if B {
-				b = blankB.Attribute
-			}
-			blankC, C := quad.Object.(*ld.BlankNode)
-			if C {
-				c = blankC.Attribute
-			}
-			if !A && !B && !C {
-				ref, err := makeReference(graph, index, constantPermutation, nil, nil, indexMap, txn)
+				ref.Place = 0
+				mIndex, err = indexMap.GetIndex(quad.Predicate, txn)
 				if err != nil {
 					return nil, nil, err
 				}
-				constants = append(constants, ref)
-			} else if (A && !B && !C) || (!A && B && !C) || (!A && !B && C) {
-				ref := &Reference{Graph: graph, Index: index}
-				var mIndex, nIndex *types.Index
-				ref.BytesM = make([]byte, 8)
-				ref.BytesN = make([]byte, 8)
-				if A {
-					ref.Place = 0
-					mIndex, err = indexMap.GetIndex(quad.Predicate, txn)
-					if err != nil {
-						return nil, nil, err
-					}
-					nIndex, err = indexMap.GetIndex(quad.Object, txn)
-					if err != nil {
-						return nil, nil, err
-					}
-				} else if B {
-					ref.Place = 1
-					mIndex, err = indexMap.GetIndex(quad.Object, txn)
-					if err != nil {
-						return nil, nil, err
-					}
-					nIndex, err = indexMap.GetIndex(quad.Subject, txn)
-					if err != nil {
-						return nil, nil, err
-					}
-				} else if C {
-					ref.Place = 2
-					mIndex, err = indexMap.GetIndex(quad.Subject, txn)
-					if err != nil {
-						return nil, nil, err
-					}
-					nIndex, err = indexMap.GetIndex(quad.Predicate, txn)
-					if err != nil {
-						return nil, nil, err
-					}
+				nIndex, err = indexMap.GetIndex(quad.Object, txn)
+				if err != nil {
+					return nil, nil, err
 				}
-
-				ref.M = mIndex
-				binary.BigEndian.PutUint64(ref.BytesM, mIndex.GetId())
-
-				ref.N = nIndex
-				binary.BigEndian.PutUint64(ref.BytesN, nIndex.GetId())
-
-				pivot := a + b + c
-				codex := codexMap.GetCodex(pivot)
-				codex.Single = append(codex.Single, ref)
-			} else if A && B && !C {
-				if a == b {
-					ref, err := makeReference(graph, index, permutationAB, nil, quad.Object, indexMap, txn)
-					if err != nil {
-						return nil, nil, err
-					}
-					codex := codexMap.GetCodex(a)
-					codex.Constraint = append(codex.Constraint, ref)
-				} else {
-					refA, err := makeReference(graph, index, permutationA, blankB, quad.Object, indexMap, txn)
-					if err != nil {
-						return nil, nil, err
-					}
-					refB, err := makeReference(graph, index, permutationB, quad.Object, blankA, indexMap, txn)
-					if err != nil {
-						return nil, nil, err
-					}
-					insertDouble(a, b, refA, codexMap)
-					insertDouble(b, a, refB, codexMap)
-					refA.Dual, refB.Dual = refB, refA
+			} else if B {
+				ref.Place = 1
+				mIndex, err = indexMap.GetIndex(quad.Object, txn)
+				if err != nil {
+					return nil, nil, err
 				}
-			} else if A && !B && C {
-				if c == a {
-					ref, err := makeReference(graph, index, permutationCA, nil, quad.Predicate, indexMap, txn)
-					if err != nil {
-						return nil, nil, err
-					}
-					codex := codexMap.GetCodex(c)
-					codex.Constraint = append(codex.Constraint, ref)
-				} else {
-					refA, err := makeReference(graph, index, permutationA, quad.Predicate, blankC, indexMap, txn)
-					if err != nil {
-						fmt.Println("wow 5")
-						return nil, nil, err
-					}
-					refC, err := makeReference(graph, index, permutationC, blankA, quad.Predicate, indexMap, txn)
-					insertDouble(a, c, refA, codexMap)
-					insertDouble(c, a, refC, codexMap)
-					refA.Dual, refC.Dual = refC, refA
+				nIndex, err = indexMap.GetIndex(quad.Subject, txn)
+				if err != nil {
+					return nil, nil, err
 				}
-			} else if !A && B && C {
-				if b == c {
-					ref, err := makeReference(graph, index, permutationBC, nil, quad.Subject, indexMap, txn)
-					if err != nil {
-						return nil, nil, err
-					}
-					codex := codexMap.GetCodex(b)
-					codex.Constraint = append(codex.Constraint, ref)
-				} else {
-					refB, err := makeReference(graph, index, permutationB, blankC, quad.Subject, indexMap, txn)
-					if err != nil {
-						return nil, nil, err
-					}
-					refC, err := makeReference(graph, index, permutationC, quad.Subject, blankB, indexMap, txn)
-					if err != nil {
-						return nil, nil, err
-					}
-					insertDouble(b, c, refB, codexMap)
-					insertDouble(c, b, refC, codexMap)
-					refB.Dual, refC.Dual = refC, refB
+			} else if C {
+				ref.Place = 2
+				mIndex, err = indexMap.GetIndex(quad.Subject, txn)
+				if err != nil {
+					return nil, nil, err
 				}
-			} else if A && B && C {
-				return nil, nil, errors.New("Cannot handle all-blank triple")
+				nIndex, err = indexMap.GetIndex(quad.Predicate, txn)
+				if err != nil {
+					return nil, nil, err
+				}
 			}
+
+			ref.M = mIndex
+			binary.BigEndian.PutUint64(ref.BytesM, mIndex.GetId())
+
+			ref.N = nIndex
+			binary.BigEndian.PutUint64(ref.BytesN, nIndex.GetId())
+
+			pivot := a + b + c
+			codex := codexMap.GetCodex(pivot)
+			codex.Single = append(codex.Single, ref)
+		} else if A && B && !C {
+			if a == b {
+				ref, err := makeReference(graph, index, permutationAB, nil, quad.Object, indexMap, txn)
+				if err != nil {
+					return nil, nil, err
+				}
+				codex := codexMap.GetCodex(a)
+				codex.Constraint = append(codex.Constraint, ref)
+			} else {
+				refA, err := makeReference(graph, index, permutationA, blankB, quad.Object, indexMap, txn)
+				if err != nil {
+					return nil, nil, err
+				}
+				refB, err := makeReference(graph, index, permutationB, quad.Object, blankA, indexMap, txn)
+				if err != nil {
+					return nil, nil, err
+				}
+				insertDouble(a, b, refA, codexMap)
+				insertDouble(b, a, refB, codexMap)
+				refA.Dual, refB.Dual = refB, refA
+			}
+		} else if A && !B && C {
+			if c == a {
+				ref, err := makeReference(graph, index, permutationCA, nil, quad.Predicate, indexMap, txn)
+				if err != nil {
+					return nil, nil, err
+				}
+				codex := codexMap.GetCodex(c)
+				codex.Constraint = append(codex.Constraint, ref)
+			} else {
+				refA, err := makeReference(graph, index, permutationA, quad.Predicate, blankC, indexMap, txn)
+				if err != nil {
+					return nil, nil, err
+				}
+				refC, err := makeReference(graph, index, permutationC, blankA, quad.Predicate, indexMap, txn)
+				insertDouble(a, c, refA, codexMap)
+				insertDouble(c, a, refC, codexMap)
+				refA.Dual, refC.Dual = refC, refA
+			}
+		} else if !A && B && C {
+			if b == c {
+				ref, err := makeReference(graph, index, permutationBC, nil, quad.Subject, indexMap, txn)
+				if err != nil {
+					return nil, nil, err
+				}
+				codex := codexMap.GetCodex(b)
+				codex.Constraint = append(codex.Constraint, ref)
+			} else {
+				refB, err := makeReference(graph, index, permutationB, blankC, quad.Subject, indexMap, txn)
+				if err != nil {
+					return nil, nil, err
+				}
+				refC, err := makeReference(graph, index, permutationC, quad.Subject, blankB, indexMap, txn)
+				if err != nil {
+					return nil, nil, err
+				}
+				insertDouble(b, c, refB, codexMap)
+				insertDouble(c, b, refC, codexMap)
+				refB.Dual, refC.Dual = refC, refB
+			}
+		} else if A && B && C {
+			return nil, nil, errors.New("Cannot handle all-blank triple")
 		}
 	}
 
