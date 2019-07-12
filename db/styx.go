@@ -19,7 +19,7 @@ type DB struct {
 }
 
 // Pinner is anything that takes a string and returns a CID
-type Pinner = func(normalized string) (cid.Cid, error)
+type Pinner = func(nquads []byte) (cid.Cid, error)
 
 // Close the Shit
 func (db *DB) Close() error {
