@@ -12,6 +12,9 @@ import (
 // DefaultShellAddress is the default shell address
 const DefaultShellAddress = "localhost:5001"
 
+// Compile-time type check
+var _ ld.DocumentLoader = (*ShellDocumentLoader)(nil)
+
 // ShellDocumentLoader is an implementation of ld.DocumentLoader
 // for ipfs:// and dweb:/ipfs/ URIs that uses an ipfs.Shell
 type ShellDocumentLoader struct {
@@ -91,7 +94,7 @@ func (dl *ShellDocumentLoader) loadDocumentIPFS(uri string, contextURL string, o
 	}
 }
 
-// NewDwebDocumentLoader creates a new instance of DwebDocumentLoader
+// NewShellDocumentLoader creates a new instance of DwebDocumentLoader
 func NewShellDocumentLoader(shell *ipfs.Shell) *ShellDocumentLoader {
 	loader := &ShellDocumentLoader{shell: shell}
 	if loader.shell == nil {

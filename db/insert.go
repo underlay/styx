@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	badger "github.com/dgraph-io/badger/v2"
+	badger "github.com/dgraph-io/badger"
 	proto "github.com/golang/protobuf/proto"
 	cid "github.com/ipfs/go-cid"
 	ld "github.com/piprate/json-gold/ld"
@@ -18,13 +18,15 @@ import (
 In this table, the 'p' that each key starts with is a single byte "prefix"
 from the "prefixes" set. The prefix encodes both the key's type and rotation.
 
-name    #  format         value type  prefixes
+name    #  key format     value type  prefixes
 ----------------------------------------------
 triple  3  p | a | b | c  SourceList  {a b c}
 major   3  p | a | b      uint64      {i j k}
 minor   3  p | a | b      uint64      {x y z}
 value   1  p | a          Value       {p}
 index   1  p | element    Index       {q}
+graph   1  p | cid        ISO Date    {g}
+counter 0                 uint64      {>}
 ----------------------------------------------
 
 When inserting a triple <|S P O|>, we perform 12-15 operations 😬
@@ -44,62 +46,42 @@ When inserting a triple <|S P O|>, we perform 12-15 operations 😬
 	prefixes {xyz}
 */
 
-// This does all sixteen db operations! :-)
-// For now we only operate on the @default graph of the dataset
-func insert(cid cid.Cid, graph string, quads []*ld.Quad, txn *badger.Txn) error {
-
-	cBytes := cid.Bytes()
+func insert(cid cid.Cid, graph string, quads []*ld.Quad, txn *badger.Txn) (err error) {
+	graphID := fmt.Sprintf("%s#%s", cid.String(), graph)
+	graphKey := types.AssembleKey(types.GraphPrefix, []byte(graphID), nil, nil)
 
 	// Check to see if this document is already in the database
-	documentKey := make([]byte, len(cBytes)+1)
-	documentKey[0] = types.DocumentPrefix
-	copy(documentKey[1:], cBytes)
-	item, err := txn.Get(documentKey)
-	if err == badger.ErrKeyNotFound {
-		// Great!
-		dateBytes := []byte(time.Now().Format(time.RFC3339))
-		err = txn.Set(documentKey, dateBytes)
-		if err != nil {
-			return err
-		}
-	} else {
-		// Database already has this document!
+	if item, err := txn.Get(graphKey); err != badger.ErrKeyNotFound {
 		return item.Value(func(val []byte) error {
-			log.Println("Duplicate document inserted previously:", string(val))
+			log.Printf("Duplicate document inserted previously on %s\n", string(val))
 			return nil
 		})
 	}
 
-	// re-use the counter slice throughout iteration; yah?
-	initialCount := make([]byte, 8)
-	binary.BigEndian.PutUint64(initialCount, types.InitialCounter)
+	// Write the current date to the graph key
+	date := []byte(time.Now().Format(time.RFC3339))
+	if err = txn.Set(graphKey, date); err != nil {
+		return
+	}
 
-	origin := &cid
-
-	valueMap := types.ValueMap{}
-	indexMap := types.IndexMap{}
-
-	var counter uint64
-	if counterItem, err := txn.Get(types.CounterKey); err == badger.ErrKeyNotFound {
-		// No counter yet! Let's make one.
-		counter = types.InitialCounter
-		err = txn.Set(types.CounterKey, initialCount)
-		if err != nil {
-			return err
-		}
+	var root uint64
+	value := make([]byte, 8)
+	if item, err := txn.Get(types.CounterKey); err == badger.ErrKeyNotFound {
+		root = types.InitialCounter
 	} else if err != nil {
+		return nil
+	} else if value, err = item.ValueCopy(value); err != nil {
 		return err
 	} else {
-		counterBytes, err := counterItem.ValueCopy(nil)
-		if err != nil {
-			return err
-		}
-		counter = binary.BigEndian.Uint64(counterBytes)
+		root = binary.BigEndian.Uint64(value)
 	}
+
+	values := types.ValueMap{}
+	indices := types.IndexMap{}
 
 	for index, quad := range quads {
 		source := &types.Source{
-			Cid:   cBytes,
+			Cid:   cid.Bytes(),
 			Graph: graph,
 			Index: int32(index),
 		}
@@ -108,224 +90,160 @@ func insert(cid cid.Cid, graph string, quads []*ld.Quad, txn *badger.Txn) error 
 			source.Graph = quad.Graph.GetValue()
 		}
 
-		// Translate into uint64 ids
-		s, err := insertValue(origin, quad.Subject, 0, counter, indexMap, valueMap, txn)
-		if err != nil {
-			return err
+		// Get the uint64 ids for the subject, predicate, and object
+		var s, p, o []byte
+		if s, err = getID(cid, quad.Subject, 0, root, indices, values, txn); err != nil {
+			return
+		} else if p, err = getID(cid, quad.Predicate, 1, root, indices, values, txn); err != nil {
+			return
+		} else if o, err = getID(cid, quad.Object, 2, root, indices, values, txn); err != nil {
+			return
 		}
 
-		p, err := insertValue(origin, quad.Predicate, 1, counter, indexMap, valueMap, txn)
-		if err != nil {
-			return err
-		}
-
-		o, err := insertValue(origin, quad.Object, 2, counter, indexMap, valueMap, txn)
-		if err != nil {
-			return err
-		}
-
-		// Update the major index
-		majorValues, err := insertCount(true, s, p, o, txn)
-		if err != nil {
-			log.Println("error from major")
-			return err
-		}
-
-		// Update the minor index
-		minorValues, err := insertCount(false, s, p, o, txn)
-		if err != nil {
-			return err
+		var major, minor [3]uint64
+		if major, minor, err = getCounts(s, p, o, txn); err != nil {
+			return
 		}
 
 		// Sanity check that majors and minors have the same values
 		for i := 0; i < 3; i++ {
 			j := (i + 1) % 3
-			if majorValues[i] != minorValues[j] {
-				return fmt.Errorf("Mismatching major & minor index values: %v %v", majorValues, minorValues)
+			if major[i] != minor[j] {
+				return fmt.Errorf("Mismatching major & minor index values: %v %v", major, minor)
 			}
 		}
 
 		// Triple loop
-		for i := byte(0); i < 3; i++ {
+		var item *badger.Item
+		for i := uint8(0); i < 3; i++ {
 			a, b, c := permuteMajor(i, s, p, o)
-			triplePrefix := types.TriplePrefixes[i]
-
-			// This is the value key.
-			// assembleKey knows to pack all of a, b, and c because of the prefix.
-			tripleKey := types.AssembleKey(triplePrefix, a, b, c)
-			tripleItem, err := txn.Get(tripleKey)
-			if err == badger.ErrKeyNotFound {
-				// Create a new SourceList container and write our source to it.
-				sourceList := &types.SourceList{Sources: []*types.Source{source}}
-				buf, err := proto.Marshal(sourceList)
-				if err != nil {
-					return err
-				}
-
-				err = txn.Set(tripleKey, buf)
-				if err != nil {
-					return err
+			key := types.AssembleKey(types.TriplePrefixes[i], a, b, c)
+			sources := &types.SourceList{}
+			var value []byte
+			if item, err = txn.Get(key); err == badger.ErrKeyNotFound {
+				// Create a new SourceList container with the source
+				sources.Sources = []*types.Source{source}
+				if value, err = proto.Marshal(sources); err != nil {
+					return
+				} else if err = txn.Set(key, value); err != nil {
+					return
 				}
 			} else if err != nil {
-				return err
+				return
+			} else if value, err = item.ValueCopy(nil); err != nil {
+				return
+			} else if err = proto.Unmarshal(value, sources); err != nil {
+				return
 			} else {
-				buf, err := tripleItem.ValueCopy(nil)
-				if err != nil {
+				sources.Sources = append(sources.GetSources(), source)
+				if value, err = proto.Marshal(sources); err != nil {
 					return err
-				}
-
-				sourceList := &types.SourceList{}
-				err = proto.Unmarshal(buf, sourceList)
-				if err != nil {
-					return err
-				}
-
-				sources := sourceList.GetSources()
-				sourceList.Sources = append(sources, source)
-				buf, err = proto.Marshal(sourceList)
-				if err != nil {
-					return err
-				}
-
-				err = txn.Set(tripleKey, buf)
-				if err != nil {
+				} else if err = txn.Set(key, value); err != nil {
 					return err
 				}
 			}
 		}
 	}
 
-	// Write back the index keys we incremented
-	for value, index := range indexMap {
-		key := make([]byte, 1, len(value)+1)
-		key[0] = types.IndexPrefix
-		key = append(key, []byte(value)...)
-		val, err := proto.Marshal(index)
-		if err != nil {
-			return err
-		}
-		err = txn.Set(key, val)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Write any value keys we created
-	for id, value := range valueMap {
-		val, err := proto.Marshal(value)
-		if err != nil {
-			return err
-		}
-
-		key := make([]byte, 9)
-		key[0] = types.ValuePrefix
-		binary.BigEndian.PutUint64(key[1:], id)
-		err = txn.Set(key, val)
-		if err != nil {
-			return err
-		}
+	if err = indices.Commit(txn); err != nil {
+		return
+	} else if err = values.Commit(txn); err != nil {
+		return
 	}
 
 	// Counter was incremented iff values is not empty
-	if len(valueMap) > 0 {
-		counterVal := make([]byte, 8)
-		newCounter := counter + uint64(len(valueMap))
-		binary.BigEndian.PutUint64(counterVal, newCounter)
-		err = txn.Set(types.CounterKey, counterVal)
-		if err != nil {
-			return err
-		}
+	if len(values) > 0 {
+		next := root + uint64(len(values))
+		binary.BigEndian.PutUint64(value, next)
+		err = txn.Set(types.CounterKey, value)
 	}
 
-	return nil
+	return
 }
 
-func insertValue(
-	origin *cid.Cid,
+func getID(
+	origin cid.Cid,
 	node ld.Node,
-	position uint8,
-	counter uint64,
-	indexMap types.IndexMap,
-	valueMap types.ValueMap,
+	place uint8,
+	root uint64,
+	indices types.IndexMap,
+	values types.ValueMap,
 	txn *badger.Txn,
 ) ([]byte, error) {
-	// The indexMap holds all of the (modified) Index structs that
-	// we need to write back to the db at the end of insertion, and
-	// valueMap holds all of the Vaflue structs that we've *created*
-	// (and incremented the counter for). Returns the uint64 id
-	// (newly created or otherwise) for the node.
-
 	ID := make([]byte, 8)
+	value := types.NodeToValue(origin, node)
+	v := value.GetValue()
 
-	value := types.MarshalNode(origin, node)
-	if index, has := indexMap[value]; has {
-		index.Increment(position)
+	if index, has := indices[v]; has {
+		index.Increment(place)
 		binary.BigEndian.PutUint64(ID, index.GetId())
 		return ID, nil
 	}
 
-	indexKey := make([]byte, 1, len(value)+1)
-	indexKey[0] = types.IndexPrefix
-	indexKey = append(indexKey, []byte(value)...)
-	indexItem, err := txn.Get(indexKey)
-	if err == badger.ErrKeyNotFound {
-		// The node does not exist in the database; we have to
-		// Create and write both keys
-		id := counter + uint64(len(valueMap))
-		index := &types.Index{Id: id}
-		index.Increment(position)
-		indexMap[value] = index
-		valueMap[id] = nodeToValue(node, origin)
-		binary.BigEndian.PutUint64(ID, id)
-		return ID, nil
+	// Assemble the index key
+	key := make([]byte, 1, len(v)+1)
+	key[0] = types.IndexPrefix
+	key = append(key, []byte(v)...)
+
+	var index *types.Index
+	if item, err := txn.Get(key); err == badger.ErrKeyNotFound {
+		// Generate a new id and create an Index struct for it
+		id := values.InsertNode(value, root)
+		index = &types.Index{Id: id}
 	} else if err != nil {
-		buf, err := indexItem.ValueCopy(nil)
-		if err != nil {
+		// Unmarshal the value into an Index struct
+		index = &types.Index{}
+		if value, err := item.ValueCopy(nil); err != nil {
+			return nil, err
+		} else if err := proto.Unmarshal(value, index); err != nil {
 			return nil, err
 		}
-		index := &types.Index{}
-		err = proto.Unmarshal(buf, index)
-		if err != nil {
-			return nil, err
-		}
-		indexMap[value] = index
-		index.Increment(position)
-		binary.BigEndian.PutUint64(ID, index.GetId())
-		return ID, nil
 	} else {
 		return nil, err
 	}
+
+	indices[v] = index
+	index.Increment(place)
+	binary.BigEndian.PutUint64(ID, index.GetId())
+
+	return ID, nil
 }
 
-func insertCount(major bool, s, p, o []byte, txn *badger.Txn) ([3]uint64, error) {
-	var countValues [3]uint64
-	for i := byte(0); i < 3; i++ {
-		var a, b []byte
-		var prefix byte
-		if major {
-			a, b, _ = permuteMajor(i, s, p, o)
-			prefix = types.MajorPrefixes[i]
-		} else {
-			a, b, _ = permuteMinor(i, s, p, o)
-			prefix = types.MinorPrefixes[i]
-		}
-		key := types.AssembleKey(prefix, a, b, nil)
-		item, err := txn.Get(key)
-		count := make([]byte, 8)
-		if err == badger.ErrKeyNotFound {
-			countValues[i] = types.InitialCounter
-		} else if err != nil {
-			return countValues, err
-		} else if count, err = item.ValueCopy(count); err != nil {
-			return countValues, err
-		} else {
-			countValues[i] = binary.BigEndian.Uint64(count) + 1
+func getCounts(s, p, o []byte, txn *badger.Txn) (major [3]uint64, minor [3]uint64, err error) {
+	for i := uint8(0); i < 3; i++ {
+		// Major Key
+		majorA, majorB, _ := permuteMajor(i, s, p, o)
+		if major[i], err = setCount(types.MajorPrefixes[i], majorA, majorB, txn); err != nil {
+			return
 		}
 
-		binary.BigEndian.PutUint64(count, countValues[i])
-		if err = txn.Set(key, count); err != nil {
-			return countValues, err
+		// Minor Key
+		minorA, minorB, _ := permuteMinor(i, s, p, o)
+		if minor[i], err = setCount(types.MinorPrefixes[i], minorA, minorB, txn); err != nil {
+			return
 		}
 	}
-	return countValues, nil
+	return
+}
+
+// setCount handlers both major and minor keys, writing the initial counter
+// for nonexistent keys and incrementing existing ones
+func setCount(prefix byte, a, b []byte, txn *badger.Txn) (count uint64, err error) {
+	key := types.AssembleKey(prefix, a, b, nil)
+	value := make([]byte, 8)
+
+	item, err := txn.Get(key)
+	if err == badger.ErrKeyNotFound {
+		count = types.InitialCounter
+	} else if err != nil {
+		return
+	} else if value, err = item.ValueCopy(value); err != nil {
+		return
+	} else {
+		count = binary.BigEndian.Uint64(value) + 1
+	}
+
+	binary.BigEndian.PutUint64(value, count)
+	err = txn.Set(key, value)
+	return
 }

@@ -14,6 +14,9 @@ import (
 	ld "github.com/piprate/json-gold/ld"
 )
 
+// Compile-time type check
+var _ ld.DocumentLoader = (*CoreDocumentLoader)(nil)
+
 // CoreDocumentLoader is an implementation of ld.DocumentLoader
 // for ipfs:// and dweb:/ipfs/ URIs that an core.CoreAPI
 type CoreDocumentLoader struct {

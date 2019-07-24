@@ -1,24 +1,19 @@
 package types
 
-// Our delimiter of choice
-// The "tab" is such a cute concept; idk why she's not more popular
-// const tab = byte('\t')
-// const newline = byte('\n')
-
 // DefaultGraph name of the JSON-LD parser
 const DefaultGraph = "@default"
 
 // Algorithm has to be URDNA2015
 const Algorithm = "URDNA2015"
 
-// Format has to be application/nquads
-const Format = "application/nquads"
+// Format has to be application/n-quads
+const Format = "application/n-quads"
 
 // CounterKey to store the id counter
-var CounterKey = []byte{202, 254, 186, 190}
+var CounterKey = []byte(">")
 
-// DocumentPrefix keys track the CIDs of the documents in the database
-const DocumentPrefix = byte('d')
+// GraphPrefix keys track the CIDs of the documents in the database
+const GraphPrefix = byte('g')
 
 // ValuePrefix keys translate uint64 ids to ld.Node values
 const ValuePrefix = byte('p')
@@ -43,13 +38,6 @@ var MinorPrefixes = [3]byte{'x', 'y', 'z'}
 
 // MinorPrefixMap inverts MinorPrefixes
 var MinorPrefixMap = map[byte]uint8{'x': 0, 'y': 1, 'z': 2}
-
-// var keySizes = map[byte]int{
-// 	'a': 3, 'b': 3, 'c': 3,
-// 	'i': 2, 'j': 2, 'k': 2,
-// 	'l': 2, 'm': 2, 'n': 2,
-// 	'x': 1, 'y': 1, 'z': 1,
-// }
 
 // InitialCounter is the first uint64 value we start counting from.
 // Let's set it to 1 just in case we want to ever use 0 for something special.

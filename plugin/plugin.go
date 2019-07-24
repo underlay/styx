@@ -17,6 +17,7 @@ import (
 	ld "github.com/piprate/json-gold/ld"
 	cbor "github.com/polydawn/refmt/cbor"
 
+	"github.com/underlay/styx/db"
 	styx "github.com/underlay/styx/db"
 	loader "github.com/underlay/styx/loader"
 	types "github.com/underlay/styx/types"
@@ -88,7 +89,7 @@ func (sp *StyxPlugin) handleMessage(dataset *ld.RDFDataset, cid cid.Cid) (respon
 	for graph, quads := range dataset.Graphs {
 		if graph != types.DefaultGraph {
 			if _, isQuery := queries[graph]; isQuery {
-				go sp.db.Query(graph, quads, queries[graph])
+				go sp.db.Query(quads, queries[graph])
 			} else {
 				go sp.db.Ingest(cid, graph, quads)
 			}
@@ -172,17 +173,8 @@ func (sp *StyxPlugin) handleCborLdConnection(conn net.Conn) {
 	unmarshaller := cbor.NewUnmarshaller(cbor.DecodeOptions{}, conn)
 	proc := ld.NewJsonLdProcessor()
 
-	datasetOptions := ld.NewJsonLdOptions("")
-	datasetOptions.ProcessingMode = ld.JsonLd_1_1
-	datasetOptions.DocumentLoader = sp.db.Loader
-	datasetOptions.UseNativeTypes = true
-	datasetOptions.CompactArrays = true
-
-	stringOptions := ld.NewJsonLdOptions("")
-	stringOptions.ProcessingMode = ld.JsonLd_1_1
-	stringOptions.DocumentLoader = sp.db.Loader
-	stringOptions.Algorithm = types.Algorithm
-	stringOptions.Format = types.Format
+	datasetOptions := db.GetDatasetOptions(sp.db.Loader)
+	stringOptions := db.GetStringOptions(sp.db.Loader)
 
 	api := ld.NewJsonLdApi()
 

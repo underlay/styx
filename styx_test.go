@@ -6,43 +6,53 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"testing"
 
-	badger "github.com/dgraph-io/badger/v2"
+	badger "github.com/dgraph-io/badger"
 	proto "github.com/golang/protobuf/proto"
+	cid "github.com/ipfs/go-cid"
 	ld "github.com/piprate/json-gold/ld"
 
+	styx "github.com/underlay/styx/db"
 	loader "github.com/underlay/styx/loader"
 	types "github.com/underlay/styx/types"
 )
 
 var sampleData = []byte(`{
-	"@context": { "@vocab": "http://schema.org/" },
-	"@graph": [
-		{
-			"@type": "Person",
-			"name": "Joel",
-			"birthDate": "1996-02-02",
-			"children": { "@id": "http://people.com/liljoel" }
+	"@context": {
+		"@vocab": "http://schema.org/",
+		"xsd": "http://www.w3.org/2001/XMLSchema#",
+		"prov": "http://www.w3.org/ns/prov#",
+		"prov:generatedAtTime": {
+			"@type": "xsd:dateTime"
 		},
-		{
-			"@id": "http://people.com/liljoel",
-			"@type": "Person",
-			"name": "Little Joel",
-			"birthDate": "2030-11-10"
+		"birthDate": {
+			"@type": "xsd:date"
 		}
-	]
+	},
+	"prov:generatedAtTime": "2019-07-24T16:46:05.751Z",
+	"@graph": {
+		"@type": "Person",
+		"name": "John Doe",
+		"birthDate": "1996-02-02",
+		"knows": {
+			"@id": "http://people.com/jane",
+			"@type": "Person",
+			"name": "Jane Doe",
+			"birthDate": "1995-01-01"
+		}
+	}
 }`)
 
 var sampleQuery = []byte(`{
 	"@context": {
-		"@vocab": "http://schema.org/",
-		"parent": { "@reverse": "children" }
+		"@vocab": "http://schema.org/"
 	},
 	"@type": "Person",
-	"birthDate": {},
-	"parent": {
-		"name": "Joel"
+	"birthDate": { },
+	"knows": {
+		"name": "Jane Doe"
 	}
 }`)
 
@@ -126,18 +136,64 @@ func TestIngest(t *testing.T) {
 		return
 	}
 
-	db := openDB(t, true)
-	defer db.Close()
+	documentLoader := loader.NewShellDocumentLoader(sh)
 
-	origin, err := Ingest(data, db, sh)
+	datasetOptions := styx.GetDatasetOptions(documentLoader)
+	stringOptions := styx.GetStringOptions(documentLoader)
+
+	proc := ld.NewJsonLdProcessor()
+	api := ld.NewJsonLdApi()
+
+	rdf, err := proc.Normalize(data, datasetOptions)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	log.Printf("Origin: %s\n", origin)
+	normalized, err := api.Normalize(rdf.(*ld.RDFDataset), stringOptions)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
-	err = db.View(func(txn *badger.Txn) error {
+	hash, err := sh.Add(bytes.NewReader([]byte(normalized.(string))))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	log.Printf("Origin: %s\n", hash)
+
+	cid, err := cid.Parse(hash)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	// Remove old db
+	fmt.Println("removing path", path)
+	if err = os.RemoveAll(path); err != nil {
+		t.Error(err)
+		return
+	}
+
+	db, err := styx.OpenDB(path)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer db.Close()
+
+	for graph, quads := range rdf.(*ld.RDFDataset).Graphs {
+		fmt.Println("ingesting", graph)
+		if err := db.Ingest(cid, graph, quads); err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	err = db.Badger.View(func(txn *badger.Txn) error {
 		iter := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer iter.Close()
 		var i int
@@ -148,6 +204,7 @@ func TestIngest(t *testing.T) {
 			if err != nil {
 				return err
 			}
+
 			prefix := key[0]
 			if bytes.Equal(key, types.CounterKey) {
 				// Counter!
@@ -155,20 +212,18 @@ func TestIngest(t *testing.T) {
 			} else if prefix == types.IndexPrefix {
 				// Index key
 				index := &types.Index{}
-				err = proto.Unmarshal(val, index)
-				if err != nil {
+				if err = proto.Unmarshal(val, index); err != nil {
 					return err
 				}
-				log.Printf("Index entry\n  %s\n  %s\n", string(key[1:]), index.String())
+				log.Printf("Index:\n  %s\n  %s\n", string(key[1:]), index.String())
 			} else if prefix == types.ValuePrefix {
 				// Value key
 				value := &types.Value{}
-				err = proto.Unmarshal(val, value)
-				if err != nil {
+				if err = proto.Unmarshal(val, value); err != nil {
 					return err
 				}
 				id := binary.BigEndian.Uint64(key[1:])
-				log.Printf("Value entry: %02d %s\n", id, value.String())
+				log.Printf("Value: %02d %s\n", id, value.GetValue())
 			} else if _, has := types.TriplePrefixMap[prefix]; has {
 				// Value key
 				sourceList := &types.SourceList{}
@@ -178,8 +233,7 @@ func TestIngest(t *testing.T) {
 					binary.BigEndian.Uint64(key[1:9]),
 					binary.BigEndian.Uint64(key[9:17]),
 					binary.BigEndian.Uint64(key[17:25]),
-					types.Sources(sourceList.Sources).String(),
-					// sourcesToString(sourceList.Sources),
+					types.PrintSources(sourceList.Sources),
 				)
 			} else if _, has := types.MinorPrefixMap[prefix]; has {
 				// Minor key
@@ -216,16 +270,62 @@ func TestQuery(t *testing.T) {
 		return
 	}
 
-	db := openDB(t, true)
-	defer db.Close()
+	documentLoader := loader.NewShellDocumentLoader(sh)
 
-	origin, err := Ingest(data, db, sh)
+	datasetOptions := styx.GetDatasetOptions(documentLoader)
+	stringOptions := styx.GetStringOptions(documentLoader)
+
+	proc := ld.NewJsonLdProcessor()
+	api := ld.NewJsonLdApi()
+
+	rdf, err := proc.Normalize(data, datasetOptions)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	log.Printf("Origin: %s\n", origin)
+	normalized, err := api.Normalize(rdf.(*ld.RDFDataset), stringOptions)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	hash, err := sh.Add(bytes.NewReader([]byte(normalized.(string))))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	log.Printf("Origin: %s\n", hash)
+
+	cid, err := cid.Parse(hash)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	// Remove old db
+	fmt.Println("removing path", path)
+	if err = os.RemoveAll(path); err != nil {
+		t.Error(err)
+		return
+	}
+
+	db, err := styx.OpenDB(path)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer db.Close()
+
+	for graph, quads := range rdf.(*ld.RDFDataset).Graphs {
+		fmt.Println("ingesting", graph)
+		if err := db.Ingest(cid, graph, quads); err != nil {
+			t.Error(err)
+			return
+		}
+	}
 
 	var queryData map[string]interface{}
 	err = json.Unmarshal(sampleQuery, &queryData)
@@ -234,17 +334,36 @@ func TestQuery(t *testing.T) {
 		return
 	}
 
-	callback := func(result interface{}) error {
-		buf, err := json.MarshalIndent(result, "", "\t")
-		if err != nil {
-			return err
-		}
-		fmt.Println(string(buf))
-		return nil
-	}
-
-	err = Query(queryData, callback, db, sh)
+	rdf, err = proc.ToRDF(queryData, datasetOptions)
 	if err != nil {
 		t.Error(err)
+		return
+	}
+
+	quads := rdf.(*ld.RDFDataset).Graphs["@default"]
+
+	fmt.Println("--- query graph ---")
+	for _, quad := range quads {
+		fmt.Printf(
+			"  %s %s %s\n",
+			quad.Subject.GetValue(),
+			quad.Predicate.GetValue(),
+			quad.Object.GetValue(),
+		)
+	}
+
+	r := make(chan []*ld.Quad)
+	go db.Query(quads, r)
+
+	result := <-r
+
+	fmt.Println("Result:")
+	for _, quad := range result {
+		fmt.Printf(
+			"  %s %s %s\n",
+			quad.Subject.GetValue(),
+			quad.Predicate.GetValue(),
+			quad.Object.GetValue(),
+		)
 	}
 }
