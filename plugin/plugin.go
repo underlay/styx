@@ -48,7 +48,7 @@ type StyxPlugin struct {
 	lns            []net.Listener
 	db             *styx.DB
 	documentLoader ld.DocumentLoader
-	pinner         func(nquads []byte) (cid.Cid, error)
+	pinner         styx.DocumentStore
 }
 
 // Compile-time type check (bleh)
@@ -91,7 +91,7 @@ func (sp *StyxPlugin) handleMessage(dataset *ld.RDFDataset, cid cid.Cid) (respon
 			if _, isQuery := queries[graph]; isQuery {
 				go sp.db.Query(quads, queries[graph])
 			} else {
-				go sp.db.Ingest(cid, graph, quads)
+				go sp.db.IngestGraph(cid, graph, quads)
 			}
 		}
 	}

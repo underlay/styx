@@ -1,6 +1,7 @@
 package db
 
 import (
+	cid "github.com/ipfs/go-cid"
 	ld "github.com/piprate/json-gold/ld"
 	types "github.com/underlay/styx/types"
 )
@@ -24,6 +25,8 @@ func permuteMinor(permutation uint8, s, p, o []byte) ([]byte, []byte, []byte) {
 		return o, p, s
 	}
 }
+
+type DocumentStore = func(data []byte) (cid.Cid, error)
 
 // GetDatasetOptions returns JsonLdOptions for parsing a document into a dataset
 func GetDatasetOptions(loader ld.DocumentLoader) *ld.JsonLdOptions {

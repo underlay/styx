@@ -138,38 +138,6 @@ func TestIngest(t *testing.T) {
 
 	documentLoader := loader.NewShellDocumentLoader(sh)
 
-	datasetOptions := styx.GetDatasetOptions(documentLoader)
-	stringOptions := styx.GetStringOptions(documentLoader)
-
-	proc := ld.NewJsonLdProcessor()
-	api := ld.NewJsonLdApi()
-
-	rdf, err := proc.Normalize(data, datasetOptions)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	normalized, err := api.Normalize(rdf.(*ld.RDFDataset), stringOptions)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	hash, err := sh.Add(bytes.NewReader([]byte(normalized.(string))))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	log.Printf("Origin: %s\n", hash)
-
-	cid, err := cid.Parse(hash)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
 	// Remove old db
 	fmt.Println("removing path", path)
 	if err = os.RemoveAll(path); err != nil {
@@ -185,13 +153,15 @@ func TestIngest(t *testing.T) {
 
 	defer db.Close()
 
-	for graph, quads := range rdf.(*ld.RDFDataset).Graphs {
-		fmt.Println("ingesting", graph)
-		if err := db.Ingest(cid, graph, quads); err != nil {
-			t.Error(err)
-			return
+	store := func(data []byte) (cid.Cid, error) {
+		hash, err := sh.Add(bytes.NewReader(data))
+		if err != nil {
+			return cid.Undef, err
 		}
+		return cid.Parse(hash)
 	}
+
+	db.IngestJsonLd(data, documentLoader, store)
 
 	err = db.Badger.View(func(txn *badger.Txn) error {
 		iter := txn.NewIterator(badger.DefaultIteratorOptions)
@@ -270,46 +240,14 @@ func TestQuery(t *testing.T) {
 		return
 	}
 
-	documentLoader := loader.NewShellDocumentLoader(sh)
-
-	datasetOptions := styx.GetDatasetOptions(documentLoader)
-	stringOptions := styx.GetStringOptions(documentLoader)
-
-	proc := ld.NewJsonLdProcessor()
-	api := ld.NewJsonLdApi()
-
-	rdf, err := proc.Normalize(data, datasetOptions)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	normalized, err := api.Normalize(rdf.(*ld.RDFDataset), stringOptions)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	hash, err := sh.Add(bytes.NewReader([]byte(normalized.(string))))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	log.Printf("Origin: %s\n", hash)
-
-	cid, err := cid.Parse(hash)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
 	// Remove old db
 	fmt.Println("removing path", path)
 	if err = os.RemoveAll(path); err != nil {
 		t.Error(err)
 		return
 	}
+
+	documentLoader := loader.NewShellDocumentLoader(sh)
 
 	db, err := styx.OpenDB(path)
 	if err != nil {
@@ -319,12 +257,17 @@ func TestQuery(t *testing.T) {
 
 	defer db.Close()
 
-	for graph, quads := range rdf.(*ld.RDFDataset).Graphs {
-		fmt.Println("ingesting", graph)
-		if err := db.Ingest(cid, graph, quads); err != nil {
-			t.Error(err)
-			return
+	store := func(data []byte) (cid.Cid, error) {
+		hash, err := sh.Add(bytes.NewReader(data))
+		if err != nil {
+			return cid.Undef, err
 		}
+		return cid.Parse(hash)
+	}
+
+	if err = db.IngestJsonLd(data, documentLoader, store); err != nil {
+		t.Error(err)
+		return
 	}
 
 	var queryData map[string]interface{}
@@ -334,7 +277,9 @@ func TestQuery(t *testing.T) {
 		return
 	}
 
-	rdf, err = proc.ToRDF(queryData, datasetOptions)
+	proc := ld.NewJsonLdProcessor()
+	datasetOptions := styx.GetDatasetOptions(documentLoader)
+	rdf, err := proc.ToRDF(queryData, datasetOptions)
 	if err != nil {
 		t.Error(err)
 		return

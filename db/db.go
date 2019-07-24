@@ -41,8 +41,42 @@ func OpenDB(path string) (*DB, error) {
 	}, nil
 }
 
-// Ingest a document
-func (db *DB) Ingest(cid cid.Cid, graph string, quads []*ld.Quad) error {
+func (db *DB) IngestJsonLd(doc interface{}, loader ld.DocumentLoader, store DocumentStore) error {
+	datasetOptions := GetDatasetOptions(loader)
+	stringOptions := GetStringOptions(loader)
+
+	proc := ld.NewJsonLdProcessor()
+	api := ld.NewJsonLdApi()
+
+	rdf, err := proc.Normalize(doc, datasetOptions)
+	if err != nil {
+		return err
+	}
+
+	normalized, err := api.Normalize(rdf.(*ld.RDFDataset), stringOptions)
+	if err != nil {
+		return err
+	}
+
+	cid, err := store([]byte(normalized.(string)))
+	if err != nil {
+		return err
+	}
+
+	return db.IngestDataset(cid, rdf.(*ld.RDFDataset))
+}
+
+func (db *DB) IngestDataset(cid cid.Cid, dataset *ld.RDFDataset) (err error) {
+	for graph, quads := range dataset.Graphs {
+		if err = db.IngestGraph(cid, graph, quads); err != nil {
+			return
+		}
+	}
+	return
+}
+
+// IngestGraph inserts a graph into the database
+func (db *DB) IngestGraph(cid cid.Cid, graph string, quads []*ld.Quad) error {
 	if graph == "@default" {
 		graph = ""
 	}
