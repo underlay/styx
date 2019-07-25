@@ -2,7 +2,7 @@ package main
 
 import (
 	"bufio"
-	"context"
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -11,13 +11,11 @@ import (
 	"net/http"
 
 	cid "github.com/ipfs/go-cid"
-	files "github.com/ipfs/go-ipfs-files"
 	plugin "github.com/ipfs/go-ipfs/plugin"
 	core "github.com/ipfs/interface-go-ipfs-core"
 	ld "github.com/piprate/json-gold/ld"
 	cbor "github.com/polydawn/refmt/cbor"
 
-	"github.com/underlay/styx/db"
 	styx "github.com/underlay/styx/db"
 	loader "github.com/underlay/styx/loader"
 	types "github.com/underlay/styx/types"
@@ -48,7 +46,7 @@ type StyxPlugin struct {
 	lns            []net.Listener
 	db             *styx.DB
 	documentLoader ld.DocumentLoader
-	pinner         styx.DocumentStore
+	store          styx.DocumentStore
 }
 
 // Compile-time type check (bleh)
@@ -126,21 +124,21 @@ func (sp *StyxPlugin) handleNQuadsConnection(conn net.Conn) {
 			return
 		}
 
-		bytes := make([]byte, m)
-		n, err := io.ReadFull(reader, bytes)
+		b := make([]byte, m)
+		n, err := io.ReadFull(reader, b)
 		if err != nil {
 			return
 		} else if m != uint64(n) {
 			return
 		}
 
-		dataset, err := serializer.Parse(bytes)
+		dataset, err := serializer.Parse(b)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
 
-		cid, err := sp.pinner(bytes)
+		cid, err := sp.store(bytes.NewReader(b))
 		if err != nil {
 			log.Println(err)
 			continue
@@ -173,8 +171,8 @@ func (sp *StyxPlugin) handleCborLdConnection(conn net.Conn) {
 	unmarshaller := cbor.NewUnmarshaller(cbor.DecodeOptions{}, conn)
 	proc := ld.NewJsonLdProcessor()
 
-	datasetOptions := db.GetDatasetOptions(sp.db.Loader)
-	stringOptions := db.GetStringOptions(sp.db.Loader)
+	datasetOptions := styx.GetDatasetOptions(sp.db.Loader)
+	stringOptions := styx.GetStringOptions(sp.db.Loader)
 
 	api := ld.NewJsonLdApi()
 
@@ -207,7 +205,7 @@ func (sp *StyxPlugin) handleCborLdConnection(conn net.Conn) {
 			continue
 		}
 
-		cid, err := sp.pinner([]byte(normalized.(string)))
+		cid, err := sp.store(bytes.NewReader([]byte(normalized.(string))))
 		if err != nil {
 			log.Println(err)
 			continue
@@ -262,14 +260,7 @@ func (sp *StyxPlugin) Start(api core.CoreAPI) error {
 
 	unixfsAPI := api.Unixfs()
 
-	sp.pinner = func(nquads []byte) (cid.Cid, error) {
-		file := files.NewBytesFile(nquads)
-		path, err := unixfsAPI.Add(context.TODO(), file)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return path.Cid(), nil
-	}
+	sp.store = styx.MakeApiDocumentStore(unixfsAPI)
 
 	var err error
 

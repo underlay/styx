@@ -11,7 +11,6 @@ import (
 
 	badger "github.com/dgraph-io/badger"
 	proto "github.com/golang/protobuf/proto"
-	cid "github.com/ipfs/go-cid"
 	ld "github.com/piprate/json-gold/ld"
 
 	styx "github.com/underlay/styx/db"
@@ -128,19 +127,15 @@ func TestIPFSDocumentLoader(t *testing.T) {
 	checkExpanded(dwebIpldResult)
 }
 
-func TestIngest(t *testing.T) {
-	var data map[string]interface{}
-	err := json.Unmarshal(sampleData, &data)
-	if err != nil {
-		t.Error(err)
+func TestSimpleIngest(t *testing.T) {
+	if !sh.IsUp() {
+		t.Error("IPFS Daemon not running")
 		return
 	}
 
-	documentLoader := loader.NewShellDocumentLoader(sh)
-
 	// Remove old db
 	fmt.Println("removing path", path)
-	if err = os.RemoveAll(path); err != nil {
+	if err := os.RemoveAll(path); err != nil {
 		t.Error(err)
 		return
 	}
@@ -153,15 +148,17 @@ func TestIngest(t *testing.T) {
 
 	defer db.Close()
 
-	store := func(data []byte) (cid.Cid, error) {
-		hash, err := sh.Add(bytes.NewReader(data))
-		if err != nil {
-			return cid.Undef, err
-		}
-		return cid.Parse(hash)
+	var data map[string]interface{}
+	if err = json.Unmarshal(sampleData, &data); err != nil {
+		t.Error(err)
+		return
 	}
 
-	db.IngestJsonLd(data, documentLoader, store)
+	dl := loader.NewShellDocumentLoader(sh)
+
+	store := styx.MakeShellDocumentStore(sh)
+
+	db.IngestJsonLd(data, dl, store)
 
 	err = db.Badger.View(func(txn *badger.Txn) error {
 		iter := txn.NewIterator(badger.DefaultIteratorOptions)
@@ -227,27 +224,24 @@ func TestIngest(t *testing.T) {
 		log.Printf("Printed %02d database entries\n", i)
 		return nil
 	})
+
 	if err != nil {
 		t.Error(err)
 	}
 }
 
-func TestQuery(t *testing.T) {
-	var data map[string]interface{}
-	err := json.Unmarshal(sampleData, &data)
-	if err != nil {
-		t.Error(err)
+func TestNTIngest(t *testing.T) {
+	if !sh.IsUp() {
+		t.Error("IPFS Daemon not running")
 		return
 	}
 
 	// Remove old db
 	fmt.Println("removing path", path)
-	if err = os.RemoveAll(path); err != nil {
+	if err := os.RemoveAll(path); err != nil {
 		t.Error(err)
 		return
 	}
-
-	documentLoader := loader.NewShellDocumentLoader(sh)
 
 	db, err := styx.OpenDB(path)
 	if err != nil {
@@ -257,13 +251,57 @@ func TestQuery(t *testing.T) {
 
 	defer db.Close()
 
-	store := func(data []byte) (cid.Cid, error) {
-		hash, err := sh.Add(bytes.NewReader(data))
-		if err != nil {
-			return cid.Undef, err
-		}
-		return cid.Parse(hash)
+	file, err := os.Open("/Users/joel/Desktop/NTNames.json")
+	if err != nil {
+		t.Error(err)
+		return
 	}
+
+	var data map[string]interface{}
+
+	d := json.NewDecoder(file)
+	if err = d.Decode(&data); err != nil {
+		t.Error(err)
+		return
+	}
+
+	dl := loader.NewShellDocumentLoader(sh)
+
+	store := styx.MakeShellDocumentStore(sh)
+
+	db.IngestJsonLd(data, dl, store)
+}
+
+func TestQuery(t *testing.T) {
+	if !sh.IsUp() {
+		t.Error("IPFS Daemon not running")
+		return
+	}
+
+	// Remove old db
+	fmt.Println("removing path", path)
+	if err := os.RemoveAll(path); err != nil {
+		t.Error(err)
+		return
+	}
+
+	db, err := styx.OpenDB(path)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer db.Close()
+
+	var data map[string]interface{}
+	if err = json.Unmarshal(sampleData, &data); err != nil {
+		t.Error(err)
+		return
+	}
+
+	documentLoader := loader.NewShellDocumentLoader(sh)
+
+	store := styx.MakeShellDocumentStore(sh)
 
 	if err = db.IngestJsonLd(data, documentLoader, store); err != nil {
 		t.Error(err)

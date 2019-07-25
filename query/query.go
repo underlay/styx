@@ -31,7 +31,6 @@ func (g *ConstraintGraph) Tick(i int, txn *badger.Txn) (err error) {
 	u.Value = u.Seek(u.Root)
 	if u.Value != nil {
 		return
-
 	}
 
 	in := g.In[p]
@@ -108,8 +107,6 @@ func (g *ConstraintGraph) Tick(i int, txn *badger.Txn) (err error) {
 		}
 
 		// We got a valid new value for u!
-		// Propagate it all the way to the top!
-
 		return
 	}
 

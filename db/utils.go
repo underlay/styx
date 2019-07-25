@@ -1,8 +1,15 @@
 package db
 
 import (
+	"context"
+	"io"
+
 	cid "github.com/ipfs/go-cid"
+	ipfs "github.com/ipfs/go-ipfs-api"
+	files "github.com/ipfs/go-ipfs-files"
+	core "github.com/ipfs/interface-go-ipfs-core"
 	ld "github.com/piprate/json-gold/ld"
+
 	types "github.com/underlay/styx/types"
 )
 
@@ -26,7 +33,28 @@ func permuteMinor(permutation uint8, s, p, o []byte) ([]byte, []byte, []byte) {
 	}
 }
 
-type DocumentStore = func(data []byte) (cid.Cid, error)
+type DocumentStore = func(reader io.Reader) (cid.Cid, error)
+
+func MakeShellDocumentStore(sh *ipfs.Shell) DocumentStore {
+	return func(reader io.Reader) (cid.Cid, error) {
+		hash, err := sh.Add(reader)
+		if err != nil {
+			return cid.Undef, err
+		}
+		return cid.Parse(hash)
+	}
+}
+
+func MakeApiDocumentStore(unixfsAPI core.UnixfsAPI) DocumentStore {
+	return func(reader io.Reader) (cid.Cid, error) {
+		file := files.NewReaderFile(reader)
+		path, err := unixfsAPI.Add(context.Background(), file)
+		if err != nil {
+			return cid.Undef, err
+		}
+		return path.Cid(), nil
+	}
+}
 
 // GetDatasetOptions returns JsonLdOptions for parsing a document into a dataset
 func GetDatasetOptions(loader ld.DocumentLoader) *ld.JsonLdOptions {

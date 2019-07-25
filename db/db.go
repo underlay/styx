@@ -1,6 +1,7 @@
 package db
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 
@@ -58,7 +59,7 @@ func (db *DB) IngestJsonLd(doc interface{}, loader ld.DocumentLoader, store Docu
 		return err
 	}
 
-	cid, err := store([]byte(normalized.(string)))
+	cid, err := store(bytes.NewReader([]byte(normalized.(string))))
 	if err != nil {
 		return err
 	}
