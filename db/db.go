@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"log"
 
 	badger "github.com/dgraph-io/badger"
 	proto "github.com/golang/protobuf/proto"
@@ -42,7 +43,8 @@ func OpenDB(path string) (*DB, error) {
 	}, nil
 }
 
-func (db *DB) IngestJsonLd(doc interface{}, loader ld.DocumentLoader, store DocumentStore) error {
+// IngestJSONLd takes a JSON-LD document and ingests it
+func (db *DB) IngestJSONLd(doc interface{}, loader ld.DocumentLoader, store DocumentStore) error {
 	datasetOptions := GetDatasetOptions(loader)
 	stringOptions := GetStringOptions(loader)
 
@@ -167,4 +169,72 @@ func setValues(node ld.Node, g *query.ConstraintGraph, values map[uint64]*types.
 
 	values[id] = value
 	return value, nil
+}
+
+// Log will print the *entire database contents* to log
+func (db *DB) Log() error {
+	return db.Badger.View(func(txn *badger.Txn) error {
+		iter := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer iter.Close()
+		var i int
+		for iter.Seek(nil); iter.Valid(); iter.Next() {
+			item := iter.Item()
+			key := item.KeyCopy(nil)
+			val, err := item.ValueCopy(nil)
+			if err != nil {
+				return err
+			}
+
+			prefix := key[0]
+			if bytes.Equal(key, types.CounterKey) {
+				// Counter!
+				log.Printf("Counter: %02d\n", binary.BigEndian.Uint64(val))
+			} else if prefix == types.IndexPrefix {
+				// Index key
+				index := &types.Index{}
+				if err = proto.Unmarshal(val, index); err != nil {
+					return err
+				}
+				log.Printf("Index:\n  %s\n  %s\n", string(key[1:]), index.String())
+			} else if prefix == types.ValuePrefix {
+				// Value key
+				value := &types.Value{}
+				if err = proto.Unmarshal(val, value); err != nil {
+					return err
+				}
+				id := binary.BigEndian.Uint64(key[1:])
+				log.Printf("Value: %02d %s\n", id, value.GetValue())
+			} else if _, has := types.TriplePrefixMap[prefix]; has {
+				// Value key
+				sourceList := &types.SourceList{}
+				proto.Unmarshal(val, sourceList)
+				log.Printf("Triple entry: %s %02d | %02d | %02d :: %s\n",
+					string(key[0]),
+					binary.BigEndian.Uint64(key[1:9]),
+					binary.BigEndian.Uint64(key[9:17]),
+					binary.BigEndian.Uint64(key[17:25]),
+					types.PrintSources(sourceList.Sources),
+				)
+			} else if _, has := types.MinorPrefixMap[prefix]; has {
+				// Minor key
+				log.Printf("Minor entry: %s %02d | %02d :: %02d\n",
+					string(key[0]),
+					binary.BigEndian.Uint64(key[1:9]),
+					binary.BigEndian.Uint64(key[9:17]),
+					binary.BigEndian.Uint64(val),
+				)
+			} else if _, has := types.MajorPrefixMap[prefix]; has {
+				// Major key
+				log.Printf("Major entry: %s %02d | %02d :: %02d\n",
+					string(key[0]),
+					binary.BigEndian.Uint64(key[1:9]),
+					binary.BigEndian.Uint64(key[9:17]),
+					binary.BigEndian.Uint64(val),
+				)
+			}
+			i++
+		}
+		log.Printf("Printed %02d database entries\n", i)
+		return nil
+	})
 }

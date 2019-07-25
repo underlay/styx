@@ -260,7 +260,7 @@ func (sp *StyxPlugin) Start(api core.CoreAPI) error {
 
 	unixfsAPI := api.Unixfs()
 
-	sp.store = styx.MakeApiDocumentStore(unixfsAPI)
+	sp.store = styx.MakeAPIDocumentStore(unixfsAPI)
 
 	var err error
 

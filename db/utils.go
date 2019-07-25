@@ -33,8 +33,10 @@ func permuteMinor(permutation uint8, s, p, o []byte) ([]byte, []byte, []byte) {
 	}
 }
 
+// DocumentStore is a function that turns bytes into CIDs (and probably pins them too)
 type DocumentStore = func(reader io.Reader) (cid.Cid, error)
 
+// MakeShellDocumentStore wraps the HTTP API interface
 func MakeShellDocumentStore(sh *ipfs.Shell) DocumentStore {
 	return func(reader io.Reader) (cid.Cid, error) {
 		hash, err := sh.Add(reader)
@@ -45,7 +47,8 @@ func MakeShellDocumentStore(sh *ipfs.Shell) DocumentStore {
 	}
 }
 
-func MakeApiDocumentStore(unixfsAPI core.UnixfsAPI) DocumentStore {
+// MakeAPIDocumentStore wraps the native CoreAPI interface
+func MakeAPIDocumentStore(unixfsAPI core.UnixfsAPI) DocumentStore {
 	return func(reader io.Reader) (cid.Cid, error) {
 		file := files.NewReaderFile(reader)
 		path, err := unixfsAPI.Add(context.Background(), file)
