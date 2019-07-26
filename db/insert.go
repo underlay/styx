@@ -50,11 +50,13 @@ func insert(cid cid.Cid, graph string, quads []*ld.Quad, txn *badger.Txn) (err e
 	graphID := fmt.Sprintf("%s#%s", cid.String(), graph)
 	graphKey := types.AssembleKey(types.GraphPrefix, []byte(graphID), nil, nil)
 
+	var item *badger.Item
+
 	// Check to see if this document is already in the database
-	if item, err := txn.Get(graphKey); err != badger.ErrKeyNotFound {
-		return item.Value(func(val []byte) error {
+	if item, err = txn.Get(graphKey); err != badger.ErrKeyNotFound {
+		return item.Value(func(val []byte) (err error) {
 			log.Printf("Duplicate document inserted previously on %s\n", string(val))
-			return nil
+			return
 		})
 	}
 
@@ -66,12 +68,12 @@ func insert(cid cid.Cid, graph string, quads []*ld.Quad, txn *badger.Txn) (err e
 
 	var root uint64
 	value := make([]byte, 8)
-	if item, err := txn.Get(types.CounterKey); err == badger.ErrKeyNotFound {
+	if item, err = txn.Get(types.CounterKey); err == badger.ErrKeyNotFound {
 		root = types.InitialCounter
 	} else if err != nil {
-		return nil
+		return
 	} else if value, err = item.ValueCopy(value); err != nil {
-		return err
+		return
 	} else {
 		root = binary.BigEndian.Uint64(value)
 	}
@@ -101,7 +103,7 @@ func insert(cid cid.Cid, graph string, quads []*ld.Quad, txn *badger.Txn) (err e
 		}
 
 		var major, minor [3]uint64
-		if major, minor, err = getCounts(s, p, o, txn); err != nil {
+		if major, minor, err = setCounts(s, p, o, txn); err != nil {
 			return
 		}
 
@@ -109,7 +111,17 @@ func insert(cid cid.Cid, graph string, quads []*ld.Quad, txn *badger.Txn) (err e
 		for i := 0; i < 3; i++ {
 			j := (i + 1) % 3
 			if major[i] != minor[j] {
-				return fmt.Errorf("Mismatching major & minor index values: %v %v", major, minor)
+				return fmt.Errorf(
+					"Mismatching major & minor index values:\n  %v %v\n  <%s %s %s>",
+					// "Mismatching major & minor index values:\n  %v %v\n  <%s %s %s>\n  <%02d %02d %02d>",
+					major, minor,
+					quad.Subject.GetValue(),
+					quad.Predicate.GetValue(),
+					quad.Object.GetValue(),
+					// binary.BigEndian.Uint64(s),
+					// binary.BigEndian.Uint64(p),
+					// binary.BigEndian.Uint64(o),
+				)
 			}
 		}
 
@@ -137,9 +149,9 @@ func insert(cid cid.Cid, graph string, quads []*ld.Quad, txn *badger.Txn) (err e
 			} else {
 				sources.Sources = append(sources.GetSources(), source)
 				if value, err = proto.Marshal(sources); err != nil {
-					return err
+					return
 				} else if err = txn.Set(key, value); err != nil {
-					return err
+					return
 				}
 			}
 		}
@@ -191,6 +203,8 @@ func getID(
 		id := values.InsertNode(value, root)
 		index = &types.Index{Id: id}
 	} else if err != nil {
+		return nil, err
+	} else {
 		// Unmarshal the value into an Index struct
 		index = &types.Index{}
 		if value, err := item.ValueCopy(nil); err != nil {
@@ -198,8 +212,6 @@ func getID(
 		} else if err := proto.Unmarshal(value, index); err != nil {
 			return nil, err
 		}
-	} else {
-		return nil, err
 	}
 
 	indices[v] = index
@@ -209,27 +221,29 @@ func getID(
 	return ID, nil
 }
 
-func getCounts(s, p, o []byte, txn *badger.Txn) (major [3]uint64, minor [3]uint64, err error) {
+func setCounts(s, p, o []byte, txn *badger.Txn) (major [3]uint64, minor [3]uint64, err error) {
+	var key []byte
 	for i := uint8(0); i < 3; i++ {
 		// Major Key
 		majorA, majorB, _ := permuteMajor(i, s, p, o)
-		if major[i], err = setCount(types.MajorPrefixes[i], majorA, majorB, txn); err != nil {
+		key = types.AssembleKey(types.MajorPrefixes[i], majorA, majorB, nil)
+		if major[i], err = setCount(key, txn); err != nil {
 			return
 		}
 
 		// Minor Key
 		minorA, minorB, _ := permuteMinor(i, s, p, o)
-		if minor[i], err = setCount(types.MinorPrefixes[i], minorA, minorB, txn); err != nil {
+		key = types.AssembleKey(types.MinorPrefixes[i], minorA, minorB, nil)
+		if minor[i], err = setCount(key, txn); err != nil {
 			return
 		}
 	}
 	return
 }
 
-// setCount handlers both major and minor keys, writing the initial counter
+// setCount handles both major and minor keys, writing the initial counter
 // for nonexistent keys and incrementing existing ones
-func setCount(prefix byte, a, b []byte, txn *badger.Txn) (count uint64, err error) {
-	key := types.AssembleKey(prefix, a, b, nil)
+func setCount(key []byte, txn *badger.Txn) (count uint64, err error) {
 	value := make([]byte, 8)
 
 	item, err := txn.Get(key)

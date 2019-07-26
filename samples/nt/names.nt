@@ -1,0 +1,518 @@
+<http://semanticbible.org/ns/2006/NTNames> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Ontology> .
+<http://semanticbible.org/ns/2006/NTNames> <http://www.w3.org/2000/01/rdf-schema#comment> "The names here are as\ntransliterated in the English Standard Version (ESV), copyright \u00A9\n2001 by Crossway Bibles, a division of Good News Publishers.\n\nReuse note: where feasible, class names coincide with SUMO (Suggested\nUpper Merged Ontology), as developed within the IEEE Standard Upper\nOntology Working Group, described at http://www.ontologyportal.org/,\nand available as OWL at http://reliant.teknowledge.com/DAML/SUMO.owl\n(but not without some problems). I've copied, rather than re-used, but\nthis provides a future migration path toward coordinating the two\nontologies.\n\n"@en .
+<http://semanticbible.org/ns/2006/NTNames> <http://www.w3.org/2002/07/owl#versionInfo> "1.0"^^<http://www.w3.org/2001/XMLSchema#string> .
+<http://semanticbible.org/ns/2006/NTNames#ReligiousBelief> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#ReligiousBelief> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#HumanAttribute> .
+<http://semanticbible.org/ns/2006/NTNames#ReligiousBelief> <http://www.w3.org/2000/01/rdf-schema#comment> "The attribute of ascribing to a ReligiousBeliefSystem (which includes philosophies)."@en .
+<http://semanticbible.org/ns/2006/NTNames#ReligiousBelief> <http://www.w3.org/2000/01/rdf-schema#label> "Religious belief"@en .
+<http://semanticbible.org/ns/2006/NTNames#HumanAttribute> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#HumanAttribute> <http://www.w3.org/2000/01/rdf-schema#comment> "Attributes of people, overlapping with the class hierarchy under suo:Group: this is unsatisfactory."@en .
+<http://semanticbible.org/ns/2006/NTNames#HumanAttribute> <http://www.w3.org/2000/01/rdf-schema#label> "Human attribute"@en .
+<http://semanticbible.org/ns/2006/NTNames#SupernaturalRegion> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#SupernaturalRegion> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#Region> .
+<http://semanticbible.org/ns/2006/NTNames#SupernaturalRegion> <http://www.w3.org/2000/01/rdf-schema#comment> "Those regions that are outside normal human existence. "^^<http://www.w3.org/2001/XMLSchema#string> .
+<http://semanticbible.org/ns/2006/NTNames#Region> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#Region> <http://www.w3.org/2000/01/rdf-schema#label> "Region"@en .
+<http://semanticbible.org/ns/2006/NTNames#Region> <http://www.w3.org/2000/01/rdf-schema#comment> "Comparable to http://reliant.teknowledge.com/DAML/SUMO.owl#Region: \"A topographic location.  Regions encompass surfaces of Objects, imaginary places, and GeographicAreas. \""@en .
+<http://semanticbible.org/ns/2006/NTNames#Region> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#Object> .
+<http://semanticbible.org/ns/2006/NTNames#ReligiousBeliefSystem> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#ReligiousBeliefSystem> <http://www.w3.org/2000/01/rdf-schema#label> "Religious belief system"@en .
+<http://semanticbible.org/ns/2006/NTNames#ReligiousBeliefSystem> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#BeliefSystem> .
+<http://semanticbible.org/ns/2006/NTNames#ReligiousBeliefSystem> <http://www.w3.org/2000/01/rdf-schema#comment> "A system of religious beliefs, or a philosophy."@en .
+<http://semanticbible.org/ns/2006/NTNames#BeliefSystem> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#BeliefSystem> <http://www.w3.org/2000/01/rdf-schema#label> "Belief system"@en .
+<http://semanticbible.org/ns/2006/NTNames#BeliefSystem> <http://www.w3.org/2000/01/rdf-schema#comment> "An organization of propositions into an identifiable belief system. A person who holds to a belief system can be considered a member of the corresponding BeliefGroup.\n\nThe notion of Proposition here is derived from http://reliant.teknowledge.com/DAML/SUMO.owl#Proposition."@en .
+<http://semanticbible.org/ns/2006/NTNames#WaterArea> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#WaterArea> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#GeographicArea> .
+<http://semanticbible.org/ns/2006/NTNames#WaterArea> <http://www.w3.org/2000/01/rdf-schema#subClassOf> _:genid1 .
+<http://semanticbible.org/ns/2006/NTNames#WaterArea> <http://www.w3.org/2000/01/rdf-schema#label> "Water Area"@en .
+<http://semanticbible.org/ns/2006/NTNames#WaterArea> <http://www.w3.org/2000/01/rdf-schema#comment> "Based on SUMO, http://reliant.teknowledge.com/DAML/SUMO.owl#WaterArea\nSUO 1.55: July 14, 2003\nA body which is made up predominantly of water,\ne.g. rivers, lakes, oceans, etc."@en .
+<http://semanticbible.org/ns/2006/NTNames#WaterArea> <http://www.w3.org/2002/07/owl#disjointWith> <http://semanticbible.org/ns/2006/NTNames#LandArea> .
+<http://semanticbible.org/ns/2006/NTNames#GeographicArea> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#GeographicArea> <http://www.w3.org/2000/01/rdf-schema#comment> "Based on SUMO, http://reliant.teknowledge.com/DAML/SUMO.owl#GeographicArea\nSUO 1.55: July 14, 2003\nA geographic location, generally having \ndefinite boundaries.  Note that this differs from its immediate superclass \n&%Region in that a &%GeographicArea is a three-dimensional &%Region of the \nearth.  Accordingly, all astronomical objects other than earth and all \none-dimensional and two-dimensional &%Regions are not classed under \n&%GeographicArea."@en .
+<http://semanticbible.org/ns/2006/NTNames#GeographicArea> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#Region> .
+<http://semanticbible.org/ns/2006/NTNames#GeographicArea> <http://www.w3.org/2000/01/rdf-schema#label> "Geographic Area"@en .
+_:genid1 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Restriction> .
+_:genid1 <http://www.w3.org/2002/07/owl#cardinality> "0"^^<http://www.w3.org/2001/XMLSchema#int> .
+_:genid1 <http://www.w3.org/2002/07/owl#onProperty> <http://semanticbible.org/ns/2006/NTNames#nativePlaceOf> .
+<http://semanticbible.org/ns/2006/NTNames#nativePlaceOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#InverseFunctionalProperty> .
+<http://semanticbible.org/ns/2006/NTNames#nativePlaceOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#nativePlaceOf> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#GeographicArea> .
+<http://semanticbible.org/ns/2006/NTNames#nativePlaceOf> <http://www.w3.org/2000/01/rdf-schema#range> _:genid38 .
+<http://semanticbible.org/ns/2006/NTNames#nativePlaceOf> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://semanticbible.org/ns/2006/NTNames#visitedPlaceOf> .
+<http://semanticbible.org/ns/2006/NTNames#nativePlaceOf> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#nativePlace> .
+<http://semanticbible.org/ns/2006/NTNames#LandArea> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#LandArea> <http://www.w3.org/2002/07/owl#disjointWith> <http://semanticbible.org/ns/2006/NTNames#WaterArea> .
+<http://semanticbible.org/ns/2006/NTNames#LandArea> <http://www.w3.org/2000/01/rdf-schema#comment> "Based on SUMO, http://reliant.teknowledge.com/DAML/SUMO.owl#LandArea\nSUO 1.55: July 14, 2003\nAn area which is predominantly solid ground,\ne.g. a &%Nation, a mountain, a desert, etc.  Note that a &%LandArea may\ncontain some relatively small &%WaterAreas.  For example, Australia is\na &%LandArea even though it contains various rivers and lakes."@en .
+<http://semanticbible.org/ns/2006/NTNames#LandArea> <http://www.w3.org/2000/01/rdf-schema#label> "Land Area"@en .
+<http://semanticbible.org/ns/2006/NTNames#LandArea> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#GeographicArea> .
+<http://semanticbible.org/ns/2006/NTNames#Angel> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#Angel> <http://www.w3.org/2000/01/rdf-schema#comment> "Supernatural beings that work to support God's purposes as his agents."@en .
+<http://semanticbible.org/ns/2006/NTNames#Angel> <http://www.w3.org/2000/01/rdf-schema#label> "Angel"@en .
+<http://semanticbible.org/ns/2006/NTNames#Angel> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#SupernaturalBeing> .
+<http://semanticbible.org/ns/2006/NTNames#Angel> <http://www.w3.org/2002/07/owl#disjointWith> <http://semanticbible.org/ns/2006/NTNames#God> .
+<http://semanticbible.org/ns/2006/NTNames#SupernaturalBeing> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#SupernaturalBeing> <http://www.w3.org/2000/01/rdf-schema#comment> "A CognitiveAgent whose effects are not limited to the physical world. This includes the Lord Almighty, as well as supposed or imaginary deities."@en .
+<http://semanticbible.org/ns/2006/NTNames#SupernaturalBeing> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#CognitiveAgent> .
+<http://semanticbible.org/ns/2006/NTNames#SupernaturalBeing> <http://www.w3.org/2000/01/rdf-schema#label> "Supernatural Being"@en .
+<http://semanticbible.org/ns/2006/NTNames#God> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#God> <http://www.w3.org/2000/01/rdf-schema#comment> "Self-documenting"@en .
+<http://semanticbible.org/ns/2006/NTNames#God> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#SupernaturalBeing> .
+<http://semanticbible.org/ns/2006/NTNames#God> <http://www.w3.org/2000/01/rdf-schema#label> "God"@en .
+<http://semanticbible.org/ns/2006/NTNames#God> <http://www.w3.org/2002/07/owl#disjointWith> <http://semanticbible.org/ns/2006/NTNames#EvilSupernaturalBeing> .
+<http://semanticbible.org/ns/2006/NTNames#God> <http://www.w3.org/2002/07/owl#disjointWith> <http://semanticbible.org/ns/2006/NTNames#Angel> .
+<http://semanticbible.org/ns/2006/NTNames#Organization> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#Organization> <http://www.w3.org/2000/01/rdf-schema#comment> "Comparable to http://reliant.teknowledge.com/DAML/SUMO.owl#Organization\nSUO 1.55: July 14, 2003\nAn &%Organization is a corporate or similar institution. The &%members of an &%Organization typically have a common purpose or function. Note that this class also covers divisions, departments, etc. of organizations.  For example, both the Shell Corporation and the accounting department at Shell would both be instances of &%Organization.  Note too that the existence of an &%Organization is dependent on the existence of at least one &%member (since &%Organization is a subclass of &%Collection).  Accordingly, in cases of purely legal organizations, a fictitious &%member \nshould be assumed."@en .
+<http://semanticbible.org/ns/2006/NTNames#Organization> <http://www.w3.org/2000/01/rdf-schema#label> "Organization"@en .
+<http://semanticbible.org/ns/2006/NTNames#Organization> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#GroupOfPeople> .
+<http://semanticbible.org/ns/2006/NTNames#GroupOfPeople> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#GroupOfPeople> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#Group> .
+<http://semanticbible.org/ns/2006/NTNames#GroupOfPeople> <http://www.w3.org/2000/01/rdf-schema#comment> "Comparable to http://reliant.teknowledge.com/DAML/SUMO.owl#GroupOfPeople\nSUO 1.55: July 14, 2003\nAny &%Group whose &%members are\nexclusively &%Humans."@en .
+<http://semanticbible.org/ns/2006/NTNames#GroupOfPeople> <http://www.w3.org/2000/01/rdf-schema#label> "Group of People"@en .
+<http://semanticbible.org/ns/2006/NTNames#Nation> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#Nation> <http://www.w3.org/2000/01/rdf-schema#comment> "Based on SUMO, http://reliant.teknowledge.com/DAML/SUMO.owl#Nation\nSUO 1.55: July 14, 2003\nThe broadest &%GeopoliticalArea, i.e. &%Nations are\n&%GeopoliticalAreas that are not part of any other overarching and\ncomprehensive governance structure (excepting commonwealths and other sorts\nof loose international organizations).\nNote that modern nations referred to in the New Testament (Spain,\nItaly, Libya) are typically not instances of Nation, but rather\nof Region (if the borders are indefinite) or of LandArea."@en .
+<http://semanticbible.org/ns/2006/NTNames#Nation> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#LandArea> .
+<http://semanticbible.org/ns/2006/NTNames#Nation> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#GeopoliticalArea> .
+<http://semanticbible.org/ns/2006/NTNames#Nation> <http://www.w3.org/2000/01/rdf-schema#label> "Nation"@en .
+<http://semanticbible.org/ns/2006/NTNames#GeopoliticalArea> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#GeopoliticalArea> <http://www.w3.org/2000/01/rdf-schema#comment> "Based on SUMO, http://reliant.teknowledge.com/DAML/SUMO.owl#GeopoliticalArea\nSUO 1.55: July 14, 2003\nAny &%GeographicArea which is associated \nwith some sort of political structure.  This class includes &%Lands, \n&%Cities, districts of cities, counties, etc.  Note that the identity \nof a &%GeopoliticalArea may remain constant after a change in borders."@en .
+<http://semanticbible.org/ns/2006/NTNames#GeopoliticalArea> <http://www.w3.org/2000/01/rdf-schema#label> "Geopolitical Area"@en .
+<http://semanticbible.org/ns/2006/NTNames#GeopoliticalArea> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#GeographicArea> .
+<http://semanticbible.org/ns/2006/NTNames#Group> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#Group> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#Agent> .
+<http://semanticbible.org/ns/2006/NTNames#Group> <http://www.w3.org/2000/01/rdf-schema#label> "Group"@en .
+<http://semanticbible.org/ns/2006/NTNames#Group> <http://www.w3.org/2000/01/rdf-schema#comment> "Comparable to http://reliant.teknowledge.com/DAML/SUMO.owl#Group\nSUO 1.55: July 14, 2003\nA &%Collection of &%Agents, e.g. a flock\nof sheep, a herd of goats, or the local Boy Scout troop."@en .
+<http://semanticbible.org/ns/2006/NTNames#Agent> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#Agent> <http://www.w3.org/2000/01/rdf-schema#comment> "Comparable to http://reliant.teknowledge.com/DAML/SUMO.owl#Agent\nSUO 1.55: July 14, 2003\nSomething or someone that can act on its own and \nproduce changes in the world."@en .
+<http://semanticbible.org/ns/2006/NTNames#Agent> <http://www.w3.org/2000/01/rdf-schema#label> "Agent"@en .
+<http://semanticbible.org/ns/2006/NTNames#Agent> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#Object> .
+<http://semanticbible.org/ns/2006/NTNames#CognitiveAgent> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#CognitiveAgent> <http://www.w3.org/2000/01/rdf-schema#label> "Cognitive Agent"@en .
+<http://semanticbible.org/ns/2006/NTNames#CognitiveAgent> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#Agent> .
+<http://semanticbible.org/ns/2006/NTNames#CognitiveAgent> <http://www.w3.org/2000/01/rdf-schema#comment> "Comparable to http://reliant.teknowledge.com/DAML/SUMO.owl#CognitiveAgent\nSUO 1.55: July 14, 2003\nA &%SentientAgent with responsibilities \nand the ability to reason, deliberate, make plans, etc.  This is \nessentially the legal/ethical notion of a person.  Note that, although \n&%Human is a subclass of &%CognitiveAgent, there may be instances of \n&%CognitiveAgent which are not also instances of &%Human.  For example, \nchimpanzees, gorillas, dolphins, whales, and some extraterrestrials \n(if they exist) may be &%CognitiveAgents."@en .
+<http://semanticbible.org/ns/2006/NTNames#Series> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#Series> <http://www.w3.org/2000/01/rdf-schema#label> "Series"@en .
+<http://semanticbible.org/ns/2006/NTNames#Series> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#ContentBearingObject> .
+<http://semanticbible.org/ns/2006/NTNames#Series> <http://www.w3.org/2000/01/rdf-schema#comment> "Broadly the same as http://reliant.teknowledge.com/DAML/SUMO.owl#Series\nSUO 1.55: July 14, 2003\nA &%Text consisting of multiple self-contained units.  \nSome examples are an encyclopedia containing a couple dozen volumes, a television \nseries made up of many episodes, a film serial, etc."@en .
+<http://semanticbible.org/ns/2006/NTNames#ContentBearingObject> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#ContentBearingObject> <http://www.w3.org/2000/01/rdf-schema#comment> "Broadly the same as http://reliant.teknowledge.com/DAML/SUMO.owl#ContentBearingObject\nSUO 1.55: July 14, 2003\nAny &%SelfConnectedObject that expresses \ninformation."@en .
+<http://semanticbible.org/ns/2006/NTNames#ContentBearingObject> <http://www.w3.org/2000/01/rdf-schema#label> "Content Bearing Object"@en .
+<http://semanticbible.org/ns/2006/NTNames#ContentBearingObject> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#Object> .
+<http://semanticbible.org/ns/2006/NTNames#EthnicGroup> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#EthnicGroup> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#GroupOfPeople> .
+<http://semanticbible.org/ns/2006/NTNames#EthnicGroup> <http://www.w3.org/2000/01/rdf-schema#comment> "Comparable to http://reliant.teknowledge.com/DAML/SUMO.owl#EthnicGroup\nSUO 1.55: July 14, 2003\nA &%Group whose &%members originate from\nthe same &%GeographicArea or share the same &%Language and/or cultural\npractices."@en .
+<http://semanticbible.org/ns/2006/NTNames#EthnicGroup> <http://www.w3.org/2000/01/rdf-schema#label> "Ethnic Group"@en .
+<http://semanticbible.org/ns/2006/NTNames#CitizenshipAttribute> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#CitizenshipAttribute> <http://www.w3.org/2000/01/rdf-schema#comment> "Belonging to the citizenry of a country (e.g. Roman). There may be parallel ethnicity attributes (Roman being the primary example) which are not easily distinguished. In the case of Roman, while all ethnic Romans (in the general sense, though not necessarily legal sense [e.g. slaves]) are Roman citizens, there are other Roman citizens (e.g. Paul) who have different ethnicity. "@en .
+<http://semanticbible.org/ns/2006/NTNames#CitizenshipAttribute> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#HumanAttribute> .
+<http://semanticbible.org/ns/2006/NTNames#CitizenshipAttribute> <http://www.w3.org/2000/01/rdf-schema#label> "Citizenship attribute"^^<http://www.w3.org/2001/XMLSchema#string> .
+<http://semanticbible.org/ns/2006/NTNames#Tribe> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#Tribe> <http://www.w3.org/2000/01/rdf-schema#label> "Tribe"@en .
+<http://semanticbible.org/ns/2006/NTNames#Tribe> <http://www.w3.org/2000/01/rdf-schema#comment> "Subclass for the Twelve Tribes of Israel"@en .
+<http://semanticbible.org/ns/2006/NTNames#Tribe> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#EthnicGroup> .
+<http://semanticbible.org/ns/2006/NTNames#SonOfGod> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#SonOfGod> <http://www.w3.org/2000/01/rdf-schema#label> "Son of God"@en .
+<http://semanticbible.org/ns/2006/NTNames#SonOfGod> <http://www.w3.org/2000/01/rdf-schema#comment> "Both Human and God"@en .
+<http://semanticbible.org/ns/2006/NTNames#SonOfGod> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#SonOfGod> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#God> .
+<http://semanticbible.org/ns/2006/NTNames#Human> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#Human> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#CognitiveAgent> .
+<http://semanticbible.org/ns/2006/NTNames#Human> <http://www.w3.org/2000/01/rdf-schema#comment> "Comparable to http://reliant.teknowledge.com/DAML/SUMO.owl#Human\nSUO 1.55: July 14, 2003\nModern man, the only remaining species of the Homo genus."@en .
+<http://semanticbible.org/ns/2006/NTNames#Human> <http://www.w3.org/2000/01/rdf-schema#label> "Human"@en .
+<http://semanticbible.org/ns/2006/NTNames#Island> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#Island> <http://www.w3.org/2000/01/rdf-schema#comment> "Based on SUMO, http://reliant.teknowledge.com/DAML/SUMO.owl#Island\nSUO 1.55: July 14, 2003\nA &%LandArea that is completely surrounded by a &%WaterArea."@en .
+<http://semanticbible.org/ns/2006/NTNames#Island> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#LandArea> .
+<http://semanticbible.org/ns/2006/NTNames#Island> <http://www.w3.org/2000/01/rdf-schema#label> "Island"@en .
+<http://semanticbible.org/ns/2006/NTNames#PoliticalOrganization> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#PoliticalOrganization> <http://www.w3.org/2000/01/rdf-schema#label> "Political Organization"@en .
+<http://semanticbible.org/ns/2006/NTNames#PoliticalOrganization> <http://www.w3.org/2000/01/rdf-schema#comment> "Comparable to http://reliant.teknowledge.com/DAML/SUMO.owl#PoliticalOrganization\nSUO 1.55: July 14, 2003\nAn &%Organization that is a &%Government,\na &%subOrganization of a &%Government, or an &%Organization that is attempting\nto bring about some sort of political change."@en .
+<http://semanticbible.org/ns/2006/NTNames#PoliticalOrganization> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#Organization> .
+<http://semanticbible.org/ns/2006/NTNames#Character> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#Character> <http://www.w3.org/2000/01/rdf-schema#comment> "Broadly the same as http://reliant.teknowledge.com/DAML/SUMO.owl#Character\nSUO 1.55: July 14, 2003\nAn element of an alphabet, a set of numerals, etc.\nNote that a &%Character may or may not be part of a &%Language.  &%Character\nis a subclass of &%SymbolicString, because every instance of &%Character is\nan alphanumeric sequence consisting of a single element."@en .
+<http://semanticbible.org/ns/2006/NTNames#Character> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#ContentBearingObject> .
+<http://semanticbible.org/ns/2006/NTNames#Character> <http://www.w3.org/2000/01/rdf-schema#label> "Character"@en .
+<http://semanticbible.org/ns/2006/NTNames#Object> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#Object> <http://www.w3.org/2000/01/rdf-schema#comment> "Following http://reliant.teknowledge.com/DAML/SUMO.owl#Object, this \"Corresponds roughly to the class of ordinary \nobjects.  Examples include normal physical objects, geographical regions, \nand locations of &%Processes, the complement of &%Objects in the &%Physical class. \""@en .
+<http://semanticbible.org/ns/2006/NTNames#Object> <http://www.w3.org/2000/01/rdf-schema#label> "Object"@en .
+<http://semanticbible.org/ns/2006/NTNames#ResidenceGroup> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#ResidenceGroup> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#GroupOfPeople> .
+<http://semanticbible.org/ns/2006/NTNames#ResidenceGroup> <http://www.w3.org/2000/01/rdf-schema#label> "Residence Group"@en .
+<http://semanticbible.org/ns/2006/NTNames#ResidenceGroup> <http://www.w3.org/2000/01/rdf-schema#comment> "A group identified by common residence in a City or StateOrProvince. At the level of Nation, this should generally be EthnicGroup. Unlike EthnicGroup, they need not have cultural or ethnic features in common."@en .
+<http://semanticbible.org/ns/2006/NTNames#StateOrProvince> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#StateOrProvince> <http://www.w3.org/2000/01/rdf-schema#label> "State or Province"@en .
+<http://semanticbible.org/ns/2006/NTNames#StateOrProvince> <http://www.w3.org/2000/01/rdf-schema#comment> "Based on SUMO, http://reliant.teknowledge.com/DAML/SUMO.owl#StateOrProvince\nSUO 1.55: July 14, 2003\nAdministrative subdivisions of a\n&%Nation that are broader than any other political subdivisions that\nmay exist.  This &%Class includes the states of the United States, as\nwell as the provinces of Canada and European countries.\nHere it covers both provinces and districts."@en .
+<http://semanticbible.org/ns/2006/NTNames#StateOrProvince> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#LandArea> .
+<http://semanticbible.org/ns/2006/NTNames#StateOrProvince> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#GeopoliticalArea> .
+<http://semanticbible.org/ns/2006/NTNames#FreshWaterArea> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#FreshWaterArea> <http://www.w3.org/2000/01/rdf-schema#label> "Fresh Water Area"@en .
+<http://semanticbible.org/ns/2006/NTNames#FreshWaterArea> <http://www.w3.org/2002/07/owl#disjointWith> <http://semanticbible.org/ns/2006/NTNames#SaltWaterArea> .
+<http://semanticbible.org/ns/2006/NTNames#FreshWaterArea> <http://www.w3.org/2000/01/rdf-schema#comment> "Based on SUMO, http://reliant.teknowledge.com/DAML/SUMO.owl#FreshWaterArea\n\nSUO 1.55: July 14, 2003\nA &%WaterArea whose &%Water is not saline,\ne.g. most rivers and lakes."@en .
+<http://semanticbible.org/ns/2006/NTNames#FreshWaterArea> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#WaterArea> .
+<http://semanticbible.org/ns/2006/NTNames#SaltWaterArea> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#SaltWaterArea> <http://www.w3.org/2000/01/rdf-schema#comment> "Based on SUMO, http://reliant.teknowledge.com/DAML/SUMO.owl#SaltWaterArea\nSUO 1.55: July 14, 2003\nA &%WaterArea whose &%Water is saline, e.g.\noceans and seas."@en .
+<http://semanticbible.org/ns/2006/NTNames#SaltWaterArea> <http://www.w3.org/2002/07/owl#disjointWith> <http://semanticbible.org/ns/2006/NTNames#FreshWaterArea> .
+<http://semanticbible.org/ns/2006/NTNames#SaltWaterArea> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#WaterArea> .
+<http://semanticbible.org/ns/2006/NTNames#SaltWaterArea> <http://www.w3.org/2000/01/rdf-schema#label> "Salt Water Area"@en .
+<http://semanticbible.org/ns/2006/NTNames#Mountain> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#Mountain> <http://www.w3.org/2000/01/rdf-schema#comment> "Wordnet: \"a land mass that projects well above its surroundings; higher than a hill. \"\nUsed here for things referred to as \"mount\", even though some of these might seem\nlike hills to well-traveled observers. "@en .
+<http://semanticbible.org/ns/2006/NTNames#Mountain> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#LandArea> .
+<http://semanticbible.org/ns/2006/NTNames#Mountain> <http://www.w3.org/2000/01/rdf-schema#label> "Mountain"@en .
+<http://semanticbible.org/ns/2006/NTNames#City> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#City> <http://www.w3.org/2000/01/rdf-schema#label> "City"@en .
+<http://semanticbible.org/ns/2006/NTNames#City> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#GeopoliticalArea> .
+<http://semanticbible.org/ns/2006/NTNames#City> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#LandArea> .
+<http://semanticbible.org/ns/2006/NTNames#City> <http://www.w3.org/2000/01/rdf-schema#comment> "Based on SUMO, http://reliant.teknowledge.com/DAML/SUMO.owl#City\nSUO 1.55: July 14, 2003\nA &%LandArea of relatively small size, inhabited\nby a community of people, and having some sort of political structure.\nNote that this class includes both large cities and small settlements\nlike towns, villages, hamlets, etc."@en .
+<http://semanticbible.org/ns/2006/NTNames#ResidencyAttribute> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#ResidencyAttribute> <http://www.w3.org/2000/01/rdf-schema#label> "Residency attribute"@en .
+<http://semanticbible.org/ns/2006/NTNames#ResidencyAttribute> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#HumanAttribute> .
+<http://semanticbible.org/ns/2006/NTNames#ResidencyAttribute> <http://www.w3.org/2000/01/rdf-schema#comment> "The attribute of living in a particular City or Province. Unlike Ethnicity, which is permanent, Residency can change."@en .
+<http://semanticbible.org/ns/2006/NTNames#EthnicityAttribute> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#EthnicityAttribute> <http://www.w3.org/2000/01/rdf-schema#label> "Ethnicity attribute"@en .
+<http://semanticbible.org/ns/2006/NTNames#EthnicityAttribute> <http://www.w3.org/2000/01/rdf-schema#comment> "The attribute of belonging to a particular ethnic group, or originating from a GeographicArea. Unlike Residency, which can change, Ethnicity is considered permanent."@en .
+<http://semanticbible.org/ns/2006/NTNames#EthnicityAttribute> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#HumanAttribute> .
+<http://semanticbible.org/ns/2006/NTNames#Woman> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#Woman> <http://www.w3.org/2000/01/rdf-schema#label> "Woman"@en .
+<http://semanticbible.org/ns/2006/NTNames#Woman> <http://www.w3.org/2000/01/rdf-schema#comment> "SUO 1.55: July 14, 2003\nThe class of &%Female &%Humans."@en .
+<http://semanticbible.org/ns/2006/NTNames#Woman> <http://www.w3.org/2002/07/owl#disjointWith> <http://semanticbible.org/ns/2006/NTNames#Man> .
+<http://semanticbible.org/ns/2006/NTNames#Woman> <http://www.w3.org/2000/01/rdf-schema#subClassOf> _:genid2 .
+<http://semanticbible.org/ns/2006/NTNames#Woman> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#Man> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#Man> <http://www.w3.org/2000/01/rdf-schema#comment> "SUO 1.55: July 14, 2003\nThe class of &%Male &%Humans."@en .
+<http://semanticbible.org/ns/2006/NTNames#Man> <http://www.w3.org/2002/07/owl#disjointWith> <http://semanticbible.org/ns/2006/NTNames#Woman> .
+<http://semanticbible.org/ns/2006/NTNames#Man> <http://www.w3.org/2000/01/rdf-schema#subClassOf> _:genid3 .
+<http://semanticbible.org/ns/2006/NTNames#Man> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#Man> <http://www.w3.org/2000/01/rdf-schema#label> "Man"@en .
+_:genid2 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Restriction> .
+_:genid2 <http://www.w3.org/2002/07/owl#allValuesFrom> <http://semanticbible.org/ns/2006/NTNames#Man> .
+_:genid2 <http://www.w3.org/2002/07/owl#onProperty> <http://semanticbible.org/ns/2006/NTNames#spouseOf> .
+<http://semanticbible.org/ns/2006/NTNames#spouseOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#SymmetricProperty> .
+<http://semanticbible.org/ns/2006/NTNames#spouseOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#spouseOf> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#spouseOf> <http://www.w3.org/2000/01/rdf-schema#label> "spouse of"@en .
+<http://semanticbible.org/ns/2006/NTNames#spouseOf> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#spouseOf> .
+<http://semanticbible.org/ns/2006/NTNames#spouseOf> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#spouseOf> <http://www.w3.org/2000/01/rdf-schema#comment> "Similar to http://purl.org/vocab/relationship vocabulary, but with different domain and range. Multiple spouses are all included, whether sequential (Herodias) or simultaneous (the woman at the well). "@en .
+<http://semanticbible.org/ns/2006/NTNames#EvilSupernaturalBeing> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#EvilSupernaturalBeing> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#SupernaturalBeing> .
+<http://semanticbible.org/ns/2006/NTNames#EvilSupernaturalBeing> <http://www.w3.org/2000/01/rdf-schema#label> "Evil Supernatural Being"@en .
+<http://semanticbible.org/ns/2006/NTNames#EvilSupernaturalBeing> <http://www.w3.org/2000/01/rdf-schema#comment> "Class of malevolent supernatural beings, whose instances include Satan and demons. "@en .
+<http://semanticbible.org/ns/2006/NTNames#EvilSupernaturalBeing> <http://www.w3.org/2002/07/owl#disjointWith> <http://semanticbible.org/ns/2006/NTNames#God> .
+<http://semanticbible.org/ns/2006/NTNames#PoliticalBeliefSystem> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#PoliticalBeliefSystem> <http://www.w3.org/2000/01/rdf-schema#label> "Political belief system"@en .
+<http://semanticbible.org/ns/2006/NTNames#PoliticalBeliefSystem> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#BeliefSystem> .
+<http://semanticbible.org/ns/2006/NTNames#FixedHoliday> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#FixedHoliday> <http://www.w3.org/2000/01/rdf-schema#comment> "Would be a subclass of http://reliant.teknowledge.com/DAML/SUMO.owl#TimeInterval, but is specified within MILO.\nMILO: &%FixedHoliday is the class of &%Holidays \nwhose observance is fixed to recurrences of the calendar day that the \nholiday commemorates."@en .
+<http://semanticbible.org/ns/2006/NTNames#FixedHoliday> <http://www.w3.org/2000/01/rdf-schema#label> "Fixed holiday"@en .
+<http://semanticbible.org/ns/2006/NTNames#GeographicLocation> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#GeographicLocation> <http://www.w3.org/2000/01/rdf-schema#label> "Geographic Location"@en .
+<http://semanticbible.org/ns/2006/NTNames#GeographicLocation> <http://www.w3.org/2000/01/rdf-schema#comment> "A collection of properties describing geographic location. "^^<http://www.w3.org/2001/XMLSchema#string> .
+<http://semanticbible.org/ns/2006/NTNames#PoliticalAttribute> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#PoliticalAttribute> <http://www.w3.org/2000/01/rdf-schema#label> "Political attribute"@en .
+<http://semanticbible.org/ns/2006/NTNames#PoliticalAttribute> <http://www.w3.org/2000/01/rdf-schema#comment> "The attribute of ascribing to a PoliticalBeliefSystem, or belonging to a political party or system."@en .
+<http://semanticbible.org/ns/2006/NTNames#PoliticalAttribute> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#HumanAttribute> .
+<http://semanticbible.org/ns/2006/NTNames#ReligiousOrganization> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#ReligiousOrganization> <http://www.w3.org/2000/01/rdf-schema#label> "Religious Organization"@en .
+<http://semanticbible.org/ns/2006/NTNames#ReligiousOrganization> <http://www.w3.org/2000/01/rdf-schema#comment> "Comparable to http://reliant.teknowledge.com/DAML/SUMO.owl#ReligiousOrganization\nSUO 1.55: July 14, 2003\nAn &%Organization whose members\nshare a set of religious beliefs."@en .
+<http://semanticbible.org/ns/2006/NTNames#ReligiousOrganization> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#Organization> .
+<http://semanticbible.org/ns/2006/NTNames#ReligiousOrganization> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#BeliefGroup> .
+<http://semanticbible.org/ns/2006/NTNames#BeliefGroup> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#BeliefGroup> <http://www.w3.org/2000/01/rdf-schema#comment> "Comparable to http://reliant.teknowledge.com/DAML/SUMO.owl#BeliefGroup\nSUO 1.55: July 14, 2003\nA &%Group whose &%members share a belief or\nset of beliefs.\nFor NTN, this covers groups defined by a particular set of beliefs (orthodox or heretical) which are informal, rather than formal, in membership and activity."@en .
+<http://semanticbible.org/ns/2006/NTNames#BeliefGroup> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#GroupOfPeople> .
+<http://semanticbible.org/ns/2006/NTNames#BeliefGroup> <http://www.w3.org/2000/01/rdf-schema#label> "Belief Group"@en .
+_:genid3 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Restriction> .
+_:genid3 <http://www.w3.org/2002/07/owl#onProperty> <http://semanticbible.org/ns/2006/NTNames#spouseOf> .
+_:genid3 <http://www.w3.org/2002/07/owl#allValuesFrom> <http://semanticbible.org/ns/2006/NTNames#Woman> .
+<http://semanticbible.org/ns/2006/NTNames#NaturalLanguage> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+<http://semanticbible.org/ns/2006/NTNames#NaturalLanguage> <http://www.w3.org/2000/01/rdf-schema#label> "Natural Language"@en .
+<http://semanticbible.org/ns/2006/NTNames#NaturalLanguage> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://semanticbible.org/ns/2006/NTNames#ContentBearingObject> .
+<http://semanticbible.org/ns/2006/NTNames#NaturalLanguage> <http://www.w3.org/2000/01/rdf-schema#comment> "Broadly the same as http://reliant.teknowledge.com/DAML/SUMO.owl#NaturalLanguage\nSUO 1.55: July 14, 2003\nThe &%subclass of &%HumanLanguages which\nare not designed and which evolve from generation to generation.  This\n&%Class includes all of the national languages, e.g. English, Spanish,\nJapanese, etc.  Note that this class includes dialects of natural\nlanguages."@en .
+<http://semanticbible.org/ns/2006/NTNames#enemyOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#enemyOf> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://semanticbible.org/ns/2006/NTNames#knows> .
+<http://semanticbible.org/ns/2006/NTNames#enemyOf> <http://www.w3.org/2000/01/rdf-schema#label> "enemy of"@en .
+<http://semanticbible.org/ns/2006/NTNames#enemyOf> <http://www.w3.org/2000/01/rdf-schema#comment> "\"A person towards whom this person feels hatred, intends injury to, or opposes the interests of\", similar to http://purl.org/vocab/relationship vocabulary, but with different domain and range. For clarity, <X, enemyOf, Y> means X feels hatred, etc. towards Y, and also (by inference) <Y, hasEnemy, X>. However, it does _not_ necessarily mean <Y, enemyOf, X>, i.e. it is not necessarily reciprocal."@en .
+<http://semanticbible.org/ns/2006/NTNames#enemyOf> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#hasEnemy> .
+<http://semanticbible.org/ns/2006/NTNames#knows> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#SymmetricProperty> .
+<http://semanticbible.org/ns/2006/NTNames#knows> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#knows> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#knows> <http://www.w3.org/2000/01/rdf-schema#label> "knows"@en .
+<http://semanticbible.org/ns/2006/NTNames#knows> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#knows> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#knows> .
+<http://semanticbible.org/ns/2006/NTNames#knows> <http://www.w3.org/2000/01/rdf-schema#comment> "\"A person known by this person (indicating some level of reciprocated interaction between the parties)\", similar to http://purl.org/vocab/relationship vocabulary, but with different domain and range. Therefore this is a symmetric relationship: if I know you, you also know me (or else we don't \"know\" each other in this sense). "@en .
+<http://semanticbible.org/ns/2006/NTNames#hasEnemy> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#hasEnemy> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://semanticbible.org/ns/2006/NTNames#knows> .
+<http://semanticbible.org/ns/2006/NTNames#hasEnemy> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#hasEnemy> <http://www.w3.org/2000/01/rdf-schema#comment> "inverse of enemyOf, which is not necessarily reciprocal"@en .
+<http://semanticbible.org/ns/2006/NTNames#hasEnemy> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#enemyOf> .
+<http://semanticbible.org/ns/2006/NTNames#hasEnemy> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#hasEnemy> <http://www.w3.org/2000/01/rdf-schema#label> "has enemy"@en .
+<http://semanticbible.org/ns/2006/NTNames#visitedPlace> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#visitedPlace> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#Region> .
+<http://semanticbible.org/ns/2006/NTNames#visitedPlace> <http://www.w3.org/2000/01/rdf-schema#comment> "Places that a human visited. For current purposes, only instances which are explicitly mentioned in Scripture are included, not those that might be inferred (e.g. if going from from A to B implies visiting C, C would not be listed). "@en .
+<http://semanticbible.org/ns/2006/NTNames#visitedPlace> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#visitedPlaceOf> .
+<http://semanticbible.org/ns/2006/NTNames#visitedPlace> <http://www.w3.org/2000/01/rdf-schema#domain> _:genid4 .
+<http://semanticbible.org/ns/2006/NTNames#visitedPlace> <http://www.w3.org/2000/01/rdf-schema#label> "visited place"@en .
+<http://semanticbible.org/ns/2006/NTNames#visitedPlaceOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#visitedPlaceOf> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#visitedPlace> .
+<http://semanticbible.org/ns/2006/NTNames#visitedPlaceOf> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#Region> .
+<http://semanticbible.org/ns/2006/NTNames#visitedPlaceOf> <http://www.w3.org/2000/01/rdf-schema#range> _:genid22 .
+_:genid4 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+_:genid4 <http://www.w3.org/2002/07/owl#unionOf> _:genid5 .
+_:genid5 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#Human> .
+_:genid5 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> _:genid6 .
+_:genid6 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#GroupOfPeople> .
+_:genid6 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+<http://semanticbible.org/ns/2006/NTNames#religiousBelief> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#religiousBelief> <http://www.w3.org/2000/01/rdf-schema#domain> _:genid7 .
+<http://semanticbible.org/ns/2006/NTNames#religiousBelief> <http://www.w3.org/2000/01/rdf-schema#comment> "Having a ReligiousBelief as an attribute"@en .
+<http://semanticbible.org/ns/2006/NTNames#religiousBelief> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#ReligiousBeliefSystem> .
+<http://semanticbible.org/ns/2006/NTNames#religiousBelief> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#religiousBeliefOf> .
+<http://semanticbible.org/ns/2006/NTNames#religiousBelief> <http://www.w3.org/2000/01/rdf-schema#label> "religious belief"@en .
+_:genid7 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+_:genid7 <http://www.w3.org/2002/07/owl#unionOf> _:genid8 .
+_:genid8 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#Human> .
+_:genid8 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> _:genid9 .
+_:genid9 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#GroupOfPeople> .
+_:genid9 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+<http://semanticbible.org/ns/2006/NTNames#religiousBeliefOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#religiousBeliefOf> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#ReligiousBeliefSystem> .
+<http://semanticbible.org/ns/2006/NTNames#religiousBeliefOf> <http://www.w3.org/2000/01/rdf-schema#range> _:genid16 .
+<http://semanticbible.org/ns/2006/NTNames#religiousBeliefOf> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#religiousBelief> .
+<http://semanticbible.org/ns/2006/NTNames#religiousBeliefOf> <http://www.w3.org/2000/01/rdf-schema#label> "religious belief of"@en .
+<http://semanticbible.org/ns/2006/NTNames#parentOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#parentOf> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#parentOf> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#parentOf> <http://www.w3.org/2000/01/rdf-schema#comment> "Similar to http://purl.org/vocab/relationship vocabulary, but with different domain and range."@en .
+<http://semanticbible.org/ns/2006/NTNames#parentOf> <http://www.w3.org/2000/01/rdf-schema#label> "parent of"@en .
+<http://semanticbible.org/ns/2006/NTNames#parentOf> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#childOf> .
+<http://semanticbible.org/ns/2006/NTNames#parentOf> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://semanticbible.org/ns/2006/NTNames#relativeOf> .
+<http://semanticbible.org/ns/2006/NTNames#childOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#childOf> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#parentOf> .
+<http://semanticbible.org/ns/2006/NTNames#childOf> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#childOf> <http://www.w3.org/2000/01/rdf-schema#comment> "Similar to http://purl.org/vocab/relationship vocabulary, but with different domain and range. In-laws are considered relatives. "@en .
+<http://semanticbible.org/ns/2006/NTNames#childOf> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#childOf> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://semanticbible.org/ns/2006/NTNames#relativeOf> .
+<http://semanticbible.org/ns/2006/NTNames#childOf> <http://www.w3.org/2000/01/rdf-schema#label> "child of"@en .
+<http://semanticbible.org/ns/2006/NTNames#relativeOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#SymmetricProperty> .
+<http://semanticbible.org/ns/2006/NTNames#relativeOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#relativeOf> <http://www.w3.org/2000/01/rdf-schema#comment> "A person who is related by kinship to this person. No attempt is made to delineate precisely which kinship relations qualify: this is used when a description indicates two people are \"related\". parent/child/siblingOf are subproperties of this, properly speaking. "@en .
+<http://semanticbible.org/ns/2006/NTNames#relativeOf> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#relativeOf> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#relativeOf> <http://www.w3.org/2000/01/rdf-schema#label> "relative of"@en .
+<http://semanticbible.org/ns/2006/NTNames#relativeOf> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#relativeOf> .
+<http://semanticbible.org/ns/2006/NTNames#ethnicity> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#ethnicity> <http://www.w3.org/2000/01/rdf-schema#comment> "The ethnicity or, more generally, cultural heritage of a person. This can overlap with both religiousBelief (which may, however, change over time) and nativePlace (which, like ethnicity, does not change, though residency might). Whether a given property represents ethnicity or citizenship (nativePlace) can be a difficult decision, but in general, ethnic identities like \"Jewish\" or \"Greek\" take precedence. For example, we consider the Apostle Paul to have Jewish ethnicity, though he was a citizen of Tarsus, because he was raised as a Jew. Ethnicity is not specified without specific evidence, either textual or reliable tradition: for example, having a Greek name is not sufficient. "@en .
+<http://semanticbible.org/ns/2006/NTNames#ethnicity> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#ethnicityOf> .
+<http://semanticbible.org/ns/2006/NTNames#ethnicity> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#EthnicityAttribute> .
+<http://semanticbible.org/ns/2006/NTNames#ethnicity> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#ethnicity> <http://www.w3.org/2000/01/rdf-schema#label> "ethnicity"@en .
+<http://semanticbible.org/ns/2006/NTNames#ethnicityOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#ethnicityOf> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#ethnicity> .
+<http://semanticbible.org/ns/2006/NTNames#ethnicityOf> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#ethnicityOf> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#EthnicityAttribute> .
+<http://semanticbible.org/ns/2006/NTNames#ethnicityOf> <http://www.w3.org/2000/01/rdf-schema#label> "ethnicity of"@en .
+<http://semanticbible.org/ns/2006/NTNames#member> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#member> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#member> <http://www.w3.org/2000/01/rdf-schema#label> "member"@en .
+<http://semanticbible.org/ns/2006/NTNames#member> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#Group> .
+<http://semanticbible.org/ns/2006/NTNames#member> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#memberOf> .
+<http://semanticbible.org/ns/2006/NTNames#member> <http://www.w3.org/2000/01/rdf-schema#comment> "Group has member Human. Inverse of memberOf. No provision for membership changes over time."@en .
+<http://semanticbible.org/ns/2006/NTNames#memberOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#memberOf> <http://www.w3.org/2000/01/rdf-schema#comment> "Human is a memberOf a Group. Inverse of member. There are subtleties about Collections in SUMO that i'm omiting here."@en .
+<http://semanticbible.org/ns/2006/NTNames#memberOf> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#member> .
+<http://semanticbible.org/ns/2006/NTNames#memberOf> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#Group> .
+<http://semanticbible.org/ns/2006/NTNames#memberOf> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#memberOf> <http://www.w3.org/2000/01/rdf-schema#label> "member of"@en .
+<http://semanticbible.org/ns/2006/NTNames#residentPlace> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#residentPlace> <http://www.w3.org/2000/01/rdf-schema#domain> _:genid10 .
+<http://semanticbible.org/ns/2006/NTNames#residentPlace> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#residentPlaceOf> .
+<http://semanticbible.org/ns/2006/NTNames#residentPlace> <http://www.w3.org/2000/01/rdf-schema#comment> "The location a person or group of people resides in. Range values may change over time: no attempt is made to capture this. Transient residence of very short duration is assumed to be visited, not resident. People addressed in a letter bound for a specific destination (e.g. the epistle of Paul to the Romans) are assumed to be resident there unless there is indication to the contrary (since the timing of a letter's arrival could not be determined with high precision). "@en .
+<http://semanticbible.org/ns/2006/NTNames#residentPlace> <http://www.w3.org/2000/01/rdf-schema#label> "resident place"@en .
+<http://semanticbible.org/ns/2006/NTNames#residentPlace> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#Region> .
+<http://semanticbible.org/ns/2006/NTNames#residentPlace> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://semanticbible.org/ns/2006/NTNames#visitedPlace> .
+_:genid10 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+_:genid10 <http://www.w3.org/2002/07/owl#unionOf> _:genid11 .
+_:genid11 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#Human> .
+_:genid11 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> _:genid12 .
+_:genid12 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#GroupOfPeople> .
+_:genid12 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+<http://semanticbible.org/ns/2006/NTNames#residentPlaceOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#residentPlaceOf> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://semanticbible.org/ns/2006/NTNames#visitedPlaceOf> .
+<http://semanticbible.org/ns/2006/NTNames#residentPlaceOf> <http://www.w3.org/2000/01/rdf-schema#range> _:genid19 .
+<http://semanticbible.org/ns/2006/NTNames#residentPlaceOf> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#residentPlace> .
+<http://semanticbible.org/ns/2006/NTNames#residentPlaceOf> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#Region> .
+<http://semanticbible.org/ns/2006/NTNames#antagonistOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#antagonistOf> <http://www.w3.org/2000/01/rdf-schema#comment> "\"A person who opposes and contends against this person\", similar to http://purl.org/vocab/relationship vocabulary, but with different domain and range. For clarity, <X antagonistOf Y> means X opposes, etc. Y, and also (by inference) <Y hasAntagonist X>. However, it does _not_ necessarily mean <Y antagonistOf X>, i.e. it is not necessarily reciprocal."@en .
+<http://semanticbible.org/ns/2006/NTNames#antagonistOf> <http://www.w3.org/2000/01/rdf-schema#label> "antagonist of"@en .
+<http://semanticbible.org/ns/2006/NTNames#antagonistOf> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#hasAntagonist> .
+<http://semanticbible.org/ns/2006/NTNames#antagonistOf> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://semanticbible.org/ns/2006/NTNames#knows> .
+<http://semanticbible.org/ns/2006/NTNames#hasAntagonist> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#hasAntagonist> <http://www.w3.org/2000/01/rdf-schema#comment> "inverse of antagonistOf, which is not necessarily reciprocal"@en .
+<http://semanticbible.org/ns/2006/NTNames#hasAntagonist> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#hasAntagonist> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://semanticbible.org/ns/2006/NTNames#knows> .
+<http://semanticbible.org/ns/2006/NTNames#hasAntagonist> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#antagonistOf> .
+<http://semanticbible.org/ns/2006/NTNames#hasAntagonist> <http://www.w3.org/2000/01/rdf-schema#label> "has antagonist"@en .
+<http://semanticbible.org/ns/2006/NTNames#politicalBelief> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#politicalBelief> <http://www.w3.org/2000/01/rdf-schema#comment> "Holding to a PoliticalBelief"@en .
+<http://semanticbible.org/ns/2006/NTNames#politicalBelief> <http://www.w3.org/2000/01/rdf-schema#label> "political belief"@en .
+<http://semanticbible.org/ns/2006/NTNames#politicalBelief> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#PoliticalBeliefSystem> .
+<http://semanticbible.org/ns/2006/NTNames#politicalBelief> <http://www.w3.org/2000/01/rdf-schema#domain> _:genid13 .
+_:genid13 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+_:genid13 <http://www.w3.org/2002/07/owl#unionOf> _:genid14 .
+_:genid14 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#Human> .
+_:genid14 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> _:genid15 .
+_:genid15 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#GroupOfPeople> .
+_:genid15 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+_:genid16 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+_:genid16 <http://www.w3.org/2002/07/owl#unionOf> _:genid17 .
+_:genid17 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#Human> .
+_:genid17 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> _:genid18 .
+_:genid18 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#GroupOfPeople> .
+_:genid18 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+_:genid19 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+_:genid19 <http://www.w3.org/2002/07/owl#unionOf> _:genid20 .
+_:genid20 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#Human> .
+_:genid20 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> _:genid21 .
+_:genid21 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#GroupOfPeople> .
+_:genid21 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+_:genid22 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+_:genid22 <http://www.w3.org/2002/07/owl#unionOf> _:genid23 .
+_:genid23 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#Human> .
+_:genid23 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> _:genid24 .
+_:genid24 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#GroupOfPeople> .
+_:genid24 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+<http://semanticbible.org/ns/2006/NTNames#name_grc> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://semanticbible.org/ns/2006/NTNames#name_grc> <http://www.w3.org/2000/01/rdf-schema#domain> _:genid25 .
+<http://semanticbible.org/ns/2006/NTNames#name_grc> <http://www.w3.org/2000/01/rdf-schema#label> "Greek name"@en .
+<http://semanticbible.org/ns/2006/NTNames#name_grc> <http://www.w3.org/2000/01/rdf-schema#comment> "The human language name of an Object in Koine (not Modern) Greek, in the standard dictionary form (nominative case). \n Since Protege (3.0 build 141) doesn't seem to support loading and saving xml:lang attributes on properties, different subproperties are used for representing names in different languages. \"grc\" is the three-letter ISO-639-2 standard designator for Koine Greek."@en .
+<http://semanticbible.org/ns/2006/NTNames#name_grc> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> .
+_:genid25 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+_:genid25 <http://www.w3.org/2002/07/owl#unionOf> _:genid26 .
+_:genid26 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#Object> .
+_:genid26 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> _:genid27 .
+_:genid27 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#BeliefSystem> .
+_:genid27 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> _:genid28 .
+_:genid28 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#FixedHoliday> .
+_:genid28 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> _:genid29 .
+_:genid29 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#HumanAttribute> .
+_:genid29 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+<http://semanticbible.org/ns/2006/NTNames#name_en> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://semanticbible.org/ns/2006/NTNames#name_en> <http://www.w3.org/2000/01/rdf-schema#label> "English name"@en .
+<http://semanticbible.org/ns/2006/NTNames#name_en> <http://www.w3.org/2000/01/rdf-schema#domain> _:genid30 .
+<http://semanticbible.org/ns/2006/NTNames#name_en> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> .
+<http://semanticbible.org/ns/2006/NTNames#name_en> <http://www.w3.org/2000/01/rdf-schema#comment> "The human language name of an Object in English. \nSince Protege (3.0 build 141) doesn't seem to support loading and saving xml:lang attributes on properties, different subproperties are used for representing names in different languages."@en .
+_:genid30 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+_:genid30 <http://www.w3.org/2002/07/owl#unionOf> _:genid31 .
+_:genid31 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#Object> .
+_:genid31 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> _:genid32 .
+_:genid32 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#BeliefSystem> .
+_:genid32 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> _:genid33 .
+_:genid33 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#FixedHoliday> .
+_:genid33 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> _:genid34 .
+_:genid34 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#HumanAttribute> .
+_:genid34 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+<http://semanticbible.org/ns/2006/NTNames#altitude> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://semanticbible.org/ns/2006/NTNames#altitude> <http://www.w3.org/2000/01/rdf-schema#label> "altitude"@en .
+<http://semanticbible.org/ns/2006/NTNames#altitude> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#GeographicLocation> .
+<http://semanticbible.org/ns/2006/NTNames#altitude> <http://www.w3.org/2000/01/rdf-schema#comment> "The altitude component of a GeographicLocation"@en .
+<http://semanticbible.org/ns/2006/NTNames#altitude> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#int> .
+<http://semanticbible.org/ns/2006/NTNames#latitude> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://semanticbible.org/ns/2006/NTNames#latitude> <http://www.w3.org/2000/01/rdf-schema#comment> "The latitude component of a GeographicLocation"@en .
+<http://semanticbible.org/ns/2006/NTNames#latitude> <http://www.w3.org/2000/01/rdf-schema#label> "latitude"@en .
+<http://semanticbible.org/ns/2006/NTNames#latitude> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#double> .
+<http://semanticbible.org/ns/2006/NTNames#latitude> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#GeographicLocation> .
+<http://semanticbible.org/ns/2006/NTNames#description> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://semanticbible.org/ns/2006/NTNames#description> <http://www.w3.org/2000/01/rdf-schema#comment> "A brief description of the salient aspects of a Human, based on their being mentioned in Scripture. This is not the way to enter dictionary-style definitions."@en .
+<http://semanticbible.org/ns/2006/NTNames#description> <http://www.w3.org/2000/01/rdf-schema#label> "description"@en .
+<http://semanticbible.org/ns/2006/NTNames#description> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#description> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> .
+<http://semanticbible.org/ns/2006/NTNames#occupation> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://semanticbible.org/ns/2006/NTNames#occupation> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> .
+<http://semanticbible.org/ns/2006/NTNames#occupation> <http://www.w3.org/2000/01/rdf-schema#label> "occupation"@en .
+<http://semanticbible.org/ns/2006/NTNames#occupation> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#longitude> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://semanticbible.org/ns/2006/NTNames#longitude> <http://www.w3.org/2000/01/rdf-schema#label> "longitude"@en .
+<http://semanticbible.org/ns/2006/NTNames#longitude> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#double> .
+<http://semanticbible.org/ns/2006/NTNames#longitude> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#GeographicLocation> .
+<http://semanticbible.org/ns/2006/NTNames#longitude> <http://www.w3.org/2000/01/rdf-schema#comment> "The longiitude component of a GeographicLocation"@en .
+<http://semanticbible.org/ns/2006/NTNames#siblingOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#TransitiveProperty> .
+<http://semanticbible.org/ns/2006/NTNames#siblingOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#SymmetricProperty> .
+<http://semanticbible.org/ns/2006/NTNames#siblingOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#siblingOf> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#siblingOf> <http://www.w3.org/2000/01/rdf-schema#label> "sibling of"@en .
+<http://semanticbible.org/ns/2006/NTNames#siblingOf> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#siblingOf> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://semanticbible.org/ns/2006/NTNames#relativeOf> .
+<http://semanticbible.org/ns/2006/NTNames#siblingOf> <http://www.w3.org/2000/01/rdf-schema#comment> "Similar to http://purl.org/vocab/relationship vocabulary, but with different domain and range."@en .
+<http://semanticbible.org/ns/2006/NTNames#siblingOf> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#siblingOf> .
+<http://semanticbible.org/ns/2006/NTNames#subregion> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#TransitiveProperty> .
+<http://semanticbible.org/ns/2006/NTNames#subregion> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#subregion> <http://www.w3.org/2000/01/rdf-schema#label> "subregion"@en .
+<http://semanticbible.org/ns/2006/NTNames#subregion> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#GeographicArea> .
+<http://semanticbible.org/ns/2006/NTNames#subregion> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#subregionOf> .
+<http://semanticbible.org/ns/2006/NTNames#subregion> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#GeographicArea> .
+<http://semanticbible.org/ns/2006/NTNames#subregion> <http://www.w3.org/2000/01/rdf-schema#comment> "Inverse of subregionOf"@en .
+<http://semanticbible.org/ns/2006/NTNames#subregionOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#TransitiveProperty> .
+<http://semanticbible.org/ns/2006/NTNames#subregionOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#subregionOf> <http://www.w3.org/2000/01/rdf-schema#label> "subregion of"@en .
+<http://semanticbible.org/ns/2006/NTNames#subregionOf> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#GeographicArea> .
+<http://semanticbible.org/ns/2006/NTNames#subregionOf> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#subregion> .
+<http://semanticbible.org/ns/2006/NTNames#subregionOf> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#GeographicArea> .
+<http://semanticbible.org/ns/2006/NTNames#subregionOf> <http://www.w3.org/2000/01/rdf-schema#comment> "A smaller GeographicArea is a subregionOf a larger one (e.g. Jerusalem is a subregionOf Israel)."@en .
+<http://semanticbible.org/ns/2006/NTNames#collaboratesWith> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#SymmetricProperty> .
+<http://semanticbible.org/ns/2006/NTNames#collaboratesWith> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#collaboratesWith> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#collaboratesWith> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#collaboratesWith> .
+<http://semanticbible.org/ns/2006/NTNames#collaboratesWith> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://semanticbible.org/ns/2006/NTNames#knows> .
+<http://semanticbible.org/ns/2006/NTNames#collaboratesWith> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#collaboratesWith> <http://www.w3.org/2000/01/rdf-schema#comment> "\"A person who works toward a common goal with this person\", similar to http://purl.org/vocab/relationship vocabulary, but with different domain and range. Those to whom the author of a New Testament Epistle send greetings are assumed to be collaborators, though this is perhaps broader than the general sense of the word. However, simple Christian fellowship or conversion do not constitute collaboration in this sense. "@en .
+<http://semanticbible.org/ns/2006/NTNames#collaboratesWith> <http://www.w3.org/2000/01/rdf-schema#label> "collaborates with"@en .
+<http://semanticbible.org/ns/2006/NTNames#possiblySamePersonAs> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#SymmetricProperty> .
+<http://semanticbible.org/ns/2006/NTNames#possiblySamePersonAs> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#possiblySamePersonAs> <http://www.w3.org/2000/01/rdf-schema#comment> "This person may be the same as the other person, though there isn't enough evidence to definitively say so. Typically the individuals will have the same name, and some overlap of circumstances that makes it possible. "@en .
+<http://semanticbible.org/ns/2006/NTNames#possiblySamePersonAs> <http://www.w3.org/2000/01/rdf-schema#label> "possibly same person as"@en .
+<http://semanticbible.org/ns/2006/NTNames#possiblySamePersonAs> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#possiblySamePersonAs> .
+<http://semanticbible.org/ns/2006/NTNames#possiblySamePersonAs> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#possiblySamePersonAs> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#LNID> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#FunctionalProperty> .
+<http://semanticbible.org/ns/2006/NTNames#LNID> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://semanticbible.org/ns/2006/NTNames#LNID> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#string> .
+<http://semanticbible.org/ns/2006/NTNames#LNID> <http://www.w3.org/2000/01/rdf-schema#label> "Louw-Nida identifier"@en .
+<http://semanticbible.org/ns/2006/NTNames#LNID> <http://www.w3.org/2000/01/rdf-schema#comment> "Louw-Nida identifier, keying specific Greek terms (and their English translations) to their taxonomy of semantic domains. A string like \"33.X'.439\" identifies the term sumballo, which can be translated as \"to express differences of opinion in a forceful way\". In their scheme, this has domain index 33 (Communication), with sub-domain index X' (Dispute, Debate). The final integer index uniquely defines this term (but the same term may have multiple senses). The sub-domain index can be determined from the term index, but it seems helpful to include both. Note the possible values of the sub-domain index are A-Z, then A'-Z', etc."@en .
+<http://semanticbible.org/ns/2006/NTNames#nativePlace> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#FunctionalProperty> .
+<http://semanticbible.org/ns/2006/NTNames#nativePlace> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#nativePlace> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#Region> .
+<http://semanticbible.org/ns/2006/NTNames#nativePlace> <http://www.w3.org/2000/01/rdf-schema#domain> _:genid35 .
+<http://semanticbible.org/ns/2006/NTNames#nativePlace> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#nativePlaceOf> .
+<http://semanticbible.org/ns/2006/NTNames#nativePlace> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://semanticbible.org/ns/2006/NTNames#visitedPlace> .
+<http://semanticbible.org/ns/2006/NTNames#nativePlace> <http://www.w3.org/2000/01/rdf-schema#comment> "Birthplace, or place in which a person grows up. Unlike residentOf, only one possible value. residentPlace is to be preferred unless the birthplace relationship is clearly identified."@en .
+<http://semanticbible.org/ns/2006/NTNames#nativePlace> <http://www.w3.org/2000/01/rdf-schema#label> "native place"@en .
+_:genid35 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+_:genid35 <http://www.w3.org/2002/07/owl#unionOf> _:genid36 .
+_:genid36 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#Human> .
+_:genid36 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> _:genid37 .
+_:genid37 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#GroupOfPeople> .
+_:genid37 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+<http://semanticbible.org/ns/2006/NTNames#hasOnlyGenealogyMention> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#FunctionalProperty> .
+<http://semanticbible.org/ns/2006/NTNames#hasOnlyGenealogyMention> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#DatatypeProperty> .
+<http://semanticbible.org/ns/2006/NTNames#hasOnlyGenealogyMention> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#Human> .
+<http://semanticbible.org/ns/2006/NTNames#hasOnlyGenealogyMention> <http://www.w3.org/2000/01/rdf-schema#comment> "The only mention of this person in the New Testament text is the genealogies of Jesus recorded in Matthew 1 and/or Luke 3. Since only limited information (their ancestry) is available about this special subset of names, this property exists to support filtering them out (or in). "@en .
+<http://semanticbible.org/ns/2006/NTNames#hasOnlyGenealogyMention> <http://www.w3.org/2000/01/rdf-schema#label> "has only genealogy mention"@en .
+<http://semanticbible.org/ns/2006/NTNames#hasOnlyGenealogyMention> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2001/XMLSchema#boolean> .
+_:genid38 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Class> .
+_:genid38 <http://www.w3.org/2002/07/owl#unionOf> _:genid39 .
+_:genid39 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#Human> .
+_:genid39 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> _:genid40 .
+_:genid40 <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://semanticbible.org/ns/2006/NTNames#GroupOfPeople> .
+_:genid40 <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+<http://semanticbible.org/ns/2006/NTNames#locationOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#InverseFunctionalProperty> .
+<http://semanticbible.org/ns/2006/NTNames#locationOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#locationOf> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#GeographicLocation> .
+<http://semanticbible.org/ns/2006/NTNames#locationOf> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#location> .
+<http://semanticbible.org/ns/2006/NTNames#locationOf> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#GeographicArea> .
+<http://semanticbible.org/ns/2006/NTNames#location> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#InverseFunctionalProperty> .
+<http://semanticbible.org/ns/2006/NTNames#location> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#FunctionalProperty> .
+<http://semanticbible.org/ns/2006/NTNames#location> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#ObjectProperty> .
+<http://semanticbible.org/ns/2006/NTNames#location> <http://www.w3.org/2000/01/rdf-schema#comment> "The location property relates a GeographicArea to a GeographicLocation. Each GeographicArea is assumed to have only one location, and no GeographicAreas share a location. "@en .
+<http://semanticbible.org/ns/2006/NTNames#location> <http://www.w3.org/2002/07/owl#inverseOf> <http://semanticbible.org/ns/2006/NTNames#locationOf> .
+<http://semanticbible.org/ns/2006/NTNames#location> <http://www.w3.org/2000/01/rdf-schema#domain> <http://semanticbible.org/ns/2006/NTNames#GeographicArea> .
+<http://semanticbible.org/ns/2006/NTNames#location> <http://www.w3.org/2000/01/rdf-schema#label> "location"@en .
+<http://semanticbible.org/ns/2006/NTNames#location> <http://www.w3.org/2000/01/rdf-schema#range> <http://semanticbible.org/ns/2006/NTNames#GeographicLocation> .

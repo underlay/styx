@@ -69,13 +69,21 @@ func (db *DB) IngestJSONLd(doc interface{}, loader ld.DocumentLoader, store Docu
 	return db.IngestDataset(cid, rdf.(*ld.RDFDataset))
 }
 
-func (db *DB) IngestDataset(cid cid.Cid, dataset *ld.RDFDataset) (err error) {
-	for graph, quads := range dataset.Graphs {
-		if err = db.IngestGraph(cid, graph, quads); err != nil {
-			return
+// IngestDataset inserts every graph into the database (DON'T USE THIS IF YOU EXPECT QUERIES)
+func (db *DB) IngestDataset(cid cid.Cid, dataset *ld.RDFDataset) error {
+	err := db.Badger.Update(func(txn *badger.Txn) (err error) {
+		for graph, quads := range dataset.Graphs {
+			if graph == "@default" {
+				graph = ""
+			}
+
+			if err = insert(cid, graph, quads, txn); err != nil {
+				return
+			}
 		}
-	}
-	return
+		return
+	})
+	return err
 }
 
 // IngestGraph inserts a graph into the database
@@ -84,30 +92,25 @@ func (db *DB) IngestGraph(cid cid.Cid, graph string, quads []*ld.Quad) error {
 		graph = ""
 	}
 
-	return db.Badger.Update(func(txn *badger.Txn) error {
+	return db.Badger.Update(func(txn *badger.Txn) (err error) {
 		return insert(cid, graph, quads, txn)
 	})
 }
 
 // Query the database
 func (db *DB) Query(quads []*ld.Quad, result chan []*ld.Quad) error {
-	fmt.Println("querying!")
 	defer func() { result <- nil }()
-	err := db.Badger.View(func(txn *badger.Txn) (err error) {
-		fmt.Println("got query view")
+	return db.Badger.View(func(txn *badger.Txn) (err error) {
 		var g *query.ConstraintGraph
 		if g, err = query.MakeConstraintGraph(quads, txn); err != nil {
 			return
 		}
 
-		fmt.Println("got constraing graph")
 		fmt.Println(g)
 
 		if err = g.Solve(txn); err != nil {
 			return
 		}
-
-		fmt.Println("solved query")
 
 		values := map[uint64]*types.Value{}
 		for _, quad := range quads {
@@ -127,12 +130,9 @@ func (db *DB) Query(quads []*ld.Quad, result chan []*ld.Quad) error {
 			}
 		}
 
-		fmt.Println("sending results!")
 		result <- quads
 		return nil
 	})
-	fmt.Println("returning from outer function thing")
-	return err
 }
 
 func setValues(node ld.Node, g *query.ConstraintGraph, values map[uint64]*types.Value, txn *badger.Txn) (ld.Node, error) {

@@ -1,14 +1,11 @@
 package query
 
 import (
-	"fmt"
-
 	badger "github.com/dgraph-io/badger"
 )
 
 // Solve solves the graph
 func (g *ConstraintGraph) Solve(txn *badger.Txn) (err error) {
-	fmt.Println("solving query")
 	for i := 0; i < len(g.Slice); i++ {
 		if err = g.Tick(i, txn); err != nil {
 			return

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"testing"
 
@@ -184,24 +185,22 @@ func TestNTIngest(t *testing.T) {
 
 	defer db.Close()
 
-	file, err := os.Open("/Users/joel/Desktop/NTNames.json")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	var data map[string]interface{}
-
-	d := json.NewDecoder(file)
-	if err = d.Decode(&data); err != nil {
-		t.Error(err)
-		return
-	}
-
 	dl := loader.NewShellDocumentLoader(sh)
 	store := styx.MakeShellDocumentStore(sh)
 
-	if err = db.IngestJSONLd(data, dl, store); err != nil {
+	names, err := openFile("/samples/nt/names.json", dl, store, db)
+	if err = db.IngestJSONLd(names, dl, store); err != nil {
+		t.Error(err)
+		return
+	}
+
+	// individuals, err := openFile("/samples/nt/individuals.json", dl, store, db)
+	// if err = db.IngestJSONLd(individuals, dl, store); err != nil {
+	// 	t.Error(err)
+	// 	return
+	// }
+
+	if err = db.Log(); err != nil {
 		t.Error(err)
 	}
 }
@@ -210,11 +209,7 @@ func TestQuery(t *testing.T) {
 	if !sh.IsUp() {
 		t.Error("IPFS Daemon not running")
 		return
-	}
-
-	// Remove old db
-	fmt.Println("removing path", path)
-	if err := os.RemoveAll(path); err != nil {
+	} else if err := os.RemoveAll(path); err != nil {
 		t.Error(err)
 		return
 	}
@@ -283,4 +278,19 @@ func TestQuery(t *testing.T) {
 			quad.Object.GetValue(),
 		)
 	}
+}
+
+func openFile(path string, dl ld.DocumentLoader, store styx.DocumentStore, db *styx.DB) (doc map[string]interface{}, err error) {
+	var dir string
+	if dir, err = os.Getwd(); err != nil {
+		return
+	}
+
+	var data []byte
+	if data, err = ioutil.ReadFile(dir + path); err != nil {
+		return
+	}
+
+	err = json.Unmarshal(data, &doc)
+	return
 }

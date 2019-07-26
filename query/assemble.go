@@ -3,7 +3,6 @@ package query
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"sort"
 
 	badger "github.com/dgraph-io/badger"
@@ -14,7 +13,6 @@ import (
 
 // MakeConstraintGraph populates, scores, sorts, and connects a new constraint graph
 func MakeConstraintGraph(quads []*ld.Quad, txn *badger.Txn) (g *ConstraintGraph, err error) {
-	fmt.Println("making constraint graph")
 	indices := types.IndexMap{}
 	values := map[uint64]*types.Index{}
 
@@ -145,8 +143,6 @@ func MakeConstraintGraph(quads []*ld.Quad, txn *badger.Txn) (g *ConstraintGraph,
 			}
 		}
 	}
-
-	fmt.Println("good stuff")
 
 	// Populate the value map of uint64 IDs to index structs
 	for _, index := range indices {
