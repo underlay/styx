@@ -223,20 +223,13 @@ func TestQuery(t *testing.T) {
 		)
 	}
 
-	r := make(chan []*ld.Quad)
-	go db.Query(quads, r)
-
-	result := <-r
-
-	fmt.Println("Result:")
-	for _, quad := range result {
-		fmt.Printf(
-			"  %s %s %s\n",
-			quad.Subject.GetValue(),
-			quad.Predicate.GetValue(),
-			quad.Object.GetValue(),
-		)
+	result, err := db.Query(quads)
+	if err != nil {
+		t.Error(err)
+		return
 	}
+	fmt.Println("Result:")
+	fmt.Println(result)
 }
 
 func TestNT(t *testing.T) {
@@ -285,12 +278,7 @@ func TestNT(t *testing.T) {
 		return
 	}
 
-	// if err = db.Log(); err != nil {
-	// 	t.Error(err)
-	// 	return
-	// }
-
-	query, err := openFile("/samples/nt/query.json", dl, store)
+	query, err := openFile("/samples/nt/small.json", dl, store)
 	if err != nil {
 		t.Error(err)
 		return
@@ -316,19 +304,13 @@ func TestNT(t *testing.T) {
 		)
 	}
 
-	r := make(chan []*ld.Quad)
-	go db.Query(quads, r)
-
-	result := <-r
-
-	fmt.Println("Result:")
-	for _, quad := range result {
-		s := quad.Subject.GetValue()
-		p := quad.Predicate.GetValue()
-		o := quad.Object.GetValue()
-		fmt.Printf("  %s %s %s\n", s, p, o)
+	result, err := db.Query(quads)
+	if err != nil {
+		t.Error(err)
+		return
 	}
-
+	fmt.Println("Result:")
+	fmt.Println(result)
 	// if err = db.Log(); err != nil {
 	// 	t.Error(err)
 	// }

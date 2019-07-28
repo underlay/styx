@@ -67,15 +67,15 @@ func insert(cid cid.Cid, graph string, quads []*ld.Quad, txn *badger.Txn) (err e
 	}
 
 	var root uint64
-	value := make([]byte, 8)
+	val := make([]byte, 8)
 	if item, err = txn.Get(types.CounterKey); err == badger.ErrKeyNotFound {
 		root = types.InitialCounter
 	} else if err != nil {
 		return
-	} else if value, err = item.ValueCopy(value); err != nil {
+	} else if val, err = item.ValueCopy(val); err != nil {
 		return
 	} else {
-		root = binary.BigEndian.Uint64(value)
+		root = binary.BigEndian.Uint64(val)
 	}
 
 	values := types.ValueMap{}
@@ -131,26 +131,26 @@ func insert(cid cid.Cid, graph string, quads []*ld.Quad, txn *badger.Txn) (err e
 			a, b, c := permuteMajor(i, s, p, o)
 			key := types.AssembleKey(types.TriplePrefixes[i], a, b, c)
 			sources := &types.SourceList{}
-			var value []byte
+			var val []byte
 			if item, err = txn.Get(key); err == badger.ErrKeyNotFound {
 				// Create a new SourceList container with the source
 				sources.Sources = []*types.Source{source}
-				if value, err = proto.Marshal(sources); err != nil {
+				if val, err = proto.Marshal(sources); err != nil {
 					return
-				} else if err = txn.Set(key, value); err != nil {
+				} else if err = txn.Set(key, val); err != nil {
 					return
 				}
 			} else if err != nil {
 				return
-			} else if value, err = item.ValueCopy(nil); err != nil {
+			} else if val, err = item.ValueCopy(nil); err != nil {
 				return
-			} else if err = proto.Unmarshal(value, sources); err != nil {
+			} else if err = proto.Unmarshal(val, sources); err != nil {
 				return
 			} else {
 				sources.Sources = append(sources.GetSources(), source)
-				if value, err = proto.Marshal(sources); err != nil {
+				if val, err = proto.Marshal(sources); err != nil {
 					return
-				} else if err = txn.Set(key, value); err != nil {
+				} else if err = txn.Set(key, val); err != nil {
 					return
 				}
 			}
@@ -166,8 +166,8 @@ func insert(cid cid.Cid, graph string, quads []*ld.Quad, txn *badger.Txn) (err e
 	// Counter was incremented iff values is not empty
 	if len(values) > 0 {
 		next := root + uint64(len(values))
-		binary.BigEndian.PutUint64(value, next)
-		err = txn.Set(types.CounterKey, value)
+		binary.BigEndian.PutUint64(val, next)
+		err = txn.Set(types.CounterKey, val)
 	}
 
 	return
@@ -207,9 +207,9 @@ func getID(
 	} else {
 		// Unmarshal the value into an Index struct
 		index = &types.Index{}
-		if value, err := item.ValueCopy(nil); err != nil {
+		if val, err := item.ValueCopy(nil); err != nil {
 			return nil, err
-		} else if err := proto.Unmarshal(value, index); err != nil {
+		} else if err := proto.Unmarshal(val, index); err != nil {
 			return nil, err
 		}
 	}
@@ -244,20 +244,20 @@ func setCounts(s, p, o []byte, txn *badger.Txn) (major [3]uint64, minor [3]uint6
 // setCount handles both major and minor keys, writing the initial counter
 // for nonexistent keys and incrementing existing ones
 func setCount(key []byte, txn *badger.Txn) (count uint64, err error) {
-	value := make([]byte, 8)
+	val := make([]byte, 8)
 
 	item, err := txn.Get(key)
 	if err == badger.ErrKeyNotFound {
 		count = types.InitialCounter
 	} else if err != nil {
 		return
-	} else if value, err = item.ValueCopy(value); err != nil {
+	} else if val, err = item.ValueCopy(val); err != nil {
 		return
 	} else {
-		count = binary.BigEndian.Uint64(value) + 1
+		count = binary.BigEndian.Uint64(val) + 1
 	}
 
-	binary.BigEndian.PutUint64(value, count)
-	err = txn.Set(key, value)
+	binary.BigEndian.PutUint64(val, count)
+	err = txn.Set(key, val)
 	return
 }

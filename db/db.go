@@ -100,78 +100,56 @@ func (db *DB) IngestGraph(cid cid.Cid, graph string, quads []*ld.Quad) error {
 }
 
 // Query the database
-func (db *DB) Query(quads []*ld.Quad, result chan []*ld.Quad) error {
-	defer func() { result <- nil }()
-	return db.Badger.View(func(txn *badger.Txn) (err error) {
-		g, err := query.MakeConstraintGraph(quads, txn)
-		defer g.Close()
-		if err != nil {
+func (db *DB) Query(quads []*ld.Quad) (v map[string]*types.Value, err error) {
+	values := make(chan map[string]*types.Value)
+	go func() {
+		err = db.Badger.View(func(txn *badger.Txn) (err error) {
+			v := map[string]*types.Value{}
+			defer func() { values <- v }()
+			var g *query.ConstraintGraph
+			g, err = query.MakeConstraintGraph(quads, txn)
+			defer g.Close()
+			if err != nil {
+				return
+			}
+
+			fmt.Println(g)
+
+			if err = g.Solve(txn); err != nil {
+				return
+			}
+
+			ids := map[uint64]*types.Value{}
+			var item *badger.Item
+			var val []byte
+			for p, u := range g.Index {
+				id := binary.BigEndian.Uint64(u.Value)
+				if value, has := ids[id]; has {
+					v[p] = value
+				} else {
+					ids[id] = &types.Value{}
+					v[p] = ids[id]
+
+					key := make([]byte, 9)
+					key[0] = types.ValuePrefix
+					copy(key[1:9], u.Value)
+
+					if item, err = txn.Get(key); err != nil {
+						return
+					} else if val, err = item.ValueCopy(nil); err != nil {
+						return
+					} else if err = proto.Unmarshal(val, ids[id]); err != nil {
+						return
+					}
+				}
+			}
+
 			return
-		}
+		})
+	}()
 
-		fmt.Println(g)
-
-		if err = g.Solve(txn); err != nil {
-			return
-		}
-
-		values := map[uint64]*types.Value{}
-		for _, quad := range quads {
-			quad.Subject, err = setValues(quad.Subject, g, values, txn)
-			if err != nil {
-				return err
-			}
-
-			quad.Predicate, err = setValues(quad.Predicate, g, values, txn)
-			if err != nil {
-				return err
-			}
-
-			quad.Object, err = setValues(quad.Object, g, values, txn)
-			if err != nil {
-				return err
-			}
-		}
-
-		result <- quads
-		return nil
-	})
-}
-
-func setValues(node ld.Node, g *query.ConstraintGraph, values map[uint64]*types.Value, txn *badger.Txn) (ld.Node, error) {
-	blank, isBlank := node.(*ld.BlankNode)
-	if !isBlank {
-		return node, nil
-	}
-
-	u := g.Index[blank.Attribute]
-	id := binary.BigEndian.Uint64(u.Value)
-
-	if value, has := values[id]; has {
-		return value, nil
-	}
-
-	key := make([]byte, 9)
-	key[0] = types.ValuePrefix
-	copy(key[1:9], u.Value)
-	item, err := txn.Get(key)
-	if err != nil {
-		return nil, err
-	}
-
-	buf, err := item.ValueCopy(nil)
-	if err != nil {
-		return nil, err
-	}
-
-	value := &types.Value{}
-	err = proto.Unmarshal(buf, value)
-	if err != nil {
-		return nil, err
-	}
-
-	values[id] = value
-	return value, nil
+	v = <-values
+	return
 }
 
 // Log will print the *entire database contents* to log

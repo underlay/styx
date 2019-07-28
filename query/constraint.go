@@ -79,19 +79,19 @@ func (c *Constraint) Close() {
 	}
 }
 
-func (c *Constraint) value() (value []byte) {
+func (c *Constraint) value() (v []byte) {
 	item := c.Iterator.Item()
 	key := item.Key()
 	if c.Iterator.ValidForPrefix(c.Prefix) {
 		prefix := key[0]
 		if _, has := types.TriplePrefixMap[prefix]; has {
-			value = key[17:25]
+			v = key[17:25]
 		} else if _, has := types.MajorPrefixMap[prefix]; has {
-			value = key[9:17]
+			v = key[9:17]
 		} else if _, has := types.MinorPrefixMap[prefix]; has {
-			value = key[9:17]
+			v = key[9:17]
 		} else {
-			value = key[1:9] // Should never happen?
+			v = key[1:9] // Should never happen?
 		}
 	}
 
@@ -106,27 +106,27 @@ func (c *Constraint) Next() []byte {
 
 // Seek advances the cursor to the first value equal to
 // or greater than given byte slice.
-func (c *Constraint) Seek(value []byte) []byte {
+func (c *Constraint) Seek(v []byte) []byte {
 	key := make([]byte, len(c.Prefix)+8)
 	copy(key[:len(c.Prefix)], c.Prefix)
-	if value != nil {
-		copy(key[len(c.Prefix):], value)
+	if v != nil {
+		copy(key[len(c.Prefix):], v)
 	}
 	c.Iterator.Seek(key)
 	return c.value()
 }
 
 // Set the value of a temporary assignment
-func (c *Constraint) Set(value []byte, txn *badger.Txn) (err error) {
+func (c *Constraint) Set(v []byte, txn *badger.Txn) (err error) {
 	place := (c.Place + 1) % 3
 	prefix := types.TriplePrefixes[place]
 
 	if _, is := c.M.(BlankNode); is {
-		c.Prefix = types.AssembleKey(prefix, value, c.n, nil)
-		c.m = value
+		c.Prefix = types.AssembleKey(prefix, v, c.n, nil)
+		c.m = v
 	} else if _, is := c.N.(BlankNode); is {
-		c.Prefix = types.AssembleKey(prefix, c.m, value, nil)
-		c.n = value
+		c.Prefix = types.AssembleKey(prefix, c.m, v, nil)
+		c.n = v
 	}
 
 	// This call to getCount could theoretically be eliminated if we retrieve
@@ -149,15 +149,15 @@ func (c *Constraint) getCount(txn *badger.Txn) (count uint64, err error) {
 	// key = types.AssembleKey(types.MinorPrefixes[(c.Place+2)%3], c.n, c.m, nil)
 
 	var item *badger.Item
-	value := make([]byte, 8)
+	val := make([]byte, 8)
 	if item, err = txn.Get(key); err == badger.ErrKeyNotFound {
 		return 0, nil
 	} else if err != nil {
 		return
-	} else if value, err = item.ValueCopy(value); err != nil {
+	} else if val, err = item.ValueCopy(val); err != nil {
 		return
 	}
-	count = binary.BigEndian.Uint64(value)
+	count = binary.BigEndian.Uint64(val)
 	return
 }
 
@@ -188,22 +188,22 @@ func (cs ConstraintSet) Swap(a, b int)      { cs[a], cs[b] = cs[b], cs[a] }
 func (cs ConstraintSet) Less(a, b int) bool { return cs[a].Count < cs[b].Count }
 
 // Seek to the next intersection
-func (cs ConstraintSet) Seek(value []byte) []byte {
+func (cs ConstraintSet) Seek(v []byte) []byte {
 	var count int
 	l := len(cs)
 	for i := 0; count < l; i = (i + 1) % l {
 		c := cs[i]
-		next := c.Seek(value)
+		next := c.Seek(v)
 		if next == nil {
 			return nil
-		} else if bytes.Equal(next, value) {
+		} else if bytes.Equal(next, v) {
 			count++
 		} else {
 			count = 1
-			value = next
+			v = next
 		}
 	}
-	return value
+	return v
 }
 
 // Next value (could be improved to not double-check cursor[0])

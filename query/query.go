@@ -118,7 +118,7 @@ func (g *ConstraintGraph) Tick(i int, txn *badger.Txn) (err error) {
 func (g *ConstraintGraph) propagate(
 	cs ConstraintMap,
 	j int, i int,
-	value []byte,
+	v []byte,
 	txn *badger.Txn,
 ) (err error) {
 	// We have the next value for the dependency, so now we set temporary
@@ -132,7 +132,7 @@ func (g *ConstraintGraph) propagate(
 		}
 
 		for _, c := range cs {
-			if err = c.Dual.Set(value, txn); err != nil {
+			if err = c.Dual.Set(v, txn); err != nil {
 				return
 			}
 		}

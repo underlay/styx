@@ -26,7 +26,7 @@ func (value *Value) GetValue() string {
 		escaped := escape(v)
 		if d == ld.RDFLangString {
 			return fmt.Sprintf("\"%s\"@%s", escaped, l)
-		} else if d != ld.XSDString {
+		} else if d != "" && d != ld.XSDString {
 			return fmt.Sprintf("\"%s\"^^<%s>", escaped, d)
 		} else {
 			return fmt.Sprintf("\"%s\"", escaped)
@@ -87,12 +87,12 @@ type IndexMap map[string]*Index
 
 // Commit writes the contents of the index map to badger
 func (indices IndexMap) Commit(txn *badger.Txn) (err error) {
-	var value []byte
+	var val []byte
 	for v, index := range indices {
 		key := AssembleKey(IndexPrefix, []byte(v), nil, nil)
-		if value, err = proto.Marshal(index); err != nil {
+		if val, err = proto.Marshal(index); err != nil {
 			return
-		} else if err = txn.Set(key, value); err != nil {
+		} else if err = txn.Set(key, val); err != nil {
 			return
 		}
 	}
@@ -109,11 +109,11 @@ func (indices IndexMap) Get(node ld.Node, txn *badger.Txn) (*Index, error) {
 	key := AssembleKey(IndexPrefix, []byte(value), nil, nil)
 	if item, err := txn.Get(key); err != nil {
 		return nil, err
-	} else if indexValue, err := item.ValueCopy(nil); err != nil {
+	} else if val, err := item.ValueCopy(nil); err != nil {
 		return nil, err
 	} else {
 		indices[value] = &Index{}
-		if err = proto.Unmarshal(indexValue, indices[value]); err != nil {
+		if err = proto.Unmarshal(val, indices[value]); err != nil {
 			return nil, err
 		}
 		return indices[value], nil
@@ -126,20 +126,17 @@ func NodeToValue(origin cid.Cid, node ld.Node) *Value {
 	if iri, isIri := node.(*ld.IRI); isIri {
 		value.Node = &Value_Iri{Iri: iri.Value}
 	} else if literal, isLiteral := node.(*ld.Literal); isLiteral {
-		value.Node = &Value_Literal{
-			Literal: &Literal{
-				Value:    literal.Value,
-				Language: literal.Language,
-				Datatype: literal.Datatype,
-			},
+		l := &Literal{Value: literal.Value}
+		if literal.Datatype == ld.RDFLangString {
+			l.Datatype = ld.RDFLangString
+			l.Language = literal.Language
+		} else if literal.Datatype != "" && literal.Datatype != ld.XSDString {
+			l.Datatype = literal.Datatype
 		}
+		value.Node = &Value_Literal{l}
 	} else if blank, isBlank := node.(*ld.BlankNode); isBlank {
-		value.Node = &Value_Blank{
-			Blank: &Blank{
-				Cid: origin.Bytes(),
-				Id:  blank.Attribute,
-			},
-		}
+		b := &Blank{Cid: origin.Bytes(), Id: blank.Attribute}
+		value.Node = &Value_Blank{Blank: b}
 	}
 	return value
 }
@@ -157,9 +154,9 @@ func (values ValueMap) InsertNode(value *Value, counter uint64) uint64 {
 
 // Commit writes the contents of the value map to badger
 func (values ValueMap) Commit(txn *badger.Txn) (err error) {
-	var value []byte
+	var val []byte
 	for id, v := range values {
-		if value, err = proto.Marshal(v); err != nil {
+		if val, err = proto.Marshal(v); err != nil {
 			return err
 		}
 
@@ -167,7 +164,7 @@ func (values ValueMap) Commit(txn *badger.Txn) (err error) {
 		key[0] = ValuePrefix
 		binary.BigEndian.PutUint64(key[1:], id)
 
-		if err = txn.Set(key, value); err != nil {
+		if err = txn.Set(key, val); err != nil {
 			return
 		}
 	}
