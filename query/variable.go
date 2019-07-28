@@ -59,6 +59,12 @@ type Variable struct {
 }
 
 func (v *Variable) String() (s string) {
+	if v.Value != nil {
+		s += fmt.Sprintf("Value: %02d\n", binary.BigEndian.Uint64(v.Value))
+	}
+	if v.Root != nil {
+		s += fmt.Sprintf("Root: %02d\n", binary.BigEndian.Uint64(v.Root))
+	}
 	s += fmt.Sprintf("DZ: %s\n", v.DZ.String())
 	s += fmt.Sprintf("D1: %s\n", v.D1.String())
 	s += fmt.Sprintln("D2:")

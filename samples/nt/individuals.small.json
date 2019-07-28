@@ -1,0 +1,90 @@
+{
+	"@context": {
+		"nt": "http://semanticbible.org/ns/2006/NTNames#",
+		"rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+		"owl": "http://www.w3.org/2002/07/owl#",
+		"owl:unionOf": { "@container": "@list", "@type": "@id" },
+		"rdfs:comment": { "@language": "en" },
+		"rdfs:label": { "@language": "en" },
+		"rdfs:subClassOf": { "@type": "@id" },
+		"owl:disjointWith": { "@type": "@id" },
+		"rdfs:domain": { "@type": "@id" },
+		"rdfs:range": { "@type": "@id" },
+		"owl:inverseOf": { "@type": "@id" },
+		"rdfs:subPropertyOf": { "@type": "@id" }
+	},
+	"@graph": [
+		{
+			"@id": "nt:Joseph",
+			"nt:childOf": [{ "@id": "nt:Heli" }, { "@id": "nt:JacobSonOfMatthan" }],
+			"nt:description": {
+				"@language": "en",
+				"@value": "the earthly father of Jesus"
+			},
+			"nt:parentOf": { "@id": "nt:Jesus" },
+			"nt:spouseOf": { "@id": "nt:Mary" },
+			"rdfs:label": "Joseph"
+		},
+		{
+			"@id": "nt:JosephSonOfJonam",
+			"nt:childOf": { "@id": "nt:Jonam" },
+			"nt:description": "JosephSonOfJonam is one of the ancestors of Jesus mentioned in Luke's geneaology",
+			"nt:parentOf": { "@id": "nt:JudahSonOfJoseph" },
+			"rdfs:label": "Joseph"
+		},
+		{
+			"@id": "nt:JosephThePatriarch",
+			"nt:childOf": [
+				{ "@id": "nt:Jacob" },
+				{
+					"@id": "nt:Rachel",
+					"nt:description": {
+						"@language": "en",
+						"@value": "one of Jacob's wives"
+					},
+					"nt:parentOf": [
+						{ "@id": "nt:Benjamin" },
+						{ "@id": "nt:JosephThePatriarch" }
+					],
+					"rdfs:label": "Rachel"
+				}
+			],
+			"rdfs:label": "Joseph"
+		},
+		{
+			"@id": "nt:Amos",
+			"nt:childOf": { "@id": "nt:Manasseh" },
+			"nt:parentOf": {
+				"@id": "nt:Josiah",
+				"nt:childOf": { "@id": "nt:Amos" },
+				"nt:parentOf": {
+					"@id": "nt:Jechoniah",
+					"nt:childOf": { "@id": "nt:Josiah" },
+					"nt:parentOf": { "@id": "nt:Shealtiel" },
+					"rdfs:label": "Jechoniah"
+				},
+				"rdfs:label": "Josiah"
+			},
+			"rdfs:label": "Amos"
+		},
+		{
+			"@id": "nt:AmosSonOfNahum",
+			"nt:childOf": { "@id": "nt:Nahum" },
+			"nt:description": "this is amos, who's there",
+			"nt:parentOf": {
+				"@id": "nt:MattathaisSonOfAmos",
+				"nt:childOf": { "@id": "nt:AmosSonOfNahum" },
+				"nt:description": "Mattathias is one of the ancestors of Jesus mentioned in Luke's geneaology",
+				"nt:parentOf": {
+					"@id": "nt:JosephSonOfMattathias",
+					"nt:childOf": { "@id": "nt:MattathaisSonOfAmos" },
+					"nt:description": "Joseph is one of the ancestors of Jesus mentioned in Luke's geneaology",
+					"nt:parentOf": { "@id": "nt:Jannai" },
+					"rdfs:label": "Joseph"
+				},
+				"rdfs:label": "Mattathias"
+			},
+			"rdfs:label": "Amos"
+		}
+	]
+}

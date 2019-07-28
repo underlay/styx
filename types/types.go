@@ -178,8 +178,7 @@ func (values ValueMap) Commit(txn *badger.Txn) (err error) {
 // how many of the elements {abc} to pack into the key.
 func AssembleKey(prefix byte, a, b, c []byte) []byte {
 	A, B, C := len(a), len(b), len(c)
-	keySize := 1 + A + B + C
-	key := make([]byte, keySize)
+	key := make([]byte, 1+A+B+C)
 	key[0] = prefix
 	if A > 0 {
 		copy(key[1:1+A], a)

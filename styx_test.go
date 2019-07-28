@@ -164,47 +164,6 @@ func TestSimpleIngest(t *testing.T) {
 	}
 }
 
-func TestNTIngest(t *testing.T) {
-	if !sh.IsUp() {
-		t.Error("IPFS Daemon not running")
-		return
-	}
-
-	// Remove old db
-	fmt.Println("removing path", path)
-	if err := os.RemoveAll(path); err != nil {
-		t.Error(err)
-		return
-	}
-
-	db, err := styx.OpenDB(path)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	defer db.Close()
-
-	dl := loader.NewShellDocumentLoader(sh)
-	store := styx.MakeShellDocumentStore(sh)
-
-	names, err := openFile("/samples/nt/names.json", dl, store, db)
-	if err = db.IngestJSONLd(names, dl, store); err != nil {
-		t.Error(err)
-		return
-	}
-
-	// individuals, err := openFile("/samples/nt/individuals.json", dl, store, db)
-	// if err = db.IngestJSONLd(individuals, dl, store); err != nil {
-	// 	t.Error(err)
-	// 	return
-	// }
-
-	if err = db.Log(); err != nil {
-		t.Error(err)
-	}
-}
-
 func TestQuery(t *testing.T) {
 	if !sh.IsUp() {
 		t.Error("IPFS Daemon not running")
@@ -280,7 +239,104 @@ func TestQuery(t *testing.T) {
 	}
 }
 
-func openFile(path string, dl ld.DocumentLoader, store styx.DocumentStore, db *styx.DB) (doc map[string]interface{}, err error) {
+func TestNT(t *testing.T) {
+	if !sh.IsUp() {
+		t.Error("IPFS Daemon not running")
+		return
+	}
+
+	// Remove old db
+	fmt.Println("removing path", path)
+	if err := os.RemoveAll(path); err != nil {
+		t.Error(err)
+		return
+	}
+
+	db, err := styx.OpenDB(path)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer db.Close()
+
+	dl := loader.NewShellDocumentLoader(sh)
+	store := styx.MakeShellDocumentStore(sh)
+
+	// names, err := openFile("/samples/nt/names.json", dl, store)
+	// if err != nil {
+	// 	t.Error(err)
+	// 	return
+	// }
+
+	// if err = db.IngestJSONLd(names, dl, store); err != nil {
+	// 	t.Error(err)
+	// 	return
+	// }
+
+	individuals, err := openFile("/samples/nt/individuals.small.json", dl, store)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if err = db.IngestJSONLd(individuals, dl, store); err != nil {
+		t.Error(err)
+		return
+	}
+
+	// if err = db.Log(); err != nil {
+	// 	t.Error(err)
+	// 	return
+	// }
+
+	query, err := openFile("/samples/nt/query.json", dl, store)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	proc := ld.NewJsonLdProcessor()
+	datasetOptions := styx.GetDatasetOptions(dl)
+	rdf, err := proc.ToRDF(query, datasetOptions)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	quads := rdf.(*ld.RDFDataset).Graphs["@default"]
+
+	fmt.Println("--- query graph ---")
+	for _, quad := range quads {
+		fmt.Printf(
+			"  %s %s %s\n",
+			quad.Subject.GetValue(),
+			quad.Predicate.GetValue(),
+			quad.Object.GetValue(),
+		)
+	}
+
+	r := make(chan []*ld.Quad)
+	go db.Query(quads, r)
+
+	result := <-r
+
+	fmt.Println("Result:")
+	for _, quad := range result {
+		fmt.Printf(
+			"  %s %s %s\n",
+			quad.Subject.GetValue(),
+			quad.Predicate.GetValue(),
+			quad.Object.GetValue(),
+		)
+	}
+
+	// if err = db.Log(); err != nil {
+	// 	t.Error(err)
+	// }
+}
+
+func openFile(path string, dl ld.DocumentLoader, store styx.DocumentStore) (doc map[string]interface{}, err error) {
 	var dir string
 	if dir, err = os.Getwd(); err != nil {
 		return

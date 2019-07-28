@@ -22,15 +22,16 @@ func (g *ConstraintGraph) Tick(i int, txn *badger.Txn) (err error) {
 	// p, q, r... are *string* variable labels
 	// u, v, w... are *Variable instances
 	// x, y... are *dependency slice indices*, where e.g. g.In[p][x] == i
-
 	p, u := g.GetIndex(i)
-
 	u.Value = u.Seek(u.Root)
 	if u.Value != nil {
+		// We got a valid value for u!
+		err = g.propagate(u.D2, i, len(g.Slice), u.Value, txn)
 		return
 	}
 
 	in := g.In[p]
+	out := g.Out[p]
 	length := len(in)
 
 	// First we need to save a snapshot of the current values, counts,
@@ -42,13 +43,13 @@ func (g *ConstraintGraph) Tick(i int, txn *badger.Txn) (err error) {
 	counts := map[[2]string][]uint64{}
 	prefixes := map[[2]string][][]byte{}
 
-	for _, j := range in {
+	for _, j := range append(in, out...) {
 		q, v := g.GetIndex(j)
 		values[q] = v.Value[:]
 
 		// Now iterate over the second-degree constraints *in-between* j and i
 		for r, cs := range v.D2 {
-			if g.Map[r] > i {
+			if g.Map[r] > j {
 				continue
 			}
 			key := [2]string{q, r}
@@ -66,14 +67,12 @@ func (g *ConstraintGraph) Tick(i int, txn *badger.Txn) (err error) {
 	for x >= 0 {
 		j := in[x]
 		q, v := g.GetIndex(j)
-
-		// _, v := g.GetIndex(d[x])
 		if v.Value = v.Next(); v.Value == nil {
 			// Reset everything, *including* the current index
 			for y := x; y < length; y++ {
-				g.reset(i, in[y], values, counts, prefixes)
+				g.reset(in[y], values, counts, prefixes)
 			}
-			i--
+			x--
 			continue
 		}
 
@@ -90,7 +89,7 @@ func (g *ConstraintGraph) Tick(i int, txn *badger.Txn) (err error) {
 				break
 			}
 
-			if err = g.propagate(w.D2, k, i, w.Value, txn); err != nil {
+			if err = g.propagate(w.D2, k, len(g.Slice), w.Value, txn); err != nil {
 				return
 			}
 		}
@@ -98,7 +97,7 @@ func (g *ConstraintGraph) Tick(i int, txn *badger.Txn) (err error) {
 		if u.Value == nil {
 			// Reset everything, *excluding* the current index
 			for y := x + 1; y < length; y++ {
-				g.reset(i, in[y], values, counts, prefixes)
+				g.reset(in[y], values, counts, prefixes)
 			}
 			continue
 		}
@@ -124,11 +123,7 @@ func (g *ConstraintGraph) propagate(
 	// to function as first-degree dependencies.
 	for r, cs := range cs {
 		w := g.Index[r]
-		if g.Map[r] < j {
-			// These constraints "point backward", so we don't care about them.
-			continue
-		} else if g.Map[r] > i {
-			// These constraints point beyond j, so we don't care about them either.
+		if g.Map[r] < j || g.Map[r] > i {
 			continue
 		}
 
@@ -145,26 +140,26 @@ func (g *ConstraintGraph) propagate(
 }
 
 func (g *ConstraintGraph) reset(
-	i int, j int,
+	i int,
 	values map[string][]byte,
 	counts map[[2]string][]uint64,
 	prefixes map[[2]string][][]byte,
 ) {
-	q, v := g.GetIndex(j)
-	v.Value = values[q]
+	p, u := g.GetIndex(i)
+	u.Value = values[p]
 
-	for r, cs := range v.D2 {
-		if g.Map[r] > i {
+	for q, cs := range u.D2 {
+		if g.Map[q] > i {
 			continue
 		}
-		key := [2]string{q, r}
+		key := [2]string{p, q}
 		for k, c := range cs {
 			c.Count = counts[key][k]
 			c.Prefix = prefixes[key][k]
-			if v.Value != nil {
-				c.Seek(v.Value)
+			if u.Value != nil {
+				c.Seek(u.Value)
 			} else {
-				c.Seek(v.Root)
+				c.Seek(u.Root)
 			}
 		}
 	}

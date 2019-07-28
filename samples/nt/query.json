@@ -1,0 +1,14 @@
+{
+	"@context": {
+		"nt": "http://semanticbible.org/ns/2006/NTNames#",
+		"rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+		"rdfs:label": { "@language": "en" }
+	},
+	"rdfs:label": "Joseph",
+	"nt:description": {},
+	"nt:childOf": {
+		"nt:childOf": {
+			"rdfs:label": "Amos"
+		}
+	}
+}

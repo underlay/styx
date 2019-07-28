@@ -31,7 +31,7 @@ func MakeConstraintGraph(quads []*ld.Quad, txn *badger.Txn) (g *ConstraintGraph,
 		} else if (S && !P && !O) || (!S && P && !O) || (!S && !P && O) {
 			// Only one of the terms is a blank node, so this is a first-degree constraint.
 			c = &Constraint{}
-			c.m, c.n = make([]byte, 8), make([]byte, 8)
+			// c.m, c.n = make([]byte, 8), make([]byte, 8)
 			if S {
 				c.Place = 0
 				if c.M, c.m, err = getID(quad.Predicate, indices, txn); err != nil {
@@ -164,6 +164,24 @@ func MakeConstraintGraph(quads []*ld.Quad, txn *badger.Txn) (g *ConstraintGraph,
 	g.Map = map[string]int{}
 	for i, u := range g.Slice {
 		g.Map[u] = i
+		for v, cs := range g.Index[u].D2 {
+			if _, has := g.Map[v]; has {
+				cs.Close()
+				for _, c := range cs {
+					p := types.TriplePrefixes[(c.Place+1)%3]
+					var prefix []byte
+					if c.m != nil {
+						prefix = types.AssembleKey(p, c.m, nil, nil)
+					} else {
+						prefix = types.AssembleKey(p, nil, nil, nil)
+					}
+					c.Iterator = txn.NewIterator(badger.IteratorOptions{
+						PrefetchValues: false,
+						Prefix:         prefix,
+					})
+				}
+			}
+		}
 	}
 
 	// Assemble the dependency maps

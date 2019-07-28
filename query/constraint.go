@@ -22,28 +22,52 @@ type Constraint struct {
 	Dual     *Constraint // If (M or N) is a blank node, this is a pointer to the mirror struct
 }
 
+func (c *Constraint) printM() (s string) {
+	if b, is := c.M.(BlankNode); is {
+		s = string(b)
+		if c.m != nil {
+			s += fmt.Sprintf(" = %02d", binary.BigEndian.Uint64(c.m))
+		}
+	} else if i, is := c.M.(*types.Index); is {
+		s = i.String()
+	}
+	return
+}
+
+func (c *Constraint) printN() (s string) {
+	if b, is := c.N.(BlankNode); is {
+		s = string(b)
+		if c.n != nil {
+			s += fmt.Sprintf(" = %02d", binary.BigEndian.Uint64(c.n))
+		}
+	} else if i, is := c.N.(*types.Index); is {
+		s = i.String()
+	}
+	return
+}
+
 func (c *Constraint) String() string {
 	if len(c.Prefix) == 9 {
 		return fmt.Sprintf(
-			"(%d {%v|%v} %s:%02d # %d)",
+			"(p%d {%s | %s} %s:%02d#%d)",
 			c.Place,
-			c.M, c.N,
+			c.printM(), c.printN(),
 			string(c.Prefix[0]),
 			binary.BigEndian.Uint64(c.Prefix[1:]),
 			c.Count,
 		)
 	} else if len(c.Prefix) == 17 {
 		return fmt.Sprintf(
-			"(%d {%v|%v} %s:%02d:%02d#%d)",
+			"(p%d {%s | %s} %s:%02d:%02d#%d)",
 			c.Place,
-			c.M, c.N,
+			c.printM(), c.printN(),
 			string(c.Prefix[0]),
 			binary.BigEndian.Uint64(c.Prefix[1:9]),
 			binary.BigEndian.Uint64(c.Prefix[9:]),
 			c.Count,
 		)
 	} else {
-		return "<invalid constraint>"
+		return "<<<invalid constraint>>>"
 	}
 }
 
@@ -56,9 +80,9 @@ func (c *Constraint) Close() {
 }
 
 func (c *Constraint) value() (value []byte) {
+	item := c.Iterator.Item()
+	key := item.Key()
 	if c.Iterator.ValidForPrefix(c.Prefix) {
-		item := c.Iterator.Item()
-		key := item.Key()
 		prefix := key[0]
 		if _, has := types.TriplePrefixMap[prefix]; has {
 			value = key[17:25]
@@ -70,6 +94,7 @@ func (c *Constraint) value() (value []byte) {
 			value = key[1:9] // Should never happen?
 		}
 	}
+
 	return
 }
 
@@ -84,24 +109,26 @@ func (c *Constraint) Next() []byte {
 // (for dyanmic and static present cursors) and partial
 // prefixes (for static future cursors) can be given
 func (c *Constraint) Seek(value []byte) []byte {
-	key := append(c.Prefix, value...)
+	key := make([]byte, len(c.Prefix)+8)
+	copy(key[:len(c.Prefix)], c.Prefix)
+	if value != nil {
+		copy(key[len(c.Prefix):], value)
+	}
 	c.Iterator.Seek(key)
 	return c.value()
 }
 
-// Set is complicated
+// Set the value of a temporary assignment
 func (c *Constraint) Set(value []byte, txn *badger.Txn) (err error) {
-	// Only second-degree constraints can be set
-
 	place := (c.Place + 1) % 3
 	prefix := types.TriplePrefixes[place]
 
-	if c.m != nil {
-		c.Prefix = types.AssembleKey(prefix, c.m, value, nil)
-		c.n = value
-	} else if c.n != nil {
+	if _, is := c.M.(BlankNode); is {
 		c.Prefix = types.AssembleKey(prefix, value, c.n, nil)
 		c.m = value
+	} else if _, is := c.N.(BlankNode); is {
+		c.Prefix = types.AssembleKey(prefix, c.m, value, nil)
+		c.n = value
 	}
 
 	// This call to getCount could theoretically be eliminated if we retrieve
@@ -182,11 +209,13 @@ func (cs ConstraintSet) Seek(value []byte) []byte {
 }
 
 // Next value (could be improved to not double-check cursor[0])
-func (cs ConstraintSet) Next() []byte {
+func (cs ConstraintSet) Next() (next []byte) {
 	c := cs[0]
 	c.Iterator.Next()
-	next := c.value()
-	return cs.Seek(next)
+	if next = c.value(); next != nil {
+		next = cs.Seek(next)
+	}
+	return
 }
 
 // A ConstraintMap is a map of string variable labels to constraint sets.
