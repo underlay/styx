@@ -6,11 +6,13 @@ import (
 
 // Solve solves the graph
 func (g *ConstraintGraph) Solve(txn *badger.Txn) (err error) {
+	_, u := g.GetIndex(0)
+	u.Value = u.Root
 	for i := 0; i < len(g.Slice); i++ {
 		if err = g.Tick(i, txn); err != nil {
 			return
 		} else if _, u := g.GetIndex(i); u.Value == nil {
-			return ErrEmptyIntersect
+			return ErrEmptyJoin
 		}
 	}
 	return
@@ -23,7 +25,9 @@ func (g *ConstraintGraph) Tick(i int, txn *badger.Txn) (err error) {
 	// u, v, w... are *Variable instances
 	// x, y... are *dependency slice indices*, where e.g. g.In[p][x] == i
 	p, u := g.GetIndex(i)
-	u.Value = u.Seek(u.Root)
+	if u.Value == nil {
+		u.Value = u.Seek(u.Root)
+	}
 	if u.Value != nil {
 		// We got a valid value for u!
 		err = g.propagate(u.D2, i, len(g.Slice), u.Value, txn)
@@ -85,7 +89,7 @@ func (g *ConstraintGraph) Tick(i int, txn *badger.Txn) (err error) {
 		// and propagating _that_!
 		for _, k := range g.Out[q] {
 			_, w := g.GetIndex(k)
-			if w.Value = w.Seek(w.Root); w.Value == nil || k == i {
+			if w.Value = w.Seek(w.Root); w.Value == nil {
 				break
 			}
 

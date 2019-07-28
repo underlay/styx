@@ -38,6 +38,8 @@ func OpenDB(path string) (*DB, error) {
 		return nil, err
 	}
 
+	// seq, err := db.GetSequence(types.CounterKey, bandwidth uint64)
+
 	return &DB{
 		Badger: db,
 	}, nil
@@ -101,8 +103,9 @@ func (db *DB) IngestGraph(cid cid.Cid, graph string, quads []*ld.Quad) error {
 func (db *DB) Query(quads []*ld.Quad, result chan []*ld.Quad) error {
 	defer func() { result <- nil }()
 	return db.Badger.View(func(txn *badger.Txn) (err error) {
-		var g *query.ConstraintGraph
-		if g, err = query.MakeConstraintGraph(quads, txn); err != nil {
+		g, err := query.MakeConstraintGraph(quads, txn)
+		defer g.Close()
+		if err != nil {
 			return
 		}
 

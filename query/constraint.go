@@ -105,9 +105,7 @@ func (c *Constraint) Next() []byte {
 }
 
 // Seek advances the cursor to the first value equal to
-// or greater than given byte slice. Both full values
-// (for dyanmic and static present cursors) and partial
-// prefixes (for static future cursors) can be given
+// or greater than given byte slice.
 func (c *Constraint) Seek(value []byte) []byte {
 	key := make([]byte, len(c.Prefix)+8)
 	copy(key[:len(c.Prefix)], c.Prefix)

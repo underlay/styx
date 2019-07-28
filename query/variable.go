@@ -37,6 +37,9 @@ var ErrInitialCountZero = fmt.Errorf("Initial constraint count of zero")
 // before joining on any other variables
 var ErrEmptyIntersect = fmt.Errorf("Empty intersect")
 
+// ErrEmptyJoin means that variables could not be joined
+var ErrEmptyJoin = fmt.Errorf("Empty join")
+
 const pC uint8 = 255 // zoot zoot
 const pS uint8 = 0
 const pP uint8 = 1

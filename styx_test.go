@@ -274,7 +274,7 @@ func TestNT(t *testing.T) {
 	// 	return
 	// }
 
-	individuals, err := openFile("/samples/nt/individuals.small.json", dl, store)
+	individuals, err := openFile("/samples/nt/individuals.json", dl, store)
 	if err != nil {
 		t.Error(err)
 		return
@@ -323,12 +323,10 @@ func TestNT(t *testing.T) {
 
 	fmt.Println("Result:")
 	for _, quad := range result {
-		fmt.Printf(
-			"  %s %s %s\n",
-			quad.Subject.GetValue(),
-			quad.Predicate.GetValue(),
-			quad.Object.GetValue(),
-		)
+		s := quad.Subject.GetValue()
+		p := quad.Predicate.GetValue()
+		o := quad.Object.GetValue()
+		fmt.Printf("  %s %s %s\n", s, p, o)
 	}
 
 	// if err = db.Log(); err != nil {
