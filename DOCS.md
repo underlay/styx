@@ -5,15 +5,15 @@ Styx handles six types of keys in twelve logical tables. The underlying key/valu
 In this table, the 'p' that each key starts with is a single byte "prefix"
 from the "prefixes" set. The prefix encodes both the key's type and rotation.
 
-| name    | #   | key format | value type | prefixes |
-| ------- | --- | ---------- | ---------- | -------- |
-| triple  | 3   | p a b c    | SourceList | {a b c}  |
-| major   | 3   | p a b      | uint64     | {i j k}  |
-| minor   | 3   | p a b      | uint64     | {x y z}  |
-| value   | 1   | p a        | Value      | {p}      |
-| index   | 1   | p element  | Index      | {q}      |
-| graph   | 1   | p cid      | ISO Date   | {g}      |
-| counter | 1   |            | uint64     | {>}      |
+| name    | #   | key format | value type | prefixes  |
+| ------- | --- | ---------- | ---------- | --------- |
+| triple  | 3   | `p a b c`  | SourceList | `{a b c}` |
+| major   | 3   | `p a b`    | uint64     | `{i j k}` |
+| minor   | 3   | `p a b`    | uint64     | `{x y z}` |
+| value   | 1   | `p a`      | Value      | `{p}`     |
+| index   | 1   | `p term`   | Index      | `{q}`     |
+| graph   | 1   | `p cid`    | ISO Date   | `{g}`     |
+| counter | 1   |            | uint64     | `{>}`     |
 
 When inserting a graph:
 
