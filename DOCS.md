@@ -1,6 +1,6 @@
 # Insertion
 
-Styx handles six types of keys in twelve logical tables. The underlying key/value store [Badger](https://github.com/dgraph-io/badger) doesn't have a concept of a table, so instead we start every key with a prefix byte to indicate its type. These are documented in a `db/insert.go`.
+Styx handles six types of keys in twelve logical tables. The underlying key/value store [Badger](https://github.com/dgraph-io/badger) doesn't have a concept of a table, so instead we start every key with a prefix byte to indicate its type.
 
 In this table, the 'p' that each key starts with is a single byte "prefix"
 from the "prefixes" set. The prefix encodes both the key's type and rotation.
