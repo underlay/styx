@@ -9,8 +9,8 @@ const Algorithm = "URDNA2015"
 // Format has to be application/n-quads
 const Format = "application/n-quads"
 
-// CounterKey to store the id counter
-var CounterKey = []byte(">")
+// SequenceKey to store the id counter
+var SequenceKey = []byte(">")
 
 // GraphPrefix keys track the CIDs of the documents in the database
 const GraphPrefix = byte('g')
@@ -38,7 +38,3 @@ var MinorPrefixes = [3]byte{'x', 'y', 'z'}
 
 // MinorPrefixMap inverts MinorPrefixes
 var MinorPrefixMap = map[byte]uint8{'x': 0, 'y': 1, 'z': 2}
-
-// InitialCounter is the first uint64 value we start counting from.
-// Let's set it to 1 just in case we want to ever use 0 for something special.
-const InitialCounter uint64 = 1

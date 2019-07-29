@@ -6,11 +6,13 @@ import (
 	"fmt"
 
 	badger "github.com/dgraph-io/badger"
+	"github.com/gogo/protobuf/proto"
 	types "github.com/underlay/styx/types"
 )
 
 // A Constraint to an occurrence of a variable in a dataset
 type Constraint struct {
+	Index    int
 	Place    uint8  // The term (subject/predicate/object) within the triple
 	M        HasID  // The next (clockwise) element in the triple
 	m        []byte // a convience slot for the []byte of M, if it exists
@@ -44,6 +46,19 @@ func (c *Constraint) printN() (s string) {
 		s = i.String()
 	}
 	return
+}
+
+// Sources can only be called on a first-degree constraint
+// and it returns the unmarshalled SourceList from the value
+// of the badger iterator's current item
+func (c *Constraint) Sources() (*types.SourceList, error) {
+	sources := &types.SourceList{}
+	item := c.Iterator.Item()
+	if val, err := item.ValueCopy(nil); err != nil {
+		return nil, err
+	} else {
+		return sources, proto.Unmarshal(val, sources)
+	}
 }
 
 func (c *Constraint) String() string {
@@ -81,7 +96,7 @@ func (c *Constraint) Close() {
 
 func (c *Constraint) value() (v []byte) {
 	item := c.Iterator.Item()
-	key := item.Key()
+	key := item.KeyCopy(make([]byte, len(c.Prefix)+8))
 	if c.Iterator.ValidForPrefix(c.Prefix) {
 		prefix := key[0]
 		if _, has := types.TriplePrefixMap[prefix]; has {
@@ -221,12 +236,11 @@ type ConstraintMap map[string]ConstraintSet
 
 // A ConstraintGraph associates ids with Variable maps.
 type ConstraintGraph struct {
-	Values map[uint64]*types.Index
-	Index  map[string]*Variable
-	Slice  []string
-	Map    map[string]int
-	In     map[string][]int
-	Out    map[string][]int
+	Index map[string]*Variable
+	Slice []string
+	Map   map[string]int
+	In    map[string][]int
+	Out   map[string][]int
 }
 
 func (g *ConstraintGraph) String() string {

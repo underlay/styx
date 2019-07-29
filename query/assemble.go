@@ -12,13 +12,22 @@ import (
 )
 
 // MakeConstraintGraph populates, scores, sorts, and connects a new constraint graph
-func MakeConstraintGraph(quads []*ld.Quad, txn *badger.Txn) (g *ConstraintGraph, err error) {
-	indices := types.IndexMap{}
-	values := map[uint64]*types.Index{}
+func MakeConstraintGraph(
+	quads []*ld.Quad,
+	graph string,
+	indices []int,
+	txn *badger.Txn,
+) (g *ConstraintGraph, err error) {
+	indexMap := types.IndexMap{}
 
-	g = &ConstraintGraph{Values: values}
+	g = &ConstraintGraph{}
 
-	for _, quad := range quads {
+	for _, index := range indices {
+		quad := quads[index]
+		if quad.Graph.GetValue() != graph {
+			continue
+		}
+
 		s, S := getAttribute(quad.Subject)
 		p, P := getAttribute(quad.Predicate)
 		o, O := getAttribute(quad.Object)
@@ -30,27 +39,26 @@ func MakeConstraintGraph(quads []*ld.Quad, txn *badger.Txn) (g *ConstraintGraph,
 			return nil, errors.New("Cannot handle all-blank triple")
 		} else if (S && !P && !O) || (!S && P && !O) || (!S && !P && O) {
 			// Only one of the terms is a blank node, so this is a first-degree constraint.
-			c = &Constraint{}
-			// c.m, c.n = make([]byte, 8), make([]byte, 8)
+			c = &Constraint{Index: index}
 			if S {
 				c.Place = 0
-				if c.M, c.m, err = getID(quad.Predicate, indices, txn); err != nil {
+				if c.M, c.m, err = getID(quad.Predicate, indexMap, txn); err != nil {
 					return
-				} else if c.N, c.n, err = getID(quad.Object, indices, txn); err != nil {
+				} else if c.N, c.n, err = getID(quad.Object, indexMap, txn); err != nil {
 					return
 				}
 			} else if P {
 				c.Place = 1
-				if c.M, c.m, err = getID(quad.Object, indices, txn); err != nil {
+				if c.M, c.m, err = getID(quad.Object, indexMap, txn); err != nil {
 					return
-				} else if c.N, c.n, err = getID(quad.Subject, indices, txn); err != nil {
+				} else if c.N, c.n, err = getID(quad.Subject, indexMap, txn); err != nil {
 					return
 				}
 			} else if O {
 				c.Place = 2
-				if c.M, c.m, err = getID(quad.Subject, indices, txn); err != nil {
+				if c.M, c.m, err = getID(quad.Subject, indexMap, txn); err != nil {
 					return
-				} else if c.N, c.n, err = getID(quad.Predicate, indices, txn); err != nil {
+				} else if c.N, c.n, err = getID(quad.Predicate, indexMap, txn); err != nil {
 					return
 				}
 			}
@@ -64,32 +72,32 @@ func MakeConstraintGraph(quads []*ld.Quad, txn *badger.Txn) (g *ConstraintGraph,
 			// If they're the same blank node, then we insert one z-degree constraint.
 			// If they're different, we insert two second-degree constraints.
 			if !O && s == p {
-				c = &Constraint{Place: pSP}
-				if c.N, c.n, err = getID(quad.Object, indices, txn); err != nil {
+				c = &Constraint{Index: index, Place: pSP}
+				if c.N, c.n, err = getID(quad.Object, indexMap, txn); err != nil {
 					return
 				}
 				g.insertDZ(s, c, txn)
 			} else if !P && o == s {
-				c = &Constraint{Place: pOS}
-				if c.N, c.n, err = getID(quad.Predicate, indices, txn); err != nil {
+				c = &Constraint{Index: index, Place: pOS}
+				if c.N, c.n, err = getID(quad.Predicate, indexMap, txn); err != nil {
 					return
 				}
 				g.insertDZ(o, c, txn)
 			} else if !S && p == o {
-				c = &Constraint{Place: pPO}
-				if c.N, c.n, err = getID(quad.Subject, indices, txn); err != nil {
+				c = &Constraint{Index: index, Place: pPO}
+				if c.N, c.n, err = getID(quad.Subject, indexMap, txn); err != nil {
 					return
 				}
 				g.insertDZ(p, c, txn)
 			} else if S && P && !O {
-				u, v := &Constraint{Place: pS}, &Constraint{Place: pP}
-				if u.M, u.m, err = getID(quad.Predicate, indices, txn); err != nil {
+				u, v := &Constraint{Index: index, Place: pS}, &Constraint{Index: index, Place: pP}
+				if u.M, u.m, err = getID(quad.Predicate, indexMap, txn); err != nil {
 					return
-				} else if u.N, u.n, err = getID(quad.Object, indices, txn); err != nil {
+				} else if u.N, u.n, err = getID(quad.Object, indexMap, txn); err != nil {
 					return
-				} else if v.M, v.m, err = getID(quad.Object, indices, txn); err != nil {
+				} else if v.M, v.m, err = getID(quad.Object, indexMap, txn); err != nil {
 					return
-				} else if v.N, v.n, err = getID(quad.Subject, indices, txn); err != nil {
+				} else if v.N, v.n, err = getID(quad.Subject, indexMap, txn); err != nil {
 					return
 				}
 
@@ -101,15 +109,15 @@ func MakeConstraintGraph(quads []*ld.Quad, txn *badger.Txn) (g *ConstraintGraph,
 					return
 				}
 			} else if S && !P && O {
-				u, v := &Constraint{Place: pS}, &Constraint{Place: pO}
+				u, v := &Constraint{Index: index, Place: pS}, &Constraint{Index: index, Place: pO}
 
-				if u.M, u.m, err = getID(quad.Predicate, indices, txn); err != nil {
+				if u.M, u.m, err = getID(quad.Predicate, indexMap, txn); err != nil {
 					return
-				} else if u.N, u.n, err = getID(quad.Object, indices, txn); err != nil {
+				} else if u.N, u.n, err = getID(quad.Object, indexMap, txn); err != nil {
 					return
-				} else if v.M, v.m, err = getID(quad.Subject, indices, txn); err != nil {
+				} else if v.M, v.m, err = getID(quad.Subject, indexMap, txn); err != nil {
 					return
-				} else if v.N, v.n, err = getID(quad.Predicate, indices, txn); err != nil {
+				} else if v.N, v.n, err = getID(quad.Predicate, indexMap, txn); err != nil {
 					return
 				}
 
@@ -121,15 +129,15 @@ func MakeConstraintGraph(quads []*ld.Quad, txn *badger.Txn) (g *ConstraintGraph,
 					return
 				}
 			} else if !S && P && O {
-				u, v := &Constraint{Place: pP}, &Constraint{Place: pO}
+				u, v := &Constraint{Index: index, Place: pP}, &Constraint{Index: index, Place: pO}
 
-				if u.M, u.m, err = getID(quad.Object, indices, txn); err != nil {
+				if u.M, u.m, err = getID(quad.Object, indexMap, txn); err != nil {
 					return
-				} else if u.N, u.n, err = getID(quad.Subject, indices, txn); err != nil {
+				} else if u.N, u.n, err = getID(quad.Subject, indexMap, txn); err != nil {
 					return
-				} else if v.M, v.m, err = getID(quad.Subject, indices, txn); err != nil {
+				} else if v.M, v.m, err = getID(quad.Subject, indexMap, txn); err != nil {
 					return
-				} else if v.N, v.n, err = getID(quad.Predicate, indices, txn); err != nil {
+				} else if v.N, v.n, err = getID(quad.Predicate, indexMap, txn); err != nil {
 					return
 				}
 
@@ -142,12 +150,6 @@ func MakeConstraintGraph(quads []*ld.Quad, txn *badger.Txn) (g *ConstraintGraph,
 				}
 			}
 		}
-	}
-
-	// Populate the value map of uint64 IDs to index structs
-	for _, index := range indices {
-		id := index.GetId()
-		g.Values[id] = index
 	}
 
 	// Score the variables

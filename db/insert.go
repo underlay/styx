@@ -46,7 +46,7 @@ When inserting a triple <|S P O|>, we perform 12-15 operations 😬
 	prefixes {xyz}
 */
 
-func insert(cid cid.Cid, graph string, quads []*ld.Quad, txn *badger.Txn) (err error) {
+func (db *DB) insert(cid cid.Cid, quads []*ld.Quad, graph string, indices []int, txn *badger.Txn) (err error) {
 	graphID := fmt.Sprintf("%s#%s", cid.String(), graph)
 	graphKey := types.AssembleKey(types.GraphPrefix, []byte(graphID), nil, nil)
 
@@ -66,25 +66,22 @@ func insert(cid cid.Cid, graph string, quads []*ld.Quad, txn *badger.Txn) (err e
 		return
 	}
 
-	var root uint64
-	val := make([]byte, 8)
-	if item, err = txn.Get(types.CounterKey); err == badger.ErrKeyNotFound {
-		root = types.InitialCounter
-	} else if err != nil {
-		return
-	} else if val, err = item.ValueCopy(val); err != nil {
-		return
-	} else {
-		root = binary.BigEndian.Uint64(val)
-	}
-
-	values := types.ValueMap{}
-	indices := types.IndexMap{}
+	valueMap := types.ValueMap{}
+	indexMap := types.IndexMap{}
 
 	for index, quad := range quads {
+		g := "@default"
+		if quad.Graph != nil {
+			g = quad.Graph.GetValue()
+		}
+
+		if g != graph {
+			continue
+		}
+
 		source := &types.Source{
 			Cid:   cid.Bytes(),
-			Graph: graph,
+			Graph: g,
 			Index: int32(index),
 		}
 
@@ -94,11 +91,11 @@ func insert(cid cid.Cid, graph string, quads []*ld.Quad, txn *badger.Txn) (err e
 
 		// Get the uint64 ids for the subject, predicate, and object
 		var s, p, o []byte
-		if s, err = getID(cid, quad.Subject, 0, root, indices, values, txn); err != nil {
+		if s, err = db.getID(cid, quad.Subject, 0, indexMap, valueMap, txn); err != nil {
 			return
-		} else if p, err = getID(cid, quad.Predicate, 1, root, indices, values, txn); err != nil {
+		} else if p, err = db.getID(cid, quad.Predicate, 1, indexMap, valueMap, txn); err != nil {
 			return
-		} else if o, err = getID(cid, quad.Object, 2, root, indices, values, txn); err != nil {
+		} else if o, err = db.getID(cid, quad.Object, 2, indexMap, valueMap, txn); err != nil {
 			return
 		}
 
@@ -157,27 +154,19 @@ func insert(cid cid.Cid, graph string, quads []*ld.Quad, txn *badger.Txn) (err e
 		}
 	}
 
-	if err = indices.Commit(txn); err != nil {
+	if err = indexMap.Commit(txn); err != nil {
 		return
-	} else if err = values.Commit(txn); err != nil {
+	} else if err = valueMap.Commit(txn); err != nil {
 		return
-	}
-
-	// Counter was incremented iff values is not empty
-	if len(values) > 0 {
-		next := root + uint64(len(values))
-		binary.BigEndian.PutUint64(val, next)
-		err = txn.Set(types.CounterKey, val)
 	}
 
 	return
 }
 
-func getID(
+func (db *DB) getID(
 	origin cid.Cid,
 	node ld.Node,
 	place uint8,
-	root uint64,
 	indices types.IndexMap,
 	values types.ValueMap,
 	txn *badger.Txn,
@@ -197,21 +186,21 @@ func getID(
 	key[0] = types.IndexPrefix
 	key = append(key, []byte(v)...)
 
-	var index *types.Index
+	// var index *types.Index
+	index := &types.Index{}
 	if item, err := txn.Get(key); err == badger.ErrKeyNotFound {
 		// Generate a new id and create an Index struct for it
-		id := values.InsertNode(value, root)
-		index = &types.Index{Id: id}
-	} else if err != nil {
-		return nil, err
-	} else {
-		// Unmarshal the value into an Index struct
-		index = &types.Index{}
-		if val, err := item.ValueCopy(nil); err != nil {
-			return nil, err
-		} else if err := proto.Unmarshal(val, index); err != nil {
+		if index.Id, err = db.Sequence.Next(); err != nil {
 			return nil, err
 		}
+		values[index.Id] = value
+	} else if err != nil {
+		return nil, err
+	} else if val, err := item.ValueCopy(nil); err != nil {
+		return nil, err
+	} else if err := proto.Unmarshal(val, index); err != nil {
+		return nil, err
+
 	}
 
 	indices[v] = index
@@ -248,7 +237,7 @@ func setCount(key []byte, txn *badger.Txn) (count uint64, err error) {
 
 	item, err := txn.Get(key)
 	if err == badger.ErrKeyNotFound {
-		count = types.InitialCounter
+		count = uint64(1)
 	} else if err != nil {
 		return
 	} else if val, err = item.ValueCopy(val); err != nil {

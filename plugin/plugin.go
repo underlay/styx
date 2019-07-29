@@ -4,11 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
+	"strings"
+	"time"
 
 	cid "github.com/ipfs/go-cid"
 	plugin "github.com/ipfs/go-ipfs/plugin"
@@ -36,17 +39,24 @@ const NQuadsListenerPort = "4045"
 // QueryType of queries in the Underlay
 const QueryType = "http://underlay.mit.edu/ns#Query"
 
-// Satisfies is the relation between a query and its result
-const Satisfies = "http://underlay.mit.edu/ns#satisfies"
+// Context is the compaction context for CBOR-LD
+var Context = []byte(`{
+	"@vocab": "http://www.w3.org/ns/prov#",
+	"value": { "@container": "@list" },
+	"u": "http://underlay.mit.edu/ns#",
+	"xsd": "http://www.w3.org/2001/XMLSchema#",
+  "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+	"v": { "@id": "rdf:value", "@type": "@id" }
+}`)
 
 // StyxPlugin is an IPFS deamon plugin
 type StyxPlugin struct {
-	path           string
-	api            string
-	lns            []net.Listener
-	db             *styx.DB
-	documentLoader ld.DocumentLoader
-	store          styx.DocumentStore
+	path   string
+	api    string
+	lns    []net.Listener
+	db     *styx.DB
+	loader ld.DocumentLoader
+	store  styx.DocumentStore
 }
 
 // Compile-time type check (bleh)
@@ -67,54 +77,125 @@ func (sp *StyxPlugin) Init() error {
 	return nil
 }
 
-func (sp *StyxPlugin) handleMessage(dataset *ld.RDFDataset, cid cid.Cid) (response *ld.RDFDataset) {
-	defaultGraph := dataset.Graphs[types.DefaultGraph]
+func (sp *StyxPlugin) handleMessage(cid cid.Cid, quads []*ld.Quad, graphs map[string][]int) map[string]interface{} {
+	queries := map[string][]int{}
+	data := map[string]chan map[string]*types.Value{}
+	prov := map[string]chan map[int]*types.SourceList{}
+	for _, quad := range quads {
+		if quad.Graph != nil {
+			continue
+		}
 
-	queries := map[string]chan []*ld.Quad{}
-
-	for _, quad := range defaultGraph {
-		if blankNode, isBlankNode := quad.Subject.(*ld.BlankNode); isBlankNode {
-			if _, hasGraph := dataset.Graphs[blankNode.Attribute]; hasGraph {
+		if b, is := quad.Subject.(*ld.BlankNode); is {
+			if indices, has := graphs[b.Attribute]; has {
 				if iri, isIRI := quad.Predicate.(*ld.IRI); isIRI && iri.Value == ld.RDFType {
 					if iri, isIRI := quad.Object.(*ld.IRI); isIRI && iri.Value == QueryType {
-						queries[blankNode.Attribute] = make(chan []*ld.Quad)
+						data[b.Attribute] = make(chan map[string]*types.Value)
+						prov[b.Attribute] = make(chan map[int]*types.SourceList)
+						queries[b.Attribute] = indices
 					}
 				}
 			}
 		}
 	}
 
-	for graph, quads := range dataset.Graphs {
-		if graph != types.DefaultGraph {
-			if _, isQuery := queries[graph]; isQuery {
-				go sp.db.Query(quads, queries[graph])
-			} else {
-				go sp.db.IngestGraph(cid, graph, quads)
-			}
+	// Messages are strictly either queries or data.
+	// Any message that has a named graph typed to be a query in
+	// the default graph will *not* have *any* of its graphs ingested.
+	if len(queries) > 0 {
+		for graph, indices := range queries {
+			go sp.db.Query(quads, graph, indices, data[graph], prov[graph])
+		}
+	} else {
+		for graph, indices := range graphs {
+			go sp.db.Ingest(cid, quads, graph, indices)
 		}
 	}
 
 	if len(queries) > 0 {
 		hash := cid.String()
-		response := ld.NewRDFDataset()
-		for graph, result := range queries {
-			if quads := <-result; quads != nil {
-				response.Graphs[graph] = quads
-				object := ld.NewIRI(fmt.Sprintf("ul:/ipfs/%s#%s", hash, graph))
-				satisfies := ld.NewQuad(ld.NewBlankNode(graph), ld.NewIRI(Satisfies), object, types.DefaultGraph)
-				response.Graphs[types.DefaultGraph] = append(response.Graphs[types.DefaultGraph], satisfies)
+
+		g := make([]map[string]interface{}, 0, len(queries))
+
+		for graph := range queries {
+			q := map[string]interface{}{
+				"@type":       "Entity",
+				"u:satisfies": map[string]interface{}{"@id": fmt.Sprintf("qv:%s", graph[2:])},
 			}
+
+			d, p := <-data[graph], <-prov[graph]
+			if len(d) > 0 && len(p) > 0 {
+				vl := make([]map[string]interface{}, 0, len(d))
+
+				for label, value := range d {
+					vl = append(vl, map[string]interface{}{
+						"@id":       fmt.Sprintf("qv:%s", label[2:]),
+						"rdf:value": value.ToJSON(),
+					})
+				}
+
+				q["value"] = vl
+
+				pl := make([]map[string]interface{}, 0, len(p))
+				for index, sources := range p {
+					values := make([]string, len(sources.Sources))
+					for i, source := range sources.Sources {
+						values[i] = source.GetValue()
+					}
+					pl = append(pl, map[string]interface{}{
+						"@id": fmt.Sprintf("qp:%d", index),
+						"v":   values,
+					})
+				}
+
+				q["wasDerivedFrom"] = map[string]interface{}{
+					"@type": "Entity",
+					"generatedAtTime": map[string]interface{}{
+						"@type":  "xsd:dateTime",
+						"@value": time.Now().Format(time.RFC3339),
+					},
+					"wasAttributedTo": map[string]interface{}{
+						"@id": "SELF_ID",
+					},
+					"value": pl,
+				}
+			} else {
+				q["value"] = []interface{}{}
+			}
+
+			g = append(g, q)
 		}
-		if len(response.Graphs) > 1 {
-			return response
+
+		// Unmarshal context string
+		context := map[string]interface{}{}
+		if err := json.Unmarshal(Context, &context); err != nil {
+			log.Println("Error unmarshalling context", err)
 		}
+		context["qv"] = fmt.Sprintf("ul:/ipfs/%s#_:", hash)
+		context["qp"] = fmt.Sprintf("ul:/ipfs/%s#/", hash)
+
+		doc := map[string]interface{}{
+			"@context": context,
+			"@graph":   g,
+		}
+
+		return doc
 	}
+
 	return nil
 }
 
 func (sp *StyxPlugin) handleNQuadsConnection(conn net.Conn) {
-	serializer := &ld.NQuadRDFSerializer{}
-	defer conn.Close()
+	log.Println("Handling new n-quads connection", conn.LocalAddr())
+
+	defer func() {
+		log.Println("Closing n-quads connection", conn.LocalAddr())
+		conn.Close()
+	}()
+
+	stringOptions := styx.GetStringOptions(sp.loader)
+	proc := ld.NewJsonLdProcessor()
+
 	reader := bufio.NewReader(conn)
 	writer := bufio.NewWriter(conn)
 	uvarint := make([]byte, 0, binary.MaxVarintLen64)
@@ -132,51 +213,43 @@ func (sp *StyxPlugin) handleNQuadsConnection(conn net.Conn) {
 			return
 		}
 
-		dataset, err := serializer.Parse(b)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-
 		cid, err := sp.store(bytes.NewReader(b))
 		if err != nil {
 			log.Println(err)
 			continue
 		}
 
-		response := sp.handleMessage(dataset, cid)
-		if response != nil {
-			res, err := serializer.Serialize(response)
-			if err != nil {
+		quads, graphs, err := styx.ParseMessage(bytes.NewReader(b))
+
+		if response := sp.handleMessage(cid, quads, graphs); response == nil {
+			continue
+		} else if res, err := proc.ToRDF(response, stringOptions); err != nil {
+			continue
+		} else if serialized, is := res.(string); !is {
+			continue
+		} else {
+			u := binary.PutUvarint(uvarint, uint64(len(serialized)))
+			if v, err := writer.Write(uvarint[:u]); err != nil || u != v {
 				continue
-			} else if serialized, isString := res.(string); !isString {
+			} else if w, err := writer.WriteString(serialized); err != nil || w != len(serialized) {
 				continue
-			} else {
-				u := binary.PutUvarint(uvarint, uint64(len(serialized)))
-				v, err := writer.Write(uvarint[:u])
-				if err != nil || u != v {
-					continue
-				}
-				w, err := writer.WriteString(serialized)
-				if err != nil || w != len(serialized) {
-					continue
-				}
 			}
 		}
 	}
 }
 
 func (sp *StyxPlugin) handleCborLdConnection(conn net.Conn) {
+	log.Println("Handling new cbor-ld connection", conn.LocalAddr())
+	defer func() {
+		log.Println("Closing cbor-ld connection", conn.LocalAddr())
+		conn.Close()
+	}()
+
 	marshaller := cbor.NewMarshaller(conn)
 	unmarshaller := cbor.NewUnmarshaller(cbor.DecodeOptions{}, conn)
 	proc := ld.NewJsonLdProcessor()
 
-	datasetOptions := styx.GetDatasetOptions(sp.db.Loader)
-	stringOptions := styx.GetStringOptions(sp.db.Loader)
-
-	api := ld.NewJsonLdApi()
-
-	defer conn.Close()
+	stringOptions := styx.GetStringOptions(sp.loader)
 
 	for {
 		var data map[string]interface{}
@@ -187,19 +260,7 @@ func (sp *StyxPlugin) handleCborLdConnection(conn net.Conn) {
 		}
 
 		// Convert to RDF
-		rdf, err := proc.Normalize(data, datasetOptions)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-
-		// Cast to *ld.RDFDataset
-		dataset, isDataset := rdf.(*ld.RDFDataset)
-		if !isDataset {
-			continue
-		}
-
-		normalized, err := api.Normalize(dataset, stringOptions)
+		normalized, err := proc.Normalize(data, stringOptions)
 		if err != nil {
 			log.Println(err)
 			continue
@@ -211,11 +272,16 @@ func (sp *StyxPlugin) handleCborLdConnection(conn net.Conn) {
 			continue
 		}
 
-		response := sp.handleMessage(dataset, cid)
-		if response != nil {
-			json, _ := api.FromRDF(response, datasetOptions)
-			compact, _ := proc.Compact(json, map[string]interface{}{}, datasetOptions)
-			marshaller.Marshal(compact)
+		log.Println("Received message", cid.String())
+
+		quads, graphs, err := styx.ParseMessage(strings.NewReader(normalized.(string)))
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		if r := sp.handleMessage(cid, quads, graphs); r != nil {
+			marshaller.Marshal(r)
 		}
 	}
 }
@@ -256,11 +322,8 @@ func (sp *StyxPlugin) attach(port string, protocol string, handler func(conn net
 
 // Start gets passed a CoreAPI instance, satisfying the plugin.PluginDaemon interface.
 func (sp *StyxPlugin) Start(api core.CoreAPI) error {
-	sp.documentLoader = loader.NewCoreDocumentLoader(api)
-
-	unixfsAPI := api.Unixfs()
-
-	sp.store = styx.MakeAPIDocumentStore(unixfsAPI)
+	sp.loader = loader.NewCoreDocumentLoader(api)
+	sp.store = styx.MakeAPIDocumentStore(api.Unixfs())
 
 	var err error
 
