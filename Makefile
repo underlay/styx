@@ -1,4 +1,5 @@
-GO111MODULE = on
+export GO111MODULE=on
+
 IPFS_PATH ?= $(HOME)/.ipfs
 
 build:

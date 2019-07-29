@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -51,6 +52,7 @@ var Context = []byte(`{
 
 // StyxPlugin is an IPFS deamon plugin
 type StyxPlugin struct {
+	id     string
 	path   string
 	api    string
 	lns    []net.Listener
@@ -154,10 +156,8 @@ func (sp *StyxPlugin) handleMessage(cid cid.Cid, quads []*ld.Quad, graphs map[st
 						"@type":  "xsd:dateTime",
 						"@value": time.Now().Format(time.RFC3339),
 					},
-					"wasAttributedTo": map[string]interface{}{
-						"@id": "SELF_ID",
-					},
-					"value": pl,
+					"wasAttributedTo": map[string]interface{}{"@id": sp.id},
+					"value":           pl,
 				}
 			} else {
 				q["value"] = []interface{}{}
@@ -325,7 +325,12 @@ func (sp *StyxPlugin) Start(api core.CoreAPI) error {
 	sp.loader = loader.NewCoreDocumentLoader(api)
 	sp.store = styx.MakeAPIDocumentStore(api.Unixfs())
 
-	var err error
+	key, err := api.Key().Self(context.Background())
+	if err != nil {
+		return err
+	}
+
+	sp.id = fmt.Sprintf("ul:/ipns/%s", key.ID().String())
 
 	sp.db, err = styx.OpenDB(sp.path)
 	if err != nil {

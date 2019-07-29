@@ -31,7 +31,7 @@ var patternDouble = regexp.MustCompile("^(\\+|-)?([0-9]+(\\.[0-9]*)?|\\.[0-9]+)(
 // ToJSON casts the value into the appropriate JSON-LD interface
 func (value *Value) ToJSON() (r interface{}) {
 	if t, is := value.Node.(*Value_Blank); is {
-		if c, err := cid.Cast(t.Blank.Cid); err != nil {
+		if c, err := cid.Cast(t.Blank.Cid); err == nil {
 			uri := fmt.Sprintf("ul:/ipfs/%s#%s", c.String(), t.Blank.Id)
 			r = map[string]interface{}{"@id": uri}
 		}

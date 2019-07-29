@@ -14,38 +14,6 @@ import (
 	types "github.com/underlay/styx/types"
 )
 
-/*
-In this table, the 'p' that each key starts with is a single byte "prefix"
-from the "prefixes" set. The prefix encodes both the key's type and rotation.
-
-name    #  key format     value type  prefixes
-----------------------------------------------
-triple  3  p | a | b | c  SourceList  {a b c}
-major   3  p | a | b      uint64      {i j k}
-minor   3  p | a | b      uint64      {x y z}
-value   1  p | a          Value       {p}
-index   1  p | element    Index       {q}
-graph   1  p | cid        ISO Date    {g}
-counter 0                 uint64      {>}
-----------------------------------------------
-
-When inserting a triple <|S P O|>, we perform 12-15 operations 😬
-- We first look up each element's index key, if it exists.
-  For each element, we either get a struct Index with a uint64 id, or we
-  create a new one and write that to the index key. We also increment
-  (or set to an initial 1) the Index.<position> counter: this is a count
-	of the total number of times this id occurs in this position
-	(.subject, .predicate, or .object) that we use a heuristic during
-	query planning.
-- We then insert the three triple keys. These are the rotations of the
-	triple [a|s|p|o], [b|p|o|s], and [c|o|s|p], where s, p, and o are the
-	uint64 ids we got from the index keys. The values for each of these
-	keys are SourceList structs.
-- Next we insert the three clockwise ("major") double keys with prefixes {ijk}
-- Next we insert the three counter-clockwise ("minor") double keys with
-	prefixes {xyz}
-*/
-
 func (db *DB) insert(cid cid.Cid, quads []*ld.Quad, graph string, indices []int, txn *badger.Txn) (err error) {
 	graphID := fmt.Sprintf("%s#%s", cid.String(), graph)
 	graphKey := types.AssembleKey(types.GraphPrefix, []byte(graphID), nil, nil)
