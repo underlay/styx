@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -332,7 +333,12 @@ func (sp *StyxPlugin) Start(api core.CoreAPI) error {
 
 	sp.id = fmt.Sprintf("ul:/ipns/%s", key.ID().String())
 
-	sp.db, err = styx.OpenDB(sp.path)
+	path := os.Getenv("STYX_PATH")
+	if path == "" {
+		path = sp.path
+	}
+
+	sp.db, err = styx.OpenDB(path)
 	if err != nil {
 		return err
 	}

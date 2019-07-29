@@ -24,7 +24,12 @@ func MakeConstraintGraph(
 
 	for _, index := range indices {
 		quad := quads[index]
-		if quad.Graph.GetValue() != graph {
+		label := "@default"
+		if quad.Graph != nil && quad.Graph.GetValue() != "" {
+			label = quad.Graph.GetValue()
+		}
+
+		if label != graph {
 			continue
 		}
 

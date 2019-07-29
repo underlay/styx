@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 
 	ld "github.com/piprate/json-gold/ld"
 
 	styx "github.com/underlay/styx/db"
 	loader "github.com/underlay/styx/loader"
+	"github.com/underlay/styx/types"
 )
 
 var sampleData = []byte(`{
@@ -123,20 +125,20 @@ func TestIPFSDocumentLoader(t *testing.T) {
 	checkExpanded(dwebIpldResult)
 }
 
-func TestSimpleIngest(t *testing.T) {
+func TestIngest(t *testing.T) {
 	if !sh.IsUp() {
 		t.Error("IPFS Daemon not running")
 		return
 	}
 
 	// Remove old db
-	fmt.Println("removing path", path)
-	if err := os.RemoveAll(path); err != nil {
+	fmt.Println("removing path", tempPath)
+	if err := os.RemoveAll(tempPath); err != nil {
 		t.Error(err)
 		return
 	}
 
-	db, err := styx.OpenDB(path)
+	db, err := styx.OpenDB(tempPath)
 	if err != nil {
 		t.Error(err)
 		return
@@ -168,12 +170,12 @@ func TestQuery(t *testing.T) {
 	if !sh.IsUp() {
 		t.Error("IPFS Daemon not running")
 		return
-	} else if err := os.RemoveAll(path); err != nil {
+	} else if err := os.RemoveAll(tempPath); err != nil {
 		t.Error(err)
 		return
 	}
 
-	db, err := styx.OpenDB(path)
+	db, err := styx.OpenDB(tempPath)
 	if err != nil {
 		t.Error(err)
 		return
@@ -204,14 +206,15 @@ func TestQuery(t *testing.T) {
 	}
 
 	proc := ld.NewJsonLdProcessor()
-	datasetOptions := styx.GetDatasetOptions(documentLoader)
-	rdf, err := proc.ToRDF(queryData, datasetOptions)
+	stringOptions := styx.GetStringOptions(documentLoader)
+	rdf, err := proc.ToRDF(queryData, stringOptions)
+
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	quads := rdf.(*ld.RDFDataset).Graphs["@default"]
+	quads, graphs, err := styx.ParseMessage(strings.NewReader(rdf.(string)))
 
 	fmt.Println("--- query graph ---")
 	for _, quad := range quads {
@@ -223,13 +226,19 @@ func TestQuery(t *testing.T) {
 		)
 	}
 
-	result, err := db.Query(quads)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	d := make(chan map[string]*types.Value)
+	p := make(chan map[int]*types.SourceList)
+	go func() {
+		if err := db.Query(quads, "@default", graphs["@default"], d, p); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	values, prov := <-d, <-p
+
 	fmt.Println("Result:")
-	fmt.Println(result)
+	fmt.Println(values)
+	fmt.Println(prov)
 }
 
 func TestNT(t *testing.T) {
@@ -239,13 +248,13 @@ func TestNT(t *testing.T) {
 	}
 
 	// Remove old db
-	fmt.Println("removing path", path)
-	if err := os.RemoveAll(path); err != nil {
+	fmt.Println("removing path", tempPath)
+	if err := os.RemoveAll(tempPath); err != nil {
 		t.Error(err)
 		return
 	}
 
-	db, err := styx.OpenDB(path)
+	db, err := styx.OpenDB(tempPath)
 	if err != nil {
 		t.Error(err)
 		return
@@ -284,15 +293,17 @@ func TestNT(t *testing.T) {
 		return
 	}
 
+	documentLoader := loader.NewShellDocumentLoader(sh)
+
 	proc := ld.NewJsonLdProcessor()
-	datasetOptions := styx.GetDatasetOptions(dl)
-	rdf, err := proc.ToRDF(query, datasetOptions)
+	stringOptions := styx.GetStringOptions(documentLoader)
+	rdf, err := proc.ToRDF(query, stringOptions)
+
 	if err != nil {
 		t.Error(err)
-		return
 	}
 
-	quads := rdf.(*ld.RDFDataset).Graphs["@default"]
+	quads, graphs, err := styx.ParseMessage(strings.NewReader(rdf.(string)))
 
 	fmt.Println("--- query graph ---")
 	for _, quad := range quads {
@@ -304,16 +315,19 @@ func TestNT(t *testing.T) {
 		)
 	}
 
-	result, err := db.Query(quads)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	d := make(chan map[string]*types.Value)
+	p := make(chan map[int]*types.SourceList)
+	go func() {
+		if err := db.Query(quads, "@default", graphs["@default"], d, p); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	values, prov := <-d, <-p
+
 	fmt.Println("Result:")
-	fmt.Println(result)
-	// if err = db.Log(); err != nil {
-	// 	t.Error(err)
-	// }
+	fmt.Println(values)
+	fmt.Println(prov)
 }
 
 func openFile(path string, dl ld.DocumentLoader, store styx.DocumentStore) (doc map[string]interface{}, err error) {
