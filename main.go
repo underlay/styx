@@ -26,7 +26,12 @@ func main() {
 		log.Fatal(shError)
 	}
 
-	http.Handle("/", http.FileServer(http.Dir(".")))
+	wd, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	http.Handle("/", http.FileServer(http.Dir(wd+"/www")))
 	log.Println("Listening on port 8000")
 	log.Fatal(http.ListenAndServe(":8000", nil))
 }
