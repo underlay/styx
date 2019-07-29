@@ -23,7 +23,7 @@ When inserting a graph:
 - We look up each element's index key, if it exists.
   For each element, we either get a struct Index with a uint64 id, or we
   create a new one and write that to the index key. We also increment
-  (or set to an initial 1) the Index.<position> counter: this is a count
+  (or set to an initial 1) the Index.(position) counter: this is a count
   of the total number of times this id occurs in this position
   (.subject, .predicate, or .object) that we use a heuristic during
   query planning.
