@@ -3,7 +3,7 @@
 Styx handles six types of keys in twelve logical tables. The underlying key/value store [Badger](https://github.com/dgraph-io/badger) doesn't have a concept of a table, so instead we start every key with a prefix byte to indicate its type.
 
 In this table, the 'p' that each key starts with is a single byte "prefix"
-from the "prefixes" set. The prefix encodes both the key's type and rotation.
+from the "prefixes" set. The prefix encodes both the key's type and its rotation.
 
 | name    | #   | key format | value type | prefixes  |
 | ------- | --- | ---------- | ---------- | --------- |
@@ -47,7 +47,7 @@ A Value key starts with `p` and maps a (big-endian) uint64 ID to a protobuf-enco
 
 A triple key starts with one of `a`, `b`, or `c`, and their values are a protobuf-encoded list of Source structs containing the CID of the source message, and the integer index of a particular quad in the dataset.
 
-... more documentation to come...
+_... more documentation to come ..._
 
 ---
 
