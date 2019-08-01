@@ -2,7 +2,7 @@ package query
 
 import (
 	"encoding/binary"
-	"errors"
+	"fmt"
 	"sort"
 
 	badger "github.com/dgraph-io/badger"
@@ -41,7 +41,7 @@ func MakeConstraintGraph(
 		if !S && !P && !O {
 			continue
 		} else if S && P && O {
-			return nil, errors.New("Cannot handle all-blank triple")
+			return nil, fmt.Errorf("Cannot handle all-blank triple: %s %d", graph, index)
 		} else if (S && !P && !O) || (!S && P && !O) || (!S && !P && O) {
 			// Only one of the terms is a blank node, so this is a first-degree constraint.
 			c = &Constraint{Index: index}

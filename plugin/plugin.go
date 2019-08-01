@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -13,9 +12,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
-	cid "github.com/ipfs/go-cid"
 	plugin "github.com/ipfs/go-ipfs/plugin"
 	core "github.com/ipfs/interface-go-ipfs-core"
 	ld "github.com/piprate/json-gold/ld"
@@ -23,7 +20,6 @@ import (
 
 	styx "github.com/underlay/styx/db"
 	loader "github.com/underlay/styx/loader"
-	types "github.com/underlay/styx/types"
 )
 
 // CborLdProtocol is the cbor-ld protocol string
@@ -37,19 +33,6 @@ const CborLdListenerPort = "4044"
 
 // NQuadsListenerPort is the n-quads listener port
 const NQuadsListenerPort = "4045"
-
-// QueryType of queries in the Underlay
-const QueryType = "http://underlay.mit.edu/ns#Query"
-
-// Context is the compaction context for CBOR-LD
-var Context = []byte(`{
-	"@vocab": "http://www.w3.org/ns/prov#",
-	"value": { "@container": "@list" },
-	"u": "http://underlay.mit.edu/ns#",
-	"xsd": "http://www.w3.org/2001/XMLSchema#",
-  "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-	"v": { "@id": "rdf:value", "@type": "@id" }
-}`)
 
 // StyxPlugin is an IPFS deamon plugin
 type StyxPlugin struct {
@@ -77,112 +60,6 @@ func (sp *StyxPlugin) Version() string {
 
 // Init initializes plugin, satisfying the plugin.Plugin interface.
 func (sp *StyxPlugin) Init() error {
-	return nil
-}
-
-func (sp *StyxPlugin) handleMessage(cid cid.Cid, quads []*ld.Quad, graphs map[string][]int) map[string]interface{} {
-	queries := map[string][]int{}
-	data := map[string]chan map[string]*types.Value{}
-	prov := map[string]chan map[int]*types.SourceList{}
-	for _, quad := range quads {
-		if quad.Graph != nil {
-			continue
-		}
-
-		if b, is := quad.Subject.(*ld.BlankNode); is {
-			if indices, has := graphs[b.Attribute]; has {
-				if iri, isIRI := quad.Predicate.(*ld.IRI); isIRI && iri.Value == ld.RDFType {
-					if iri, isIRI := quad.Object.(*ld.IRI); isIRI && iri.Value == QueryType {
-						data[b.Attribute] = make(chan map[string]*types.Value)
-						prov[b.Attribute] = make(chan map[int]*types.SourceList)
-						queries[b.Attribute] = indices
-					}
-				}
-			}
-		}
-	}
-
-	// Messages are strictly either queries or data.
-	// Any message that has a named graph typed to be a query in
-	// the default graph will *not* have *any* of its graphs ingested.
-	if len(queries) > 0 {
-		for graph, indices := range queries {
-			go sp.db.Query(quads, graph, indices, data[graph], prov[graph])
-		}
-	} else {
-		for graph, indices := range graphs {
-			go sp.db.Ingest(cid, quads, graph, indices)
-		}
-	}
-
-	if len(queries) > 0 {
-		hash := cid.String()
-
-		g := make([]map[string]interface{}, 0, len(queries))
-
-		for graph := range queries {
-			q := map[string]interface{}{
-				"@type":       "Entity",
-				"u:satisfies": map[string]interface{}{"@id": fmt.Sprintf("qv:%s", graph[2:])},
-			}
-
-			d, p := <-data[graph], <-prov[graph]
-			if len(d) > 0 && len(p) > 0 {
-				vl := make([]map[string]interface{}, 0, len(d))
-
-				for label, value := range d {
-					vl = append(vl, map[string]interface{}{
-						"@id":       fmt.Sprintf("qv:%s", label[2:]),
-						"rdf:value": value.ToJSON(),
-					})
-				}
-
-				q["value"] = vl
-
-				pl := make([]map[string]interface{}, 0, len(p))
-				for index, sources := range p {
-					values := make([]string, len(sources.Sources))
-					for i, source := range sources.Sources {
-						values[i] = source.GetValue()
-					}
-					pl = append(pl, map[string]interface{}{
-						"@id": fmt.Sprintf("qp:%d", index),
-						"v":   values,
-					})
-				}
-
-				q["wasDerivedFrom"] = map[string]interface{}{
-					"@type": "Entity",
-					"generatedAtTime": map[string]interface{}{
-						"@type":  "xsd:dateTime",
-						"@value": time.Now().Format(time.RFC3339),
-					},
-					"wasAttributedTo": map[string]interface{}{"@id": sp.id},
-					"value":           pl,
-				}
-			} else {
-				q["value"] = []interface{}{}
-			}
-
-			g = append(g, q)
-		}
-
-		// Unmarshal context string
-		context := map[string]interface{}{}
-		if err := json.Unmarshal(Context, &context); err != nil {
-			log.Println("Error unmarshalling context", err)
-		}
-		context["qv"] = fmt.Sprintf("ul:/ipfs/%s#_:", hash)
-		context["qp"] = fmt.Sprintf("ul:/ipfs/%s#/", hash)
-
-		doc := map[string]interface{}{
-			"@context": context,
-			"@graph":   g,
-		}
-
-		return doc
-	}
-
 	return nil
 }
 
@@ -222,7 +99,7 @@ func (sp *StyxPlugin) handleNQuadsConnection(conn net.Conn) {
 
 		quads, graphs, err := styx.ParseMessage(bytes.NewReader(b))
 
-		if response := sp.handleMessage(cid, quads, graphs); response == nil {
+		if response := sp.db.HandleMessage(sp.id, cid, quads, graphs); response == nil {
 			continue
 		} else if res, err := proc.ToRDF(response, stringOptions); err != nil {
 			continue
@@ -253,21 +130,21 @@ func (sp *StyxPlugin) handleCborLdConnection(conn net.Conn) {
 	stringOptions := styx.GetStringOptions(sp.loader)
 
 	for {
-		var data map[string]interface{}
-		err := unmarshaller.Unmarshal(&data)
+		var doc map[string]interface{}
+		err := unmarshaller.Unmarshal(&doc)
 		if err != nil {
 			log.Println(err)
 			return
 		}
 
 		// Convert to RDF
-		normalized, err := proc.Normalize(data, stringOptions)
+		normalized, err := proc.Normalize(doc, stringOptions)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
 
-		cid, err := sp.store(bytes.NewReader([]byte(normalized.(string))))
+		cid, err := sp.store(strings.NewReader(normalized.(string)))
 		if err != nil {
 			log.Println(err)
 			continue
@@ -281,7 +158,7 @@ func (sp *StyxPlugin) handleCborLdConnection(conn net.Conn) {
 			continue
 		}
 
-		if r := sp.handleMessage(cid, quads, graphs); r != nil {
+		if r := sp.db.HandleMessage(sp.id, cid, quads, graphs); r != nil {
 			marshaller.Marshal(r)
 		}
 	}

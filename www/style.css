@@ -1,0 +1,155 @@
+@font-face {
+	font-family: "Go Smallcaps";
+	font-weight: normal;
+	font-style: normal;
+	src: url("gofont/Go-Smallcaps.ttf") format("truetype");
+}
+
+html {
+	height: 100%;
+	font-family: Monaco, monospace;
+	background: ghostwhite;
+}
+
+body {
+	height: 100%;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+header {
+	background: lavender;
+	display: flex;
+	font-family: "Go Smallcaps";
+	padding: 8px 8px 0 1em;
+	border-bottom: 1px solid lightslategray;
+}
+
+header h1 {
+	margin: 0;
+}
+
+main {
+	flex: 1;
+	display: flex;
+	flex-direction: row;
+}
+
+#blocklyArea {
+	flex: 2;
+}
+
+#blocklyDiv {
+	position: absolute;
+}
+
+#right {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	border-left: 1px solid lightslategray;
+}
+
+/*---------*/
+
+#json div.jsoneditor {
+	border: none;
+	border-bottom: 1px solid lightslategray;
+	background-color: snow;
+}
+
+#json div.jsoneditor-menu {
+	border-bottom: 1px solid lightgray;
+	display: flex;
+	background-color: inherit;
+}
+
+#json .jsoneditor-menu::before {
+	flex: 1;
+	padding: 4px 6px;
+	content: "Inspect Query JSON";
+	color: initial;
+	align-self: end;
+}
+
+#json div.jsoneditor-menu button[type="button"] {
+	filter: invert(0.8);
+}
+
+/*---------*/
+
+#query {
+	font-family: "Go Smallcaps";
+	font-size: larger;
+	padding: calc(2px + 0.1em) 0.1em;
+	border: none;
+	cursor: pointer;
+	background-color: aliceblue;
+	box-sizing: border-box;
+}
+
+#query:hover,
+#query:focus {
+	background-color: honeydew;
+}
+
+#query:active {
+	border: 2px inset;
+	padding: 0.1em;
+}
+
+#query:disabled {
+	background-color: initial;
+	border: none;
+	padding: calc(2px + 0.1em) 0.1em;
+	cursor: not-allowed;
+}
+
+#result {
+	background-color: snow;
+	display: block;
+	border-top: 1px solid lightslategray;
+	flex: 1;
+	white-space: pre-line;
+	font-size: 12px;
+}
+
+/*---------*/
+
+.blocklyMainBackground {
+	stroke: none;
+	stroke-width: 0;
+}
+
+.blocklySvg {
+	background-color: ghostwhite;
+}
+
+.blocklyFlyout {
+	background-color: whitesmoke;
+	border-right: 1px solid lightslategray;
+}
+
+.blocklyFlyoutBackground {
+	fill: whitesmoke;
+	fill-opacity: 0;
+}
+
+.blocklyText,
+.blocklyHtmlInput {
+	font-family: inherit;
+	font-size: 9pt !important;
+}
+
+.blocklyHtmlInput {
+	padding-left: 5px;
+	margin-left: 2px;
+	width: calc(100% - 6px);
+	display: block;
+	margin-top: 1px;
+}
+
+div.blocklyWidgetDiv * {
+	font-family: inherit !important;
+}

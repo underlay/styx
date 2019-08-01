@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8" />
+		<title>Styx</title>
+		<link rel="prefetch" href="gofont/Go-Smallcaps.ttf" as="font" />
+		<link href="style.css" rel="stylesheet" type="text/css" />
+
+		<link
+			href="jsoneditor/jsoneditor.min.css"
+			rel="stylesheet"
+			type="text/css"
+		/>
+	</head>
+
+	<body>
+		<header>
+			<h1>Styx</h1>
+		</header>
+		<main>
+			<div id="blocklyArea"></div>
+			<div id="right">
+				<div id="json"></div>
+				<button disabled="" id="query">Query</button>
+				<table id="result"></table>
+			</div>
+		</main>
+		<div id="blocklyDiv"></div>
+		<xml id="toolbox" style="display: none">
+			<block type="variable"></block>
+			<block type="iri"></block>
+			<block type="predicate">
+				<field name="id">schema:name</field>
+			</block>
+			<block type="text"></block>
+			<block type="math_number"></block>
+			<block type="logic_boolean"></block>
+		</xml>
+	</body>
+	<script src="jsonld.min.js"></script>
+	<script src="blockly/blockly_compressed.js"></script>
+	<script src="blockly/blocks_compressed.js"></script>
+	<script src="blockly/msg/js/en.js"></script>
+	<script src="jsoneditor/jsoneditor.min.js"></script>
+	<script src="blocks.js"></script>
+	<script src="index.js"></script>
+</html>

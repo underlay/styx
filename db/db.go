@@ -3,7 +3,10 @@ package db
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
+	"fmt"
 	"log"
+	"time"
 
 	badger "github.com/dgraph-io/badger"
 	proto "github.com/golang/protobuf/proto"
@@ -13,6 +16,19 @@ import (
 	query "github.com/underlay/styx/query"
 	types "github.com/underlay/styx/types"
 )
+
+// QueryType of queries in the Underlay
+const QueryType = "http://underlay.mit.edu/ns#Query"
+
+// Context is the compaction context for CBOR-LD
+var Context = []byte(`{
+	"@vocab": "http://www.w3.org/ns/prov#",
+	"value": { "@container": "@list" },
+	"u": "http://underlay.mit.edu/ns#",
+	"xsd": "http://www.w3.org/2001/XMLSchema#",
+  "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+	"v": { "@id": "rdf:value", "@type": "@id" }
+}`)
 
 // SequenceBandwidth sets the lease block size of the ID counter
 const SequenceBandwidth = 512
@@ -47,7 +63,120 @@ func OpenDB(path string) (*DB, error) {
 	}
 }
 
-// IngestJSONLd takes a JSON-LD document and ingests it
+// HandleMessage is where all the magic happens.
+func (db *DB) HandleMessage(id string, cid cid.Cid, quads []*ld.Quad, graphs map[string][]int) map[string]interface{} {
+	log.Println("Handling message", cid.String())
+
+	queries := map[string][]int{}
+	data := map[string]chan map[string]*types.Value{}
+	prov := map[string]chan map[int]*types.SourceList{}
+	for _, quad := range quads {
+		if quad.Graph != nil {
+			continue
+		}
+
+		if b, is := quad.Subject.(*ld.BlankNode); is {
+			if indices, has := graphs[b.Attribute]; has {
+				if iri, isIRI := quad.Predicate.(*ld.IRI); isIRI && iri.Value == ld.RDFType {
+					if iri, isIRI := quad.Object.(*ld.IRI); isIRI && iri.Value == QueryType {
+						data[b.Attribute] = make(chan map[string]*types.Value)
+						prov[b.Attribute] = make(chan map[int]*types.SourceList)
+						queries[b.Attribute] = indices
+					}
+				}
+			}
+		}
+	}
+
+	// Messages are strictly either queries or data.
+	// Any message that has a named graph typed to be a query in
+	// the default graph will *not* have *any* of its graphs ingested.
+	if len(queries) > 0 {
+		for graph, indices := range queries {
+			go db.Query(quads, graph, indices, data[graph], prov[graph])
+		}
+	} else {
+		for graph, indices := range graphs {
+			go db.Ingest(cid, quads, graph, indices)
+		}
+	}
+
+	if len(queries) > 0 {
+		hash := cid.String()
+
+		g := make([]map[string]interface{}, 0, len(queries))
+
+		for graph := range queries {
+			q := map[string]interface{}{
+				"@type":       "Entity",
+				"u:satisfies": map[string]interface{}{"@id": fmt.Sprintf("qv:%s", graph[2:])},
+			}
+
+			d, p := <-data[graph], <-prov[graph]
+			if len(d) > 0 && len(p) > 0 {
+				vl := make([]map[string]interface{}, 0, len(d))
+
+				for label, value := range d {
+					vl = append(vl, map[string]interface{}{
+						"@id":       fmt.Sprintf("qv:%s", label[2:]),
+						"rdf:value": value.ToJSON(),
+					})
+				}
+
+				q["value"] = vl
+
+				pl := make([]map[string]interface{}, 0, len(p))
+				for index, sources := range p {
+					values := make([]string, len(sources.Sources))
+					for i, source := range sources.Sources {
+						values[i] = source.GetValue()
+					}
+					pl = append(pl, map[string]interface{}{
+						"@id": fmt.Sprintf("qp:%d", index),
+						"v":   values,
+					})
+				}
+
+				q["wasDerivedFrom"] = map[string]interface{}{
+					"@type": "Entity",
+					"generatedAtTime": map[string]interface{}{
+						"@type":  "xsd:dateTime",
+						"@value": time.Now().Format(time.RFC3339),
+					},
+					"wasAttributedTo": map[string]interface{}{
+						"@id": fmt.Sprintf("ul:/ipns/%s", id),
+					},
+					"value": pl,
+				}
+			} else {
+				q["value"] = []interface{}{}
+			}
+
+			g = append(g, q)
+		}
+
+		// Unmarshal context string
+		context := map[string]interface{}{}
+		if err := json.Unmarshal(Context, &context); err != nil {
+			log.Println("Error unmarshalling context", err)
+		}
+		context["qv"] = fmt.Sprintf("ul:/ipfs/%s#_:", hash)
+		context["qp"] = fmt.Sprintf("ul:/ipfs/%s#/", hash)
+
+		doc := map[string]interface{}{
+			"@context": context,
+			"@graph":   g,
+		}
+
+		return doc
+	}
+
+	return nil
+}
+
+// IngestJSONLd takes a JSON-LD document and ingests it.
+// This is mostly a convenience method for testing;
+// actual messages should get handled at HandleMessage.
 func (db *DB) IngestJSONLd(doc interface{}, loader ld.DocumentLoader, store DocumentStore) error {
 	options := GetStringOptions(loader)
 
