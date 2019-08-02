@@ -103,8 +103,7 @@ All put together, our response to this query would look like this:
 {
 	"@context": {
 		"@vocab": "http://www.w3.org/ns/prov#",
-		"q": "ul:/ipfs/QmPhqpDoDMCkQayAUFw2g1dtW8CxqYB8xVj4mRW8EUkcMf#/",
-		"v": "ul:/ipfs/QmPhqpDoDMCkQayAUFw2g1dtW8CxqYB8xVj4mRW8EUkcMf#_:",
+		"q": "ul:/ipfs/QmPhqpDoDMCkQayAUFw2g1dtW8CxqYB8xVj4mRW8EUkcMf#",
 		"rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
 		"u": "http://underlay.mit.edu/ns#",
 		"value": { "@container": "@list" },
@@ -115,15 +114,15 @@ All put together, our response to this query would look like this:
 		"u:satisfies": { "@id": "v:c14n2" },
 		"value": [
 			{
-				"@id": "v:c14n0",
+				"@id": "q:_:c14n0",
 				"rdf:value": true
 			},
 			{
-				"@id": "v:c14n1",
+				"@id": "q:_:c14n1",
 				"rdf:value": "Mount Fuji"
 			},
 			{
-				"@id": "v:c14n3",
+				"@id": "q:_:c14n3",
 				"rdf:value": {
 					"@id": "ul:/ipfs/QmNp2yo87y4nmXWvJgTGD3zurx7hKfDRiRWtRNPCvHC3rQ#_:c14n0"
 				}
@@ -140,15 +139,15 @@ All put together, our response to this query would look like this:
 			},
 			"value": [
 				{
-					"@id": "q:1",
+					"@id": "q:/1",
 					"rdf:value": "ul:/ipfs/QmNp2yo87y4nmXWvJgTGD3zurx7hKfDRiRWtRNPCvHC3rQ#/0"
 				},
 				{
-					"@id": "q:2",
+					"@id": "q:/2",
 					"rdf:value": "ul:/ipfs/QmNp2yo87y4nmXWvJgTGD3zurx7hKfDRiRWtRNPCvHC3rQ#/1"
 				},
 				{
-					"@id": "q:3",
+					"@id": "q:/3",
 					"rdf:value": "ul:/ipfs/QmNp2yo87y4nmXWvJgTGD3zurx7hKfDRiRWtRNPCvHC3rQ#/2"
 				}
 			]
