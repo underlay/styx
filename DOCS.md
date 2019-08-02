@@ -31,9 +31,9 @@ When inserting a graph:
   triple [a|s|p|o], [b|p|o|s], and [c|o|s|p], where s, p, and o are the
   uint64 ids we got from the index keys. The values for each of these
   keys are SourceList structs.
-- Next we insert the three clockwise ("major") double keys with prefixes {ijk}
+- Next we insert the three clockwise ("major") double keys with prefixes `{i j k}`
 - Next we insert the three counter-clockwise ("minor") double keys with
-  prefixes {xyz}
+  prefixes `{x y z}`
 
 ## Index keys
 
@@ -79,7 +79,7 @@ Suppose that we're a node with PeerId `QmYxMiLd4GXeW8FTSFGUiaY8imCksY6HH9LBq86ga
 }
 ```
 
-... which has CID `QmPhqpDoDMCkQayAUFw2g1dtW8CxqYB8xVj4mRW8EUkcMf`.
+... which has CID `QmNp2yo87y4nmXWvJgTGD3zurx7hKfDRiRWtRNPCvHC3rQ`.
 
 Then we receive a query...
 
@@ -95,14 +95,15 @@ Then we receive a query...
 }
 ```
 
+... which has CID `QmPhqpDoDMCkQayAUFw2g1dtW8CxqYB8xVj4mRW8EUkcMf`.
+
 All put together, our response to this query would look like this:
 
 ```json
 {
 	"@context": {
 		"@vocab": "http://www.w3.org/ns/prov#",
-		"q": "ul:/ipfs/QmPhqpDoDMCkQayAUFw2g1dtW8CxqYB8xVj4mRW8EUkcMf#/",
-		"v": "ul:/ipfs/QmPhqpDoDMCkQayAUFw2g1dtW8CxqYB8xVj4mRW8EUkcMf#_:",
+		"q": "ul:/ipfs/QmPhqpDoDMCkQayAUFw2g1dtW8CxqYB8xVj4mRW8EUkcMf#",
 		"rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
 		"u": "http://underlay.mit.edu/ns#",
 		"value": { "@container": "@list" },
@@ -113,15 +114,15 @@ All put together, our response to this query would look like this:
 		"u:satisfies": { "@id": "v:c14n2" },
 		"value": [
 			{
-				"@id": "v:c14n0",
+				"@id": "q:_:c14n0",
 				"rdf:value": true
 			},
 			{
-				"@id": "v:c14n1",
+				"@id": "q:_:c14n1",
 				"rdf:value": "Mount Fuji"
 			},
 			{
-				"@id": "v:c14n3",
+				"@id": "q:_:c14n3",
 				"rdf:value": {
 					"@id": "ul:/ipfs/QmNp2yo87y4nmXWvJgTGD3zurx7hKfDRiRWtRNPCvHC3rQ#_:c14n0"
 				}
@@ -138,15 +139,15 @@ All put together, our response to this query would look like this:
 			},
 			"value": [
 				{
-					"@id": "q:1",
+					"@id": "q:/1",
 					"rdf:value": "ul:/ipfs/QmNp2yo87y4nmXWvJgTGD3zurx7hKfDRiRWtRNPCvHC3rQ#/0"
 				},
 				{
-					"@id": "q:2",
+					"@id": "q:/2",
 					"rdf:value": "ul:/ipfs/QmNp2yo87y4nmXWvJgTGD3zurx7hKfDRiRWtRNPCvHC3rQ#/1"
 				},
 				{
-					"@id": "q:3",
+					"@id": "q:/3",
 					"rdf:value": "ul:/ipfs/QmNp2yo87y4nmXWvJgTGD3zurx7hKfDRiRWtRNPCvHC3rQ#/2"
 				}
 			]
