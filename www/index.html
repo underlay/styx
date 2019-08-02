@@ -20,6 +20,7 @@
 		<main>
 			<div id="blocklyArea"></div>
 			<div id="right">
+				<div id="context"></div>
 				<div id="json"></div>
 				<button disabled="" id="query">Query</button>
 				<table id="result"></table>
@@ -27,10 +28,15 @@
 		</main>
 		<div id="blocklyDiv"></div>
 		<xml id="toolbox" style="display: none">
-			<block type="variable"></block>
-			<block type="iri"></block>
+			<block type="node"></block>
 			<block type="predicate">
 				<field name="id">schema:name</field>
+			</block>
+			<block type="blank">
+				<field name="id" id="blank-id">b0</field>
+			</block>
+			<block type="iri">
+				<field name="id">http://...</field>
 			</block>
 			<block type="text"></block>
 			<block type="math_number"></block>
