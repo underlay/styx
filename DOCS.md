@@ -31,9 +31,9 @@ When inserting a graph:
   triple [a|s|p|o], [b|p|o|s], and [c|o|s|p], where s, p, and o are the
   uint64 ids we got from the index keys. The values for each of these
   keys are SourceList structs.
-- Next we insert the three clockwise ("major") double keys with prefixes {ijk}
+- Next we insert the three clockwise ("major") double keys with prefixes `{i j k}`
 - Next we insert the three counter-clockwise ("minor") double keys with
-  prefixes {xyz}
+  prefixes `{x y z}`
 
 ## Index keys
 
