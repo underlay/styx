@@ -79,7 +79,7 @@ Suppose that we're a node with PeerId `QmYxMiLd4GXeW8FTSFGUiaY8imCksY6HH9LBq86ga
 }
 ```
 
-... which has CID `QmPhqpDoDMCkQayAUFw2g1dtW8CxqYB8xVj4mRW8EUkcMf`.
+... which has CID `QmNp2yo87y4nmXWvJgTGD3zurx7hKfDRiRWtRNPCvHC3rQ`.
 
 Then we receive a query...
 
@@ -94,6 +94,8 @@ Then we receive a query...
 	}
 }
 ```
+
+... which has CID `QmPhqpDoDMCkQayAUFw2g1dtW8CxqYB8xVj4mRW8EUkcMf`.
 
 All put together, our response to this query would look like this:
 
