@@ -108,9 +108,9 @@ func MakeConstraintGraph(
 
 				u.Dual, v.Dual = v, u
 
-				if err = g.insertD2(s, p, u, true, txn); err != nil {
+				if err = g.insertD2(s, p, u, txn); err != nil {
 					return
-				} else if err = g.insertD2(p, s, v, false, txn); err != nil {
+				} else if err = g.insertD2(p, s, v, txn); err != nil {
 					return
 				}
 			} else if S && !P && O {
@@ -128,9 +128,9 @@ func MakeConstraintGraph(
 
 				u.Dual, v.Dual = v, u
 
-				if err = g.insertD2(s, o, u, true, txn); err != nil {
+				if err = g.insertD2(s, o, u, txn); err != nil {
 					return
-				} else if err = g.insertD2(o, s, v, false, txn); err != nil {
+				} else if err = g.insertD2(o, s, v, txn); err != nil {
 					return
 				}
 			} else if !S && P && O {
@@ -148,9 +148,9 @@ func MakeConstraintGraph(
 
 				u.Dual, v.Dual = v, u
 
-				if err = g.insertD2(p, o, u, true, txn); err != nil {
+				if err = g.insertD2(p, o, u, txn); err != nil {
 					return
-				} else if err = g.insertD2(o, p, v, false, txn); err != nil {
+				} else if err = g.insertD2(o, p, v, txn); err != nil {
 					return
 				}
 			}

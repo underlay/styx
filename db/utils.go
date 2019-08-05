@@ -147,7 +147,7 @@ const (
 	ws       = "[ \\t]+"
 
 	subject  = "(?:" + iri + "|" + bnode + ")" + ws
-	property = iri + ws
+	property = "(?:" + iri + "|" + bnode + ")" + ws // iri + ws
 	object   = "(?:" + iri + "|" + bnode + "|" + literal + ")" + wso
 	graph    = "(?:\\.|(?:(?:" + iri + "|" + bnode + ")" + wso + "\\.))"
 )
@@ -161,7 +161,7 @@ var regexEmpty = regexp.MustCompile("^" + wso + "$")
 // define quad part regexes
 
 var regexSubject = regexp.MustCompile("(?:" + iri + "|" + bnode + ")" + ws)
-var regexProperty = regexp.MustCompile(iri + ws)
+var regexProperty = regexp.MustCompile("(?:" + iri + "|" + bnode + ")" + ws) // regexp.MustCompile(iri + ws)
 var regexObject = regexp.MustCompile("(?:" + iri + "|" + bnode + "|" + literal + ")" + wso)
 var regexGraph = regexp.MustCompile("(?:\\.|(?:(?:" + iri + "|" + bnode + ")" + wso + "\\.))")
 
@@ -203,34 +203,40 @@ func ParseMessage(input io.Reader) ([]*ld.Quad, map[string][]int, error) {
 		}
 
 		// get predicate
-		predicate := ld.NewIRI(unescape(match[3]))
+		// predicate := ld.NewIRI(unescape(match[3]))
+		var predicate ld.Node
+		if match[3] != "" {
+			predicate = ld.NewIRI(unescape(match[3]))
+		} else {
+			predicate = ld.NewBlankNode(unescape(match[4]))
+		}
 
 		// get object
 		var object ld.Node
-		if match[4] != "" {
-			object = ld.NewIRI(unescape(match[4]))
-		} else if match[5] != "" {
-			object = ld.NewBlankNode(unescape(match[5]))
+		if match[5] != "" {
+			object = ld.NewIRI(unescape(match[5]))
+		} else if match[6] != "" {
+			object = ld.NewBlankNode(unescape(match[6]))
 		} else {
-			language := unescape(match[8])
+			language := unescape(match[9])
 			var datatype string
-			if match[7] != "" {
-				datatype = unescape(match[7])
+			if match[9] != "" {
+				datatype = unescape(match[8])
 			} else if match[8] != "" {
 				datatype = ld.RDFLangString
 			} else {
 				datatype = ld.XSDString
 			}
-			unescaped := unescape(match[6])
+			unescaped := unescape(match[7])
 			object = ld.NewLiteral(unescaped, datatype, language)
 		}
 
 		// get graph name ('@default' is used for the default graph)
 		name := "@default"
-		if match[9] != "" {
-			name = unescape(match[9])
-		} else if match[10] != "" {
+		if match[10] != "" {
 			name = unescape(match[10])
+		} else if match[11] != "" {
+			name = unescape(match[11])
 		}
 
 		if graph, has := graphs[name]; has {

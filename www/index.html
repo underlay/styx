@@ -28,19 +28,37 @@
 		</main>
 		<div id="blocklyDiv"></div>
 		<xml id="toolbox" style="display: none">
-			<block type="node"></block>
+			<block type="node">
+				<value name="subject">
+					<block type="blank">
+						<field name="id" id="node-id">b0</field>
+					</block>
+				</value>
+				<value name="predicate">
+					<block type="predicate">
+						<field name="id">rdf:type</field>
+					</block>
+				</value>
+			</block>
+			<block type="blank-predicate">
+				<field name="id" id="predicate-id">b0</field>
+			</block>
 			<block type="predicate">
-				<field name="id">schema:name</field>
+				<field name="id">rdf:type</field>
 			</block>
 			<block type="blank">
 				<field name="id" id="blank-id">b0</field>
 			</block>
 			<block type="iri">
-				<field name="id">http://...</field>
+				<field name="id">schema:Person</field>
 			</block>
 			<block type="text"></block>
 			<block type="math_number"></block>
 			<block type="logic_boolean"></block>
+			<block type="literal">
+				<field name="value">...</field>
+				<field name="type">xsd:</field>
+			</block>
 		</xml>
 	</body>
 	<script src="jsonld.min.js"></script>

@@ -2,6 +2,8 @@ const node = "node"
 const blank = "blank"
 const iri = "iri"
 const predicate = "predicate"
+const blankPredicate = "blank-predicate"
+const literal = "literal"
 
 Blockly.Blocks[node] = {
 	init: function() {
@@ -18,7 +20,7 @@ Blockly.Blocks[node] = {
 				{
 					type: "input_statement",
 					name: "predicate",
-					check: predicate,
+					check: [predicate, blankPredicate],
 				},
 			],
 			inputsInline: true,
@@ -41,12 +43,35 @@ Blockly.Blocks[predicate] = {
 				{
 					type: "input_value",
 					name: "object",
-					check: ["String", "Boolean", "Number", iri, blank, node],
+					check: ["String", "Boolean", "Number", literal, iri, blank, node],
 				},
 			],
-			previousStatement: predicate,
-			nextStatement: predicate,
+			previousStatement: [predicate, blankPredicate],
+			nextStatement: [predicate, blankPredicate],
 			colour: 260,
+		})
+	},
+}
+
+Blockly.Blocks[blankPredicate] = {
+	init: function() {
+		this.jsonInit({
+			type: blankPredicate,
+			message0: "_:%1 %2",
+			args0: [
+				{
+					type: "field_input",
+					name: "id",
+				},
+				{
+					type: "input_value",
+					name: "object",
+					check: ["String", "Boolean", "Number", literal, iri, blank, node],
+				},
+			],
+			previousStatement: [predicate, blankPredicate],
+			nextStatement: [predicate, blankPredicate],
+			colour: 180,
 		})
 	},
 }
@@ -81,6 +106,30 @@ Blockly.Blocks[iri] = {
 			],
 			output: iri,
 			colour: 30,
+		})
+	},
+}
+
+Blockly.Blocks[literal] = {
+	init: function() {
+		this.jsonInit({
+			type: literal,
+			message0: '"%1"',
+			message1: "‹%1›",
+			args0: [
+				{
+					type: "field_input",
+					name: "value",
+				},
+			],
+			args1: [
+				{
+					type: "field_input",
+					name: "type",
+				},
+			],
+			output: literal,
+			colour: 60,
 		})
 	},
 }

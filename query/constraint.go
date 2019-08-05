@@ -355,7 +355,7 @@ func (g *ConstraintGraph) insertD1(u string, c *Constraint, txn *badger.Txn) (er
 	return
 }
 
-func (g *ConstraintGraph) insertD2(u string, v string, c *Constraint, major bool, txn *badger.Txn) (err error) {
+func (g *ConstraintGraph) insertD2(u string, v string, c *Constraint, txn *badger.Txn) (err error) {
 	// For second-degree constraints we get the *count* with an index key
 	// and set the *prefix* to either a major or minor key
 
@@ -369,13 +369,13 @@ func (g *ConstraintGraph) insertD2(u string, v string, c *Constraint, major bool
 		variable.D2[v] = ConstraintSet{c}
 	}
 
-	if major {
+	if index, is := c.M.(*types.Index); is {
 		place := (c.Place + 1) % 3
-		c.Count = c.M.(*types.Index).Get(place)
+		c.Count = index.Get(place)
 		c.Prefix = types.AssembleKey(types.MinorPrefixes[place], c.m, nil, nil)
-	} else {
+	} else if index, is := c.N.(*types.Index); is {
 		place := (c.Place + 2) % 3
-		c.Count = c.N.(*types.Index).Get(place)
+		c.Count = index.Get(place)
 		c.Prefix = types.AssembleKey(types.MajorPrefixes[place], c.n, nil, nil)
 	}
 

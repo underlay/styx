@@ -71,7 +71,7 @@ func (db *DB) HandleMessage(id string, cid cid.Cid, quads []*ld.Quad, graphs map
 	data := map[string]chan map[string]*types.Value{}
 	prov := map[string]chan map[int]*types.SourceList{}
 	for _, quad := range quads {
-		if quad.Graph != nil {
+		if quad.Graph != nil && quad.Graph.GetValue() != "@default" {
 			continue
 		}
 

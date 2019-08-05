@@ -1,7 +1,9 @@
 let QUADS = null
 let BLANK_ID = 0
 const blankTest = /^b(0|[1-9]\d*)$/
-const blankField = document.getElementById("blank-id")
+const fields = ["blank-id", "node-id", "predicate-id"].map(id =>
+	document.getElementById(id)
+)
 
 const QUERY_TYPE = "http://underlay.mit.edu/ns#Query"
 const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
@@ -88,7 +90,7 @@ const result = document.getElementById("result")
 const query = document.getElementById("query")
 query.addEventListener("click", async () => {
 	if (QUADS === null) return
-
+	console.log(QUADS)
 	const res = await fetch("/", {
 		method: "POST",
 		headers: {
@@ -99,6 +101,7 @@ query.addEventListener("click", async () => {
 
 	if (res.status === 200) {
 		const r = await res.json()
+		console.log(r)
 		const {
 			"@graph": [
 				{ "u:satisfies": q, "prov:value": value, "prov:wasDerivedFrom": prov },
@@ -146,7 +149,7 @@ function renderValue(value) {
 	}
 }
 
-function walk(block, graph, g) {
+function walk(block, quads, nodes, graph) {
 	switch (block.type) {
 		case iri:
 			return `<${expand(block.getFieldValue("id"))}>`
@@ -161,12 +164,20 @@ function walk(block, graph, g) {
 			const value = escape(block.inputList[0].fieldRow[1].getValue())
 			return `"${value}"`
 		case "math_number":
-			const n = Number(block.inputList[0].fieldRow[0].getValue())
-			const type = n === parseInt(n) ? XSD_INTEGER : XSD_DOUBLE
-			return `"${n}"^^<${type}>`
+			const v = Number(block.inputList[0].fieldRow[0].getValue())
+			const type = v === parseInt(v) ? XSD_INTEGER : XSD_DOUBLE
+			return `"${v}"^^<${type}>`
 		case "logic_boolean":
 			const b = block.inputList[0].fieldRow[0].getValue() === "TRUE"
 			return `"${b}"^^<${XSD_BOOLEAN}>`
+		case blankPredicate:
+			const i = block.getFieldValue("id")
+			const n = blankTest.exec(i)
+			if (n !== null) {
+				BLANK_ID = Math.max(BLANK_ID, parseInt(n[1]) + 1)
+			}
+		case predicate:
+			return
 	}
 
 	const subject = block.getInputTargetBlock("subject")
@@ -174,20 +185,31 @@ function walk(block, graph, g) {
 		return null
 	}
 
-	const s = walk(subject, graph, g)
+	const s = walk(subject, quads, nodes, graph)
 
-	let predicate = block.getInputTargetBlock("predicate")
-	while (predicate !== null) {
-		const id = predicate.getFieldValue("id")
-		const object = predicate.getInputTargetBlock("object")
+	let property = block.getInputTargetBlock("predicate")
+	while (property !== null) {
+		let p = null
+		const id = property.getFieldValue("id")
+		if (property.type === blankPredicate) {
+			p = `_:${id}`
+			const m = blankTest.exec(id)
+			if (m !== null) {
+				BLANK_ID = Math.max(BLANK_ID, parseInt(m[1]) + 1)
+			}
+		} else {
+			p = `<${expand(id)}>`
+		}
+
+		const object = property.getInputTargetBlock("object")
 		if (object !== null) {
-			const o = walk(object, graph, g)
+			const o = walk(object, quads, nodes, graph)
 			if (o !== null) {
-				graph.push(`${s} <${expand(id)}> ${o} ${g}.`)
+				quads.push(`${s} ${p} ${o} ${graph} .`)
 			}
 		}
 
-		predicate = predicate.getNextBlock()
+		property = property.getNextBlock()
 	}
 
 	return s
@@ -216,33 +238,43 @@ const clear = () => {
 }
 
 workspace.addChangeListener(() => {
-	const graph = []
-	const g = "_:q"
+	const nodes = []
+	const quads = []
+	const graph = "_:q"
 
 	BLANK_ID = 0
 	for (const block of workspace.getTopBlocks(true)) {
 		if (block.rendered) {
-			walk(block, graph, g)
+			walk(block, quads, nodes, graph)
 		}
 	}
 
-	blankField.innerText = `b${BLANK_ID}`
+	for (const field of fields) {
+		field.innerText = `b${BLANK_ID}`
+	}
+
 	workspace.updateToolbox(toolbox)
 
-	if (graph.length === 0) return clear()
+	if (quads.length === 0) return clear()
 
-	graph.push(`${g} <${RDF_TYPE}> <${QUERY_TYPE}> .\n`)
-	const quads = graph.join("\n")
-	jsonld
-		.fromRDF(quads, { format: "application/n-quads", useNativeTypes: true })
-		.then(doc => jsonld.compact(doc, context))
-		.then(doc => {
-			QUADS = quads
-			query.removeAttribute("disabled")
-			jsonEditor.update(doc)
-		})
-		.catch(err => {
-			console.error(err)
-			clear()
-		})
+	quads.push(`${graph} <${RDF_TYPE}> <${QUERY_TYPE}> .\n`)
+	const nq = quads.join("\n")
+	QUADS = nq
+	query.removeAttribute("disabled")
+	// jsonld
+	// 	.fromRDF(nq, {
+	// 		format: "application/n-quads",
+	// 		useNativeTypes: true,
+	// 		produceGeneralizedRdf: true,
+	// 	})
+	// 	.then(doc => jsonld.compact(doc, context))
+	// 	.then(doc => {
+	// 		QUADS = nq
+	// 		query.removeAttribute("disabled")
+	// 		jsonEditor.update(doc)
+	// 	})
+	// 	.catch(err => {
+	// 		console.error(err)
+	// 		clear()
+	// 	})
 })
