@@ -13,3 +13,14 @@ Styx runs an HTTP interface at `http://localhost:8000` that you can also interac
 - `POST /` with a `Content-Type` of either `application/ld+json` or `application/n-quads`. If the attached message contains queries, the response `200` body will contain a JSON-LD-serialized query response. Otherwise the route will respond `204` and persist the attached message to disk (and pin it to IPFS via HTTP API).
 
 Another way to interact with styx for now is to also install [percolate](https://github.com/underlay/percolate) and run the [`examples/ping/index.js`](https://github.com/underlay/percolate/tree/master/examples/ping) example, which is configured to send a simple test message to the local IPFS node at `"/ip4/127.0.0.1/tcp/4001/ipfs/<YOUR-PEER-ID-HERE>"`.
+
+## Roadmap
+
+- Rules! We plan on implementing a variant of Datalog.
+  - Linear Datalog with semi-naive evaluation would be simplest to implement
+  - Handling of arithmetic / custom "evaluated" functions will be tricky
+  - Datalog queries will need more elaborate provenance
+- Reification
+  - This will be how we implement provenance-based filtering (independent of Datlog or rules)
+- Pinning
+  - How to actually manage a styx node? What sorts of control mechanisms?
