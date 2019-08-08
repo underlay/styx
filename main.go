@@ -3,14 +3,18 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"strings"
 
-	"github.com/ipfs/go-cid"
+	uuid "github.com/google/uuid"
+	cid "github.com/ipfs/go-cid"
 	ipfs "github.com/ipfs/go-ipfs-api"
 	ld "github.com/piprate/json-gold/ld"
 
@@ -20,16 +24,56 @@ import (
 
 // Replace at your leisure
 const tempPath = "/tmp/styx"
+const tempPort = "8000"
 
 var path = os.Getenv("STYX_PATH")
+var port = os.Getenv("STYX_PORT")
 
 // Replace at your leisure
 var sh = ipfs.NewShell("localhost:5001")
 var shError = "IPFS Daemon not running"
 
+func walkValues(values []interface{}, files map[string]string) {
+	for _, value := range values {
+		if object, is := value.(map[string]interface{}); is {
+			for key, val := range object {
+				if id, is := val.(string); is && key == "@id" {
+					if uri, has := files[id]; has {
+						object["@id"] = uri
+					}
+				} else if array, is := val.([]interface{}); is && (key == "@list" || key == "@set") {
+					walkValues(array, files)
+				}
+			}
+		}
+	}
+}
+
+func walk(graph []interface{}, files map[string]string) {
+	for _, element := range graph {
+		if node, is := element.(map[string]interface{}); is {
+			for key, val := range node {
+				if id, is := val.(string); is && key == "@id" {
+					if uri, has := files[id]; has {
+						node["@id"] = uri
+					}
+				} else if values, is := val.([]interface{}); is && key == "@graph" {
+					walk(values, files)
+				} else if is {
+					walkValues(values, files)
+				}
+			}
+		}
+	}
+}
+
 func main() {
 	if path == "" {
 		path = tempPath
+	}
+
+	if port == "" {
+		port = tempPort
 	}
 
 	if !sh.IsUp() {
@@ -63,10 +107,16 @@ func main() {
 	fs := http.FileServer(dir)
 	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
 		if req.Method == "POST" && req.URL.Path == "/" {
-			t := req.Header.Get("Content-Type")
+			ct := req.Header.Get("Content-Type")
+			m, params, err := mime.ParseMediaType(ct)
+			if err != nil {
+				res.WriteHeader(400)
+				return
+			}
+
 			var cid cid.Cid
 			var reader io.Reader
-			if t == "application/ld+json" {
+			if m == "application/ld+json" {
 				decoder := json.NewDecoder(req.Body)
 				var doc interface{}
 				if err := decoder.Decode(&doc); err != nil {
@@ -86,7 +136,7 @@ func main() {
 					cid = c
 					reader = strings.NewReader(s)
 				}
-			} else if t == "application/n-quads" {
+			} else if m == "application/n-quads" {
 				if b, err := ioutil.ReadAll(req.Body); err != nil {
 					res.WriteHeader(500)
 					return
@@ -96,6 +146,61 @@ func main() {
 				} else {
 					cid = c
 					reader = bytes.NewReader(b)
+				}
+			} else if boundary, has := params["boundary"]; m == "multipart/form-data" && has {
+				r := multipart.NewReader(req.Body, boundary)
+				files := map[string]string{}
+				u, err := uuid.NewRandom()
+				if err != nil {
+					res.WriteHeader(500)
+					return
+				}
+				base := fmt.Sprintf("uuid://%s/", u.String())
+				opts := ld.NewJsonLdOptions(base)
+				opts.DocumentLoader = dl
+				opts.ProcessingMode = ld.JsonLd_1_1
+				var graph []interface{}
+				for {
+					if p, err := r.NextPart(); err == io.EOF {
+						break
+					} else if err != nil {
+						res.WriteHeader(400)
+						return
+					} else if name := p.FormName(); name == req.URL.RawQuery {
+						if doc, err := ld.DocumentFromReader(p); err != nil {
+							res.WriteHeader(400)
+							return
+						} else if expanded, err := proc.Expand(doc, opts); err != nil {
+							res.WriteHeader(400)
+							return
+						} else if flattened, err := proc.Flatten(expanded, nil, opts); err != nil {
+							res.WriteHeader(400)
+							return
+						} else {
+							graph = flattened.([]interface{})
+						}
+					} else if c, err := store(p); err != nil {
+						res.WriteHeader(400)
+						return
+					} else {
+						id := base + name
+						uri := fmt.Sprintf("dweb:/ipfs/%s", c.String())
+						files[id] = uri
+					}
+				}
+				walk(graph, files)
+
+				// Convert to RDF
+				rdf, err := proc.Normalize(graph, options)
+				if s, is := rdf.(string); !is || err != nil {
+					res.WriteHeader(400)
+					return
+				} else if c, err := store(strings.NewReader(s)); err != nil {
+					res.WriteHeader(500)
+					return
+				} else {
+					cid = c
+					reader = strings.NewReader(s)
 				}
 			} else {
 				res.WriteHeader(415)
@@ -117,6 +222,6 @@ func main() {
 		fs.ServeHTTP(res, req)
 	})
 
-	log.Println("Listening on port 8000")
-	log.Fatal(http.ListenAndServe(":8000", nil))
+	log.Printf("Listening on port %s\n", port)
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
