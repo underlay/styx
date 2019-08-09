@@ -21,17 +21,17 @@
 			<div id="blocklyArea"></div>
 			<div id="right">
 				<div id="context"></div>
-				<div id="json"></div>
 				<button disabled="" id="query">Query</button>
 				<table id="result"></table>
 			</div>
 		</main>
 		<div id="blocklyDiv"></div>
 		<xml id="toolbox" style="display: none">
+			<button text="New Variable" callbackKey="variable"></button>
 			<block type="node">
 				<value name="subject">
 					<block type="blank">
-						<field name="id" id="node-id">b0</field>
+						<field name="id">b0</field>
 					</block>
 				</value>
 				<value name="predicate">
@@ -41,13 +41,13 @@
 				</value>
 			</block>
 			<block type="blank-predicate">
-				<field name="id" id="predicate-id">b0</field>
+				<field name="id">b0</field>
 			</block>
 			<block type="predicate">
 				<field name="id">rdf:type</field>
 			</block>
 			<block type="blank">
-				<field name="id" id="blank-id">b0</field>
+				<field name="id">b0</field>
 			</block>
 			<block type="iri">
 				<field name="id">schema:Person</field>

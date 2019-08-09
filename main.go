@@ -188,6 +188,7 @@ func main() {
 						files[id] = uri
 					}
 				}
+
 				walk(graph, files)
 
 				// Convert to RDF

@@ -1,9 +1,11 @@
 let QUADS = null
-let BLANK_ID = 0
-const blankTest = /^b(0|[1-9]\d*)$/
-const fields = ["blank-id", "node-id", "predicate-id"].map(id =>
-	document.getElementById(id)
-)
+let VARIABLE = 0
+
+const fields = [
+	'block[type="node"] block[type="blank"]',
+	'block[type="blank-predicate"]',
+	'block[type="blank"]',
+].map(s => document.querySelector(`#toolbox > ${s} field`))
 
 const QUERY_TYPE = "http://underlay.mit.edu/ns#Query"
 const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
@@ -42,10 +44,6 @@ const options = {
 const contextElement = document.getElementById("context")
 const contextEditor = new JSONEditor(contextElement, options, context)
 contextEditor.collapseAll()
-
-const jsonElement = document.getElementById("json")
-const jsonEditor = new JSONEditor(jsonElement, options, {})
-jsonEditor.collapseAll()
 
 const toolbox = document.getElementById("toolbox")
 const area = document.getElementById("blocklyArea")
@@ -149,33 +147,28 @@ function renderValue(value) {
 	}
 }
 
-function walk(block, quads, nodes, graph) {
+function walk(block, quads, nodes, g) {
+	let value, type
 	switch (block.type) {
+		case "text":
+			value = escape(block.getFieldValue("TEXT"))
+			return `"${value}"`
+		case "math_number":
+			value = Number(block.getFieldValue("NUM"))
+			type = value === parseInt(value) ? XSD_INTEGER : XSD_DOUBLE
+			return `"${value}"^^<${type}>`
+		case "logic_boolean":
+			value = block.getFieldValue("BOOL").toLowerCase()
+			return `"${value}"^^<${XSD_BOOLEAN}>`
+		case literal:
+			value = block.getFieldValue("value")
+			type = block.getFieldValue("type")
+			return `"${escape(value)}"^^<${expand(type)}>`
 		case iri:
 			return `<${expand(block.getFieldValue("id"))}>`
 		case blank:
-			const l = block.getFieldValue("id")
-			const m = blankTest.exec(l)
-			if (m !== null) {
-				BLANK_ID = Math.max(BLANK_ID, parseInt(m[1]) + 1)
-			}
-			return `_:${l}`
-		case "text":
-			const value = escape(block.inputList[0].fieldRow[1].getValue())
-			return `"${value}"`
-		case "math_number":
-			const v = Number(block.inputList[0].fieldRow[0].getValue())
-			const type = v === parseInt(v) ? XSD_INTEGER : XSD_DOUBLE
-			return `"${v}"^^<${type}>`
-		case "logic_boolean":
-			const b = block.inputList[0].fieldRow[0].getValue() === "TRUE"
-			return `"${b}"^^<${XSD_BOOLEAN}>`
+			return `_:${workspace.getVariableById(block.getFieldValue("id")).name}`
 		case blankPredicate:
-			const i = block.getFieldValue("id")
-			const n = blankTest.exec(i)
-			if (n !== null) {
-				BLANK_ID = Math.max(BLANK_ID, parseInt(n[1]) + 1)
-			}
 		case predicate:
 			return
 	}
@@ -185,31 +178,25 @@ function walk(block, quads, nodes, graph) {
 		return null
 	}
 
-	const s = walk(subject, quads, nodes, graph)
+	const s = walk(subject, quads, nodes, g)
 
-	let property = block.getInputTargetBlock("predicate")
-	while (property !== null) {
-		let p = null
+	for (
+		let property = block.getInputTargetBlock("predicate");
+		property !== null;
+		property = property.getNextBlock()
+	) {
 		const id = property.getFieldValue("id")
-		if (property.type === blankPredicate) {
-			p = `_:${id}`
-			const m = blankTest.exec(id)
-			if (m !== null) {
-				BLANK_ID = Math.max(BLANK_ID, parseInt(m[1]) + 1)
-			}
-		} else {
-			p = `<${expand(id)}>`
-		}
-
+		const p =
+			property.type === blankPredicate
+				? `_:${workspace.getVariableById(id).name}`
+				: `<${expand(id)}>`
 		const object = property.getInputTargetBlock("object")
 		if (object !== null) {
-			const o = walk(object, quads, nodes, graph)
+			const o = walk(object, quads, nodes, g)
 			if (o !== null) {
-				quads.push(`${s} ${p} ${o} ${graph} .`)
+				quads.push(`${s} ${p} ${o} ${g} .`)
 			}
 		}
-
-		property = property.getNextBlock()
 	}
 
 	return s
@@ -234,47 +221,33 @@ const escape = s =>
 const clear = () => {
 	QUADS = null
 	query.setAttribute("disabled", true)
-	jsonEditor.update({})
 }
+
+workspace.createVariable("b0", null, "0")
+workspace.registerButtonCallback("variable", _ => {
+	const name = `b${++VARIABLE}`
+	const variable = workspace.createVariable(name)
+	const id = variable.getId()
+	for (const field of fields) {
+		field.textContent = name
+	}
+})
 
 workspace.addChangeListener(() => {
 	const nodes = []
 	const quads = []
-	const graph = "_:q"
+	const g = "_:q"
 
-	BLANK_ID = 0
 	for (const block of workspace.getTopBlocks(true)) {
 		if (block.rendered) {
-			walk(block, quads, nodes, graph)
+			walk(block, quads, nodes, g)
 		}
-	}
-
-	for (const field of fields) {
-		field.innerText = `b${BLANK_ID}`
 	}
 
 	workspace.updateToolbox(toolbox)
 
 	if (quads.length === 0) return clear()
-
-	quads.push(`${graph} <${RDF_TYPE}> <${QUERY_TYPE}> .\n`)
-	const nq = quads.join("\n")
-	QUADS = nq
+	quads.push(`${g} <${RDF_TYPE}> <${QUERY_TYPE}> .\n`)
+	QUADS = quads.join("\n")
 	query.removeAttribute("disabled")
-	// jsonld
-	// 	.fromRDF(nq, {
-	// 		format: "application/n-quads",
-	// 		useNativeTypes: true,
-	// 		produceGeneralizedRdf: true,
-	// 	})
-	// 	.then(doc => jsonld.compact(doc, context))
-	// 	.then(doc => {
-	// 		QUADS = nq
-	// 		query.removeAttribute("disabled")
-	// 		jsonEditor.update(doc)
-	// 	})
-	// 	.catch(err => {
-	// 		console.error(err)
-	// 		clear()
-	// 	})
 })

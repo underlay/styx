@@ -60,7 +60,7 @@ Blockly.Blocks[blankPredicate] = {
 			message0: "_:%1 %2",
 			args0: [
 				{
-					type: "field_input",
+					type: "field_variable",
 					name: "id",
 				},
 				{
@@ -83,7 +83,7 @@ Blockly.Blocks[blank] = {
 			message0: "_∶%1",
 			args0: [
 				{
-					type: "field_input",
+					type: "field_variable",
 					name: "id",
 				},
 			],
