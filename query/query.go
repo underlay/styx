@@ -102,11 +102,12 @@ func (g *ConstraintGraph) Solve(txn *badger.Txn) (err error) {
 			}
 		}
 
-		// We ran out of variables to backtrack on!
-		// This means the variable is unsatisfiable :-/
-		return ErrEmptyJoin
+		return
 	}
-	return
+
+	// We ran out of variables to backtrack on!
+	// This means the variable is unsatisfiable :-/
+	return ErrEmptyJoin
 }
 
 // Tick seeks to the first *cumulatively satisfying value* for the given index.
