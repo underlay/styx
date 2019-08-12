@@ -1,6 +1,6 @@
 # styx
 
-> Home-grown graph store inspired by [Hexastore](https://dl.acm.org/citation.cfm?id=1453965), tailored for use in the [Underlay](https://underlay.mit.edu).
+> Experimental graph store. Gateway to the Underworld.
 
 Make sure your IPFS daemon is running, and start `./styx`.
 
