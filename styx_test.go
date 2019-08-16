@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
+	cid "github.com/ipfs/go-cid"
 	ld "github.com/piprate/json-gold/ld"
 
 	styx "github.com/underlay/styx/db"
 	loader "github.com/underlay/styx/loader"
-	"github.com/underlay/styx/types"
 )
 
 var sampleData = []byte(`{
@@ -31,25 +31,70 @@ var sampleData = []byte(`{
 	"prov:generatedAtTime": "2019-07-24T16:46:05.751Z",
 	"@graph": {
 		"@type": "Person",
-		"name": "John Doe",
+		"name": ["John Doe", "Johnny Doe"],
 		"birthDate": "1996-02-02",
 		"knows": {
 			"@id": "http://people.com/jane",
 			"@type": "Person",
 			"name": "Jane Doe",
+			"familyName": { "@value": "Doe", "@language": "en" },
 			"birthDate": "1995-01-01"
 		}
 	}
 }`)
 
-var sampleQuery = []byte(`{
+var simpleQuery = []byte(`{
 	"@context": {
 		"@vocab": "http://schema.org/"
 	},
-	"@type": "Person",
-	"birthDate": { },
-	"knows": {
-		"name": "Jane Doe"
+	"@type": "http://underlay.mit.edu/ns#Query",
+	"@graph": {
+		"@type": "Person",
+		"birthDate": { },
+		"knows": {
+			"name": "Jane Doe"
+		}
+	}
+}`)
+
+var entityQuery = []byte(`{
+	"@context": {
+		"@vocab": "http://schema.org/",
+		"prov": "http://www.w3.org/ns/prov#",
+		"u": "http://underlay.mit.edu/ns#"
+	},
+	"@type": "http://underlay.mit.edu/ns#Query",
+	"@graph": {
+		"@type": "prov:Entity",
+		"u:satisfies": {
+			"@graph": {
+				"@type": "Person",
+				"birthDate": { },
+				"knows": {
+					"name": "Jane Doe"
+				}
+			}
+		}
+	}
+}`)
+
+var bundleQuery = []byte(`{
+	"@context": {
+		"@vocab": "http://schema.org/",
+		"dcterms": "http://purl.org/dc/terms/",
+		"prov": "http://www.w3.org/ns/prov#",
+		"u": "http://underlay.mit.edu/ns#"
+	},
+	"@type": "http://underlay.mit.edu/ns#Query",
+	"@graph": {
+		"@type": "prov:Bundle",
+		"dcterms:extent": 3,
+		"u:enumerates": {
+			"@graph": {
+				"@type": "Person",
+				"name": { }
+			}
+		}
 	}
 }`)
 
@@ -166,84 +211,115 @@ func TestIngest(t *testing.T) {
 	}
 }
 
-func TestQuery(t *testing.T) {
+func testQuery(query []byte) error {
 	if !sh.IsUp() {
-		t.Error("IPFS Daemon not running")
-		return
+		return fmt.Errorf("IPFS Daemon not running")
 	} else if err := os.RemoveAll(tempPath); err != nil {
-		t.Error(err)
-		return
+		return err
+	}
+
+	peerID, err := sh.ID()
+	if err != nil {
+		return err
 	}
 
 	db, err := styx.OpenDB(tempPath)
 	if err != nil {
-		t.Error(err)
-		return
+		return err
 	}
 
 	defer db.Close()
 
 	var data map[string]interface{}
-	if err = json.Unmarshal(sampleData, &data); err != nil {
-		t.Error(err)
-		return
+	if err := json.Unmarshal(sampleData, &data); err != nil {
+		return err
 	}
 
 	documentLoader := loader.NewShellDocumentLoader(sh)
 
 	store := styx.MakeShellDocumentStore(sh)
 
-	if err = db.IngestJSONLd(data, documentLoader, store); err != nil {
-		t.Error(err)
-		return
+	if err := db.IngestJSONLd(data, documentLoader, store); err != nil {
+		return err
 	}
 
+	db.Log()
+
 	var queryData map[string]interface{}
-	err = json.Unmarshal(sampleQuery, &queryData)
-	if err != nil {
-		t.Error(err)
-		return
+	if err := json.Unmarshal(query, &queryData); err != nil {
+		return err
 	}
 
 	proc := ld.NewJsonLdProcessor()
 	stringOptions := styx.GetStringOptions(documentLoader)
 	rdf, err := proc.ToRDF(queryData, stringOptions)
-
 	if err != nil {
-		t.Error(err)
-		return
+		return err
 	}
+
+	hash, err := sh.Add(strings.NewReader(rdf.(string)))
+	if err != nil {
+		return err
+	}
+
+	c, err := cid.Decode(hash)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("CID", c)
 
 	quads, graphs, err := styx.ParseMessage(strings.NewReader(rdf.(string)))
 
 	fmt.Println("--- query graph ---")
 	for _, quad := range quads {
 		fmt.Printf(
-			"  %s %s %s\n",
+			"  %s %s %s",
 			quad.Subject.GetValue(),
 			quad.Predicate.GetValue(),
 			quad.Object.GetValue(),
 		)
+		if quad.Graph != nil {
+			fmt.Print(" " + quad.Graph.GetValue())
+		}
+		fmt.Print("\n")
 	}
 
-	d := make(chan map[string]*types.Value)
-	p := make(chan map[int]*types.SourceList)
-	go func() {
-		if err := db.Query(quads, "@default", graphs["@default"], d, p); err != nil {
-			t.Error(err)
-		}
-	}()
-
-	values, prov := <-d, <-p
+	result := db.HandleMessage(peerID.ID, c, quads, graphs)
 
 	fmt.Println("Result:")
-	fmt.Println(values)
-	fmt.Println(prov)
+	b, err := json.MarshalIndent(result, "", "  ")
+	fmt.Println(string(b))
+	return err
+}
+
+func TestSimpleQuery(t *testing.T) {
+	if err := testQuery(simpleQuery); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestEntityQuery(t *testing.T) {
+	if err := testQuery(entityQuery); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestBundleQuery(t *testing.T) {
+	if err := testQuery(bundleQuery); err != nil {
+		t.Error(err)
+	}
 }
 
 func TestNT(t *testing.T) {
 	if !sh.IsUp() {
 		t.Error("IPFS Daemon not running")
+		return
+	}
+
+	peerID, err := sh.ID()
+	if err != nil {
+		t.Error(err)
 		return
 	}
 
@@ -305,6 +381,18 @@ func TestNT(t *testing.T) {
 
 	quads, graphs, err := styx.ParseMessage(strings.NewReader(rdf.(string)))
 
+	hash, err := sh.Add(strings.NewReader(rdf.(string)))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	c, err := cid.Decode(hash)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
 	fmt.Println("--- query graph ---")
 	for _, quad := range quads {
 		fmt.Printf(
@@ -315,19 +403,11 @@ func TestNT(t *testing.T) {
 		)
 	}
 
-	d := make(chan map[string]*types.Value)
-	p := make(chan map[int]*types.SourceList)
-	go func() {
-		if err := db.Query(quads, "@default", graphs["@default"], d, p); err != nil {
-			t.Error(err)
-		}
-	}()
-
-	values, prov := <-d, <-p
+	result := db.HandleMessage(peerID.ID, c, quads, graphs)
 
 	fmt.Println("Result:")
-	fmt.Println(values)
-	fmt.Println(prov)
+	b, err := json.MarshalIndent(result, "", "  ")
+	fmt.Println(string(b))
 }
 
 func openFile(path string, dl ld.DocumentLoader, store styx.DocumentStore) (doc map[string]interface{}, err error) {

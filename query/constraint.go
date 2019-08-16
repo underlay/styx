@@ -238,6 +238,8 @@ type ConstraintMap map[string]ConstraintSet
 type ConstraintGraph struct {
 	Index map[string]*Variable
 	Slice []string
+	Pivot int
+	Root  map[string][]byte
 	Map   map[string]int
 	In    map[string][]int
 	Out   map[string][]int
@@ -254,11 +256,12 @@ func (g *ConstraintGraph) String() string {
 
 // Close just calls Close on its child constraints
 func (g *ConstraintGraph) Close() {
-	if g == nil {
-		return
-	}
-	for _, id := range g.Slice {
-		g.Index[id].Close()
+	if g != nil && g.Slice != nil && g.Index != nil {
+		for _, id := range g.Slice {
+			if index, has := g.Index[id]; has {
+				index.Close()
+			}
+		}
 	}
 }
 

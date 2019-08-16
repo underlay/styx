@@ -38,7 +38,7 @@ func (db *DB) insert(cid cid.Cid, quads []*ld.Quad, graph string, indices []int,
 	indexMap := types.IndexMap{}
 
 	for index, quad := range quads {
-		g := "@default"
+		g := ""
 		if quad.Graph != nil {
 			g = quad.Graph.GetValue()
 		}
@@ -51,10 +51,6 @@ func (db *DB) insert(cid cid.Cid, quads []*ld.Quad, graph string, indices []int,
 			Cid:   cid.Bytes(),
 			Graph: g,
 			Index: int32(index),
-		}
-
-		if quad.Graph != nil {
-			source.Graph = quad.Graph.GetValue()
 		}
 
 		// Get the uint64 ids for the subject, predicate, and object
@@ -135,15 +131,15 @@ func (db *DB) getID(
 	origin cid.Cid,
 	node ld.Node,
 	place uint8,
-	indices types.IndexMap,
-	values types.ValueMap,
+	indexMap types.IndexMap,
+	valueMap types.ValueMap,
 	txn *badger.Txn,
 ) ([]byte, error) {
 	ID := make([]byte, 8)
 	value := types.NodeToValue(origin, node)
 	v := value.GetValue()
 
-	if index, has := indices[v]; has {
+	if index, has := indexMap[v]; has {
 		index.Increment(place)
 		binary.BigEndian.PutUint64(ID, index.GetId())
 		return ID, nil
@@ -161,7 +157,7 @@ func (db *DB) getID(
 		if index.Id, err = db.Sequence.Next(); err != nil {
 			return nil, err
 		}
-		values[index.Id] = value
+		valueMap[index.Id] = value
 	} else if err != nil {
 		return nil, err
 	} else if val, err := item.ValueCopy(nil); err != nil {
@@ -171,7 +167,7 @@ func (db *DB) getID(
 
 	}
 
-	indices[v] = index
+	indexMap[v] = index
 	index.Increment(place)
 	binary.BigEndian.PutUint64(ID, index.GetId())
 

@@ -1,8 +1,5 @@
 package types
 
-// DefaultGraph name of the JSON-LD parser
-const DefaultGraph = "@default"
-
 // Algorithm has to be URDNA2015
 const Algorithm = "URDNA2015"
 

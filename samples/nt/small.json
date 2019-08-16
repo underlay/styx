@@ -1,14 +1,17 @@
 {
 	"@context": {
+		"u": "http://underlay.mit.edu/ns#",
 		"nt": "http://semanticbible.org/ns/2006/NTNames#",
-		"rdfs": "http://www.w3.org/2000/01/rdf-schema#",
-		"rdfs:label": { "@language": "en" }
+		"rdfs": "http://www.w3.org/2000/01/rdf-schema#"
 	},
-	"rdfs:label": "Joseph",
-	"nt:description": {},
-	"nt:childOf": {
+	"@type": "u:Query",
+	"@graph": {
+		"rdfs:label": "Joseph",
+		"nt:description": {},
 		"nt:childOf": {
-			"rdfs:label": "Amos"
+			"nt:childOf": {
+				"rdfs:label": "Amos"
+			}
 		}
 	}
 }

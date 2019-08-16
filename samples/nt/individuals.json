@@ -23,7 +23,7 @@
 			"owl:imports": {
 				"@id": "http://www.semanticbible.org/2006/11/NTNames.owl"
 			},
-			"owl:versionInfo": [{ "@language": "en", "@value": "2006-09" }, "1.0"]
+			"owl:versionInfo": [{ "@value": "2006-09" }, "1.0"]
 		},
 		{
 			"@id": "nt:Aaron",
@@ -68,7 +68,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:Rehoboam" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew's geneaology"
 			},
 			"nt:ethnicity": {
@@ -78,7 +77,7 @@
 				"@type": "http://www.w3.org/2001/XMLSchema#boolean",
 				"@value": "true"
 			},
-			"nt:occupation": { "@language": "en", "@value": "king of Judah" },
+			"nt:occupation": { "@value": "king of Judah" },
 			"nt:parentOf": { "@id": "nt:Asaph" },
 			"nt:relativeOf": [{ "@id": "nt:Asaph" }, { "@id": "nt:Rehoboam" }],
 			"rdfs:comment": "His occupation as king comes from Old Testament sources, 2Chr.12-13.",
@@ -220,7 +219,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:Jotham" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "King of Judah during the time of Isaiah"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -228,7 +226,7 @@
 				"@type": "http://www.w3.org/2001/XMLSchema#boolean",
 				"@value": "true"
 			},
-			"nt:occupation": { "@language": "en", "@value": "king" },
+			"nt:occupation": { "@value": "king" },
 			"nt:parentOf": { "@id": "nt:Hezekiah" },
 			"rdfs:comment": "See OT descriptions in 2 Kings 16; Isa. 7-9; 2 Chr. 28.",
 			"rdfs:label": "Ahaz"
@@ -239,7 +237,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:SimonOfCyrene" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "Probably an early Christian known to Mark, who mentions him as the son of Simon of Cyrene, who was compelled to carry Jesus' cross"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -290,7 +287,7 @@
 				"@type": "http://www.w3.org/2001/XMLSchema#boolean",
 				"@value": "false"
 			},
-			"nt:occupation": { "@language": "en", "@value": "coppersmith" },
+			"nt:occupation": { "@value": "coppersmith" },
 			"nt:possiblySamePersonAs": { "@id": "nt:AlexanderTheHeretic" },
 			"rdfs:comment": "This may be the same as AlexanderTheHeretic, since they are both identified as opponents of Paul and the Gospel, and they both resided in Ephesus.",
 			"rdfs:label": "Alexander"
@@ -343,7 +340,6 @@
 			"@id": "nt:Alphaeus",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "The father of James, one of the Twelve"
 			},
 			"nt:ethnicity": { "@id": "nt:Galilean" },
@@ -366,7 +362,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": [{ "@id": "nt:Ram" }, { "@id": "nt:Admin" }],
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew's geneaology"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -498,7 +493,6 @@
 			"@type": "nt:Man",
 			"nt:collaboratesWith": [{ "@id": "nt:Paul" }, { "@id": "nt:Junia" }],
 			"nt:description": {
-				"@language": "en",
 				"@value": "A Christian in Rome to whom Paul sent greetings"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -629,7 +623,6 @@
 			"@id": "nt:Apelles",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a Christian in Rome whom Paul greeted"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -807,7 +800,6 @@
 				{ "@id": "nt:GaiusOfDerbe" }
 			],
 			"nt:description": {
-				"@language": "en",
 				"@value": "a traveling companion of Paul"
 			},
 			"nt:ethnicity": { "@id": "nt:Macedonian" },
@@ -837,7 +829,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:Hezron" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Luke's geneaology"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -878,7 +869,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:AbijahSonOfRehoboam" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew's geneaology"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -886,7 +876,7 @@
 				"@type": "http://www.w3.org/2001/XMLSchema#boolean",
 				"@value": "true"
 			},
-			"nt:occupation": { "@language": "en", "@value": "king of Judah" },
+			"nt:occupation": { "@value": "king of Judah" },
 			"nt:parentOf": { "@id": "nt:Jehoshaphat" },
 			"nt:relativeOf": { "@id": "nt:AbijahSonOfRehoboam" },
 			"rdfs:comment": "Not the same as the psalmist and leader of King David's choir in 1Chr.6.39.",
@@ -946,7 +936,6 @@
 			"@id": "nt:Asyncritus",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a Roman to whom Paul sent greetings"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -1190,7 +1179,6 @@
 			"@type": "nt:Woman",
 			"nt:childOf": { "@id": "nt:HerodAgrippaI" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "a daughter of Herod Agrippa I who heard Paul's defense to her brother, Herod Agrippa II"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -1326,7 +1314,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": [{ "@id": "nt:Rahab" }, { "@id": "nt:Salmon" }],
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew's geneaology"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -1516,7 +1503,7 @@
 				"@type": "http://www.w3.org/2001/XMLSchema#boolean",
 				"@value": "false"
 			},
-			"nt:occupation": { "@language": "en", "@value": "queen" },
+			"nt:occupation": { "@value": "queen" },
 			"rdfs:comment": "Candace is actually a title like \"Pharaoh\" rather than a personal name, hence her occupation as queen.",
 			"rdfs:label": "Candace"
 		},
@@ -1638,7 +1625,6 @@
 			"@id": "nt:Claudia",
 			"@type": "nt:Woman",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a Christian who sent greeetings to Timothy in Paul's second epislte."
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -1668,7 +1654,6 @@
 			"@id": "nt:ClaudiusLysias",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "the military tribune commanding the Roman forces in Jerusalem"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -1676,7 +1661,7 @@
 				"@value": "false"
 			},
 			"nt:knows": [{ "@id": "nt:Felix" }, { "@id": "nt:Paul" }],
-			"nt:occupation": { "@language": "en", "@value": "tribune" },
+			"nt:occupation": { "@value": "tribune" },
 			"nt:residentPlace": { "@id": "nt:Jerusalem" },
 			"rdfs:comment": "Greek ethnicity is suggested by his surname. ",
 			"rdfs:label": "Claudius Lysias"
@@ -1906,7 +1891,6 @@
 			"@id": "nt:Damaris",
 			"@type": "nt:Woman",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a convert from Paul's address to the Aeropagus"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -1944,7 +1928,7 @@
 				"@type": "http://www.w3.org/2001/XMLSchema#boolean",
 				"@value": "false"
 			},
-			"nt:occupation": { "@language": "en", "@value": "king of Israel" },
+			"nt:occupation": { "@value": "king of Israel" },
 			"nt:parentOf": [{ "@id": "nt:Solomon" }, { "@id": "nt:Nathan" }],
 			"nt:spouseOf": { "@id": "nt:Bathsheba" },
 			"rdfs:label": "David"
@@ -1967,7 +1951,6 @@
 			"@type": "nt:Man",
 			"nt:collaboratesWith": { "@id": "nt:JohnSonOfZebedee" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "a disciple mentioned in 3 John as having a good reputation"
 			},
 			"nt:knows": { "@id": "nt:GaiusTheBeloved" },
@@ -1979,11 +1962,10 @@
 			"@id": "nt:DemetriusTheSilversmith",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a craftsman in Ephesus who made silver shrines of Artemis"
 			},
 			"nt:enemyOf": { "@id": "nt:Paul" },
-			"nt:occupation": { "@language": "en", "@value": "silversmith" },
+			"nt:occupation": { "@value": "silversmith" },
 			"nt:possiblySamePersonAs": { "@id": "nt:Demetrius" },
 			"rdfs:comment": "Demetrius was a common name, so it's unlikely this man is the same as the disciple mentioned in 3John.1.12.",
 			"rdfs:label": "Demetrius"
@@ -2023,7 +2005,6 @@
 			"@type": "nt:Man",
 			"nt:antagonistOf": { "@id": "nt:JohnSonOfZebedee" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "a member of the church to which 3 John was addressed"
 			},
 			"rdfs:label": "Diotrephes"
@@ -2032,7 +2013,7 @@
 			"@id": "nt:Drusilla",
 			"@type": "nt:Woman",
 			"nt:childOf": { "@id": "nt:HerodAgrippaI" },
-			"nt:description": { "@language": "en", "@value": "wife of Felix" },
+			"nt:description": { "@value": "wife of Felix" },
 			"nt:ethnicity": { "@id": "nt:Jewish" },
 			"nt:hasOnlyGenealogyMention": {
 				"@type": "http://www.w3.org/2001/XMLSchema#boolean",
@@ -2082,7 +2063,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:Eliud" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew's geneaology"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -2136,7 +2116,6 @@
 			"@id": "nt:Elisha",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "an Old Testament prophet"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -2148,7 +2127,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:Achim" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew's geneaology"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -2163,7 +2141,6 @@
 			"@id": "nt:Elizabeth",
 			"@type": "nt:Woman",
 			"nt:description": {
-				"@language": "en",
 				"@value": "the mother of John the Baptist"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -2185,7 +2162,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:Er" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Luke's geneaology"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -2226,7 +2202,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:Jared" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Luke's geneaology"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -2242,7 +2217,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:Seth" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Luke's geneaology"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -2257,7 +2231,6 @@
 			"@id": "nt:Epaenetus",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "A Christian in Rome whom Paul describes as \"the first convert to Christ in Asia\""
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -2275,10 +2248,9 @@
 			"@type": "nt:Man",
 			"nt:collaboratesWith": { "@id": "nt:Paul" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "A fellow minister with Paul, and likely founder of the Colossian church"
 			},
-			"nt:occupation": { "@language": "en", "@value": "missionary" },
+			"nt:occupation": { "@value": "missionary" },
 			"rdfs:comment": "Paul mentions that Epaphras \"worked hard\" for those in Laodicea and Hierapolis, so it's possible (but not certain) he visited there as well. ",
 			"rdfs:label": "Epaphras",
 			"owl:differentFrom": { "@id": "nt:Epaphroditus" }
@@ -2288,7 +2260,6 @@
 			"@type": "nt:Man",
 			"nt:collaboratesWith": { "@id": "nt:Paul" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "A Christian sent by the Philippian church with a gift for Paul"
 			},
 			"rdfs:comment": "Though Epaphras is a contraction of Epaphroditus, this individual is distinct from the Epaphras mentioned in Colossians and Philemon.\nRome as a visitedPlace assumes Paul was there while writing Philippians. ",
@@ -2377,7 +2348,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:JoshuaSonOfEliezer" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Luke's geneaology"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -2393,7 +2363,6 @@
 			"@type": "nt:Man",
 			"nt:collaboratesWith": [{ "@id": "nt:Paul" }, { "@id": "nt:Timothy" }],
 			"nt:description": {
-				"@language": "en",
 				"@value": "a travelling companion of Paul"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -2417,7 +2386,7 @@
 				"@value": "false"
 			},
 			"nt:knows": { "@id": "nt:Paul" },
-			"nt:occupation": { "@language": "en", "@value": "treasurer" },
+			"nt:occupation": { "@value": "treasurer" },
 			"nt:possiblySamePersonAs": { "@id": "nt:Erastus" },
 			"http://www.w3.org/2000/01/rdf-schema#comment": "It is uncertain whether this Erastus is the same as Paul's travelling companion and fellow minister, though possible. ",
 			"http://www.w3.org/2000/01/rdf-schema#label": "Erastus the city treasurer"
@@ -2427,7 +2396,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": [{ "@id": "nt:Isaac" }, { "@id": "nt:Rebecca" }],
 			"nt:description": {
-				"@language": "en",
 				"@value": "a character from the Old Testament era"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -2631,7 +2599,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:Jacob" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the 12 Patriarchs of Israel"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -2806,7 +2773,6 @@
 			"@id": "nt:Gamaliel",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a respected Jewish teacher whom Paul studied under"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -2818,7 +2784,6 @@
 			"nt:memberOf": [{ "@id": "nt:Pharisees" }, { "@id": "nt:Sanhedrin" }],
 			"nt:nativePlace": { "@id": "nt:Israel" },
 			"nt:occupation": {
-				"@language": "en",
 				"@value": "teacher of the Jewish Law"
 			},
 			"nt:religiousBelief": [
@@ -2880,7 +2845,6 @@
 			"@id": "nt:Gideon",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a  judge of Israel prior to the monarchy"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -2895,7 +2859,6 @@
 			"@id": "nt:Gog",
 			"@type": "nt:GroupOfPeople",
 			"nt:description": {
-				"@language": "en",
 				"@value": "an apocalyptic opponent of God's people"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -2958,7 +2921,6 @@
 			"@type": "nt:Woman",
 			"nt:antagonistOf": { "@id": "nt:Sarah" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "mother of Ishmael; servant to Abraham's wife Sarah "
 			},
 			"nt:ethnicity": { "@id": "nt:Egyptian" },
@@ -2968,7 +2930,7 @@
 				"@value": "false"
 			},
 			"nt:knows": { "@id": "nt:Abraham" },
-			"nt:occupation": { "@language": "en", "@value": "servant" },
+			"nt:occupation": { "@value": "servant" },
 			"nt:residentPlace": { "@id": "nt:Canaan" },
 			"http://www.w3.org/2000/01/rdf-schema#comment": "her son Ishmael is not named in the New Testament",
 			"rdfs:label": "Hagar"
@@ -2983,7 +2945,7 @@
 				"@value": "false"
 			},
 			"nt:nativePlace": { "@id": "nt:Shechem" },
-			"nt:occupation": { "@language": "en", "@value": "ruler" },
+			"nt:occupation": { "@value": "ruler" },
 			"rdfs:label": "Hamor"
 		},
 		{
@@ -3039,7 +3001,6 @@
 			"@id": "nt:Hermas",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a Roman to whom Paul sent greetings"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -3055,7 +3016,6 @@
 			"@id": "nt:Hermes",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a Roman to whom Paul sent greetings"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -3071,7 +3031,6 @@
 			"@id": "nt:Hermogenes",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a Christian who refused to help Paul during his Roman imprisonment"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -3090,7 +3049,7 @@
 				"@type": "http://www.w3.org/2001/XMLSchema#boolean",
 				"@value": "false"
 			},
-			"nt:occupation": { "@language": "en", "@value": "king" },
+			"nt:occupation": { "@value": "king" },
 			"nt:parentOf": [{ "@id": "nt:Drusilla" }, { "@id": "nt:Bernice" }],
 			"rdfs:label": "Herod Agrippa I"
 		},
@@ -3102,7 +3061,7 @@
 				"@type": "http://www.w3.org/2001/XMLSchema#boolean",
 				"@value": "false"
 			},
-			"nt:occupation": { "@language": "en", "@value": "king" },
+			"nt:occupation": { "@value": "king" },
 			"nt:siblingOf": [{ "@id": "nt:Bernice" }, { "@id": "nt:Drusilla" }],
 			"rdfs:label": "Herod Agrippa II"
 		},
@@ -3133,7 +3092,7 @@
 				"@type": "http://www.w3.org/2001/XMLSchema#boolean",
 				"@value": "false"
 			},
-			"nt:occupation": { "@language": "en", "@value": "king" },
+			"nt:occupation": { "@value": "king" },
 			"nt:parentOf": [
 				{ "@id": "nt:HerodAntipas" },
 				{ "@id": "nt:PhilipSonOfHerod" },
@@ -3150,7 +3109,6 @@
 			"@id": "nt:Herodias",
 			"@type": "nt:Woman",
 			"nt:description": {
-				"@language": "en",
 				"@value": "wife of Herod Antipas who had John the Baptist put to death"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -3190,7 +3148,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:Perez" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew's geneaology"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -3303,7 +3260,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": [{ "@id": "nt:Rebecca" }, { "@id": "nt:Isaac" }],
 			"nt:description": {
-				"@language": "en",
 				"@value": "The patriarch of the nation of Israel, son of Isaac and Abraham"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -3331,7 +3287,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:Matthan" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew's geneaology"
 			},
 			"nt:parentOf": { "@id": "nt:Joseph" },
@@ -3389,7 +3344,6 @@
 			"@id": "nt:Jason",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": " a companion of Paul's who sent greetings to the Roman church"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -3420,7 +3374,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:Asaph" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew's geneaology"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -3428,7 +3381,7 @@
 				"@type": "http://www.w3.org/2001/XMLSchema#boolean",
 				"@value": "true"
 			},
-			"nt:occupation": { "@language": "en", "@value": "king of Judah" },
+			"nt:occupation": { "@value": "king of Judah" },
 			"nt:parentOf": { "@id": "nt:Joram" },
 			"rdfs:label": "Jehoshaphat"
 		},
@@ -3502,7 +3455,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:Obed" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "the father of King David"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -3675,7 +3627,6 @@
 			"@id": "nt:Jezebel",
 			"@type": "nt:Woman",
 			"nt:description": {
-				"@language": "en",
 				"@value": "the pagan wife of Ahab in the Old Testament"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -3703,7 +3654,6 @@
 			"@type": "nt:Woman",
 			"nt:collaboratesWith": { "@id": "nt:Jesus" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "a woman wno contributed to Jesus' support"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -3853,7 +3803,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:Jehoshaphat" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew's geneaology"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -3861,7 +3810,7 @@
 				"@type": "http://www.w3.org/2001/XMLSchema#boolean",
 				"@value": "true"
 			},
-			"nt:occupation": { "@language": "en", "@value": "king of Judah" },
+			"nt:occupation": { "@value": "king of Judah" },
 			"nt:parentOf": { "@id": "nt:Uzziah" },
 			"http://www.w3.org/2000/01/rdf-schema#comment": "His occupation as King comes from Old Testament sources. ",
 			"rdfs:label": "Joram"
@@ -3901,10 +3850,9 @@
 			"@type": "nt:Man",
 			"nt:childOf": [{ "@id": "nt:Heli" }, { "@id": "nt:JacobSonOfMatthan" }],
 			"nt:description": {
-				"@language": "en",
 				"@value": "the earthly father of Jesus"
 			},
-			"nt:occupation": { "@language": "en", "@value": "carpenter" },
+			"nt:occupation": { "@value": "carpenter" },
 			"nt:parentOf": { "@id": "nt:Jesus" },
 			"nt:spouseOf": { "@id": "nt:Mary" },
 			"rdfs:comment": "Joseph was Jesus' parent in the normal sense, even though not his biological father.\nLuke 3:23 has \"Joseph, son of Heli\", though Matthew has Joseph's father named Jacob. Here I've represented the opinion that Joseph was actually son-in-law of Heli, and that Luke's geneaology describes Mary's lineage rather than Joseph's. ",
@@ -3991,7 +3939,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:Uzziah" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew's geneaology"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -3999,7 +3946,7 @@
 				"@type": "http://www.w3.org/2001/XMLSchema#boolean",
 				"@value": "true"
 			},
-			"nt:occupation": { "@language": "en", "@value": "king of Judah" },
+			"nt:occupation": { "@value": "king of Judah" },
 			"nt:parentOf": { "@id": "nt:Ahaz" },
 			"http://www.w3.org/2000/01/rdf-schema#comment": "His occupation as King comes from Old Testament sources, 2Chron.26-27. ",
 			"rdfs:label": "Jotham"
@@ -4087,7 +4034,6 @@
 			"@id": "nt:Julia",
 			"@type": "nt:Woman",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a Roman to whom Paul sent greetings"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -4106,7 +4052,6 @@
 			"@type": "nt:Woman",
 			"nt:collaboratesWith": { "@id": "nt:Andronicus" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "a \"kinsman\" and fellow prisoner of Paul"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -4200,7 +4145,6 @@
 			"@id": "nt:Lazarus",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a man Jesus brought back to life"
 			},
 			"nt:knows": { "@id": "nt:Jesus" },
@@ -4216,7 +4160,6 @@
 			"nt:childOf": { "@id": "nt:AlphaeusFatherOfLevi" },
 			"nt:collaboratesWith": { "@id": "nt:Andrew" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of Jesus' twelve apostles"
 			},
 			"nt:ethnicity": { "@id": "nt:Galilean" },
@@ -4365,7 +4308,6 @@
 			"@type": "nt:Woman",
 			"nt:collaboratesWith": { "@id": "nt:Paul" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "a convert from Paul's preaching in Philippi"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -4374,7 +4316,6 @@
 			},
 			"nt:nativePlace": { "@id": "nt:Thyatira" },
 			"nt:occupation": {
-				"@language": "en",
 				"@value": "seller of purple goods"
 			},
 			"nt:religiousBelief": { "@id": "nt:Christianity" },
@@ -4452,7 +4393,6 @@
 			"@id": "nt:Magog",
 			"@type": "nt:GroupOfPeople",
 			"nt:description": {
-				"@language": "en",
 				"@value": "an apocalyptic opponent of God's people"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -4532,7 +4472,6 @@
 			"@id": "nt:Martha",
 			"@type": "nt:Woman",
 			"nt:description": {
-				"@language": "en",
 				"@value": "the sister of Lazarus and Mary who annointed Jesus before his death"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -4549,7 +4488,7 @@
 		{
 			"@id": "nt:Mary",
 			"@type": "nt:Woman",
-			"nt:description": { "@language": "en", "@value": "the mother of Jesus" },
+			"nt:description": { "@value": "the mother of Jesus" },
 			"nt:ethnicity": { "@id": "nt:Jewish" },
 			"nt:hasOnlyGenealogyMention": {
 				"@type": "http://www.w3.org/2001/XMLSchema#boolean",
@@ -4602,7 +4541,6 @@
 			"@id": "nt:MaryMotherOfJohnMark",
 			"@type": "nt:Woman",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a woman to whose house Peter came after his release from prison"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -4621,7 +4559,6 @@
 			"@id": "nt:MaryOfBethany",
 			"@type": "nt:Woman",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a follower of Jesus who annointed him late in his ministry"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -4640,7 +4577,6 @@
 			"@id": "nt:MaryOfRome",
 			"@type": "nt:Woman",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a woman to whom Paul sent greetings in his letter to the Romans"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -4713,7 +4649,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:Eleazar" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew's geneaology"
 			},
 			"nt:parentOf": { "@id": "nt:JacobSonOfMatthan" },
@@ -4956,7 +4891,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:Amminadab" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew's geneaology"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -5097,7 +5031,6 @@
 			"@id": "nt:Nereus",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a Roman to whom Paul sent greetings"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -5177,7 +5110,6 @@
 			"@type": "nt:Woman",
 			"nt:collaboratesWith": { "@id": "nt:Paul" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "the church in Laodicea met in her house"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -5194,7 +5126,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": [{ "@id": "nt:Boaz" }, { "@id": "nt:Ruth" }],
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew and Luke's geneaologies"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -5215,7 +5146,6 @@
 			"@id": "nt:Olympas",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a Roman to whom Paul sent greetings"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -5307,7 +5237,6 @@
 			"@id": "nt:Patrobas",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a Roman to whom Paul sent greetings"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -5423,7 +5352,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": [{ "@id": "nt:Tamar" }, { "@id": "nt:Judah" }],
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew's geneaology"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -5481,7 +5409,7 @@
 		{
 			"@id": "nt:Pharaoh",
 			"@type": "nt:Man",
-			"nt:occupation": { "@language": "en", "@value": "king" },
+			"nt:occupation": { "@value": "king" },
 			"rdfs:comment": "Pharaoh is actually a title rather than a personal name, but in the New Testament it refers to a single individual.",
 			"rdfs:label": "Pharaoh"
 		},
@@ -5591,7 +5519,6 @@
 			"@id": "nt:Philologus",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a Roman to whom Paul sent greetings"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -5607,7 +5534,6 @@
 			"@id": "nt:Phlegon",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a Roman to whom Paul sent greetings"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -5662,7 +5588,6 @@
 			"@id": "nt:Phygelus",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a Christian who refused to help Paul during his Roman imprisonment"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -5772,7 +5697,7 @@
 		{
 			"@id": "nt:Rachel",
 			"@type": "nt:Woman",
-			"nt:description": { "@language": "en", "@value": "one of Jacob's wives" },
+			"nt:description": { "@value": "one of Jacob's wives" },
 			"nt:ethnicity": { "@id": "nt:Jewish" },
 			"nt:hasOnlyGenealogyMention": {
 				"@type": "http://www.w3.org/2001/XMLSchema#boolean",
@@ -5795,7 +5720,7 @@
 				"@type": "http://www.w3.org/2001/XMLSchema#boolean",
 				"@value": "false"
 			},
-			"nt:occupation": { "@language": "en", "@value": "prostitute" },
+			"nt:occupation": { "@value": "prostitute" },
 			"nt:parentOf": { "@id": "nt:Boaz" },
 			"nt:spouseOf": { "@id": "nt:Salmon" },
 			"rdfs:label": "Rahab"
@@ -5805,7 +5730,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:Hezron" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew's geneaology"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -5845,7 +5769,7 @@
 		{
 			"@id": "nt:Rebecca",
 			"@type": "nt:Woman",
-			"nt:description": { "@language": "en", "@value": "husband of Isaac" },
+			"nt:description": { "@value": "husband of Isaac" },
 			"nt:ethnicity": { "@id": "nt:Jewish" },
 			"nt:hasOnlyGenealogyMention": {
 				"@type": "http://www.w3.org/2001/XMLSchema#boolean",
@@ -6049,7 +5973,6 @@
 			"@id": "nt:Ruth",
 			"@type": "nt:Woman",
 			"nt:description": {
-				"@language": "en",
 				"@value": "an ancestor of King David in Matthew's genealogy of Jesus"
 			},
 			"nt:ethnicity": { "@id": "nt:Moabite" },
@@ -6153,7 +6076,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:Nahshon" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew and Luke's geneaologies"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -6194,7 +6116,6 @@
 			"@type": "nt:Woman",
 			"nt:collaboratesWith": { "@id": "nt:Jesus" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "one of the woman who came to annoint Jesus' body after his crucifixion"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -6289,7 +6210,6 @@
 			"@id": "nt:Sapphira",
 			"@type": "nt:Woman",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a member of the early church who misrepresented a gift and died as a \n    consequence"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -6310,7 +6230,6 @@
 			"nt:antagonistOf": { "@id": "nt:Hagar" },
 			"nt:childOf": { "@id": "nt:Terah" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "the wife of Abraham and an example of faith"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -6690,7 +6609,6 @@
 			"@type": "nt:Man",
 			"nt:collaboratesWith": { "@id": "nt:SimonPeter" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "Simon Peter stayed at Simon the Tanner's house in Joppa"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -6763,11 +6681,10 @@
 			"@type": "nt:Man",
 			"nt:childOf": [{ "@id": "nt:Bathsheba" }, { "@id": "nt:David" }],
 			"nt:description": {
-				"@language": "en",
 				"@value": "King of Israel renowned for his wisdom"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
-			"nt:occupation": { "@language": "en", "@value": "king" },
+			"nt:occupation": { "@value": "king" },
 			"nt:parentOf": { "@id": "nt:Rehoboam" },
 			"rdfs:label": "Solomon"
 		},
@@ -6789,7 +6706,6 @@
 			"@id": "nt:Sosipater",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a companion of Paul's who sent greetings to the Roman church"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -6816,7 +6732,6 @@
 			"@id": "nt:Stachys",
 			"@type": "nt:Man",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a Christian in Rome to whom Paul sent greetings"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -6853,7 +6768,6 @@
 			"@type": "nt:Woman",
 			"nt:collaboratesWith": { "@id": "nt:Jesus" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "a woman who contributed to Jesus' support"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -6899,7 +6813,6 @@
 				{ "@id": "nt:Euodia" }
 			],
 			"nt:description": {
-				"@language": "en",
 				"@value": "a Philippian Christian who worked alongside Paul"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -6952,7 +6865,6 @@
 			"@id": "nt:Tabitha",
 			"@type": "nt:Woman",
 			"nt:description": {
-				"@language": "en",
 				"@value": "a Christian in Joppa known for her charity"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -6969,7 +6881,6 @@
 			"@id": "nt:Tamar",
 			"@type": "nt:Woman",
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew's geneaology"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -7020,7 +6931,6 @@
 			"@type": "nt:Man",
 			"nt:collaboratesWith": { "@id": "nt:Paul" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "the scribe of Paul's letter to the Roman church"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -7362,7 +7272,6 @@
 			"@type": "nt:Man",
 			"nt:collaboratesWith": { "@id": "nt:Paul" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "a Christian in Rome to whom Paul sent greetings"
 			},
 			"nt:hasOnlyGenealogyMention": {
@@ -7379,7 +7288,6 @@
 			"@type": "nt:Man",
 			"nt:collaboratesWith": { "@id": "nt:David" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew's geneaology"
 			},
 			"nt:hasEnemy": { "@id": "nt:David" },
@@ -7387,7 +7295,7 @@
 				"@type": "http://www.w3.org/2001/XMLSchema#boolean",
 				"@value": "true"
 			},
-			"nt:occupation": { "@language": "en", "@value": "soldier" },
+			"nt:occupation": { "@value": "soldier" },
 			"nt:spouseOf": { "@id": "nt:Bathsheba" },
 			"rdfs:comment": "From OT sources, Uriah was a Hittite and a soldier in David's army (therefore having both collaboratesWith and hasEnemy relationships with David). ",
 			"rdfs:label": "Uriah"
@@ -7397,7 +7305,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": { "@id": "nt:Joram" },
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew's geneaology"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },
@@ -7405,7 +7312,7 @@
 				"@type": "http://www.w3.org/2001/XMLSchema#boolean",
 				"@value": "true"
 			},
-			"nt:occupation": { "@language": "en", "@value": "king of Judah" },
+			"nt:occupation": { "@value": "king of Judah" },
 			"nt:parentOf": { "@id": "nt:Jotham" },
 			"http://www.w3.org/2000/01/rdf-schema#comment": "His occupation as King comes from Old Testament sources. ",
 			"rdfs:label": "Uzziah"
@@ -7467,7 +7374,6 @@
 			"@type": "nt:Man",
 			"nt:childOf": [{ "@id": "nt:Judah" }, { "@id": "nt:Tamar" }],
 			"nt:description": {
-				"@language": "en",
 				"@value": "One of the ancestors of Jesus mentioned in Matthew's geneaology"
 			},
 			"nt:ethnicity": { "@id": "nt:Jewish" },

@@ -87,10 +87,6 @@ To get the provenance of a query result, we _query for the provenance_ instead:
 	"@type": "u:Query",
 	"@graph": {
 		"@type": "prov:Entity",
-		"prov:value": {},
-		"prov:wasDerivedFrom": {},
-		"prov:generatedAtTime": {},
-		"prov:wasAttributedTo": {},
 		"u:satisfies": {
 			"@graph": {
 				"@type": "Volcano",
@@ -105,17 +101,15 @@ To get the provenance of a query result, we _query for the provenance_ instead:
 This message normalizes to
 
 ```
-_:c14n2 <http://underlay.mit.edu/ns#satisfies> _:c14n1 _:c14n5 .
-_:c14n2 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/ns/prov#Entity> _:c14n5 .
-_:c14n2 <http://www.w3.org/ns/prov#value> _:c14n6 _:c14n5 .
-_:c14n2 <http://www.w3.org/ns/prov#wasDerivedFrom> _:c14n3 _:c14n5 .
-_:c14n5 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://underlay.mit.edu/ns#Query> .
-_:c14n7 <http://schema.org/name> _:c14n4 _:c14n1 .
-_:c14n7 <http://schema.org/smokingAllowed> _:c14n0 _:c14n1 .
-_:c14n7 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://schema.org/Volcano> _:c14n1 .
+_:c14n2 <http://underlay.mit.edu/ns#satisfies> _:c14n1 _:c14n3 .
+_:c14n2 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/ns/prov#Entity> _:c14n3 .
+_:c14n3 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://underlay.mit.edu/ns#Query> .
+_:c14n5 <http://schema.org/name> _:c14n4 _:c14n1 .
+_:c14n5 <http://schema.org/smokingAllowed> _:c14n0 _:c14n1 .
+_:c14n5 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://schema.org/Volcano> _:c14n1 .
 ```
 
-... with CID `QmczGkueqTfkAbtkSHLNFw1QUQAHL2JVNBsEyoTnvRcDyz`, which we'll call `ul:/ipfs/...vRcDyz` for short.
+... with CID `QmWSeN7y5wSYkMBUMJPpDg5BwRASk7ZWqvrccnHasWffFp`, which we'll call `ul:/ipfs/...sWffFp` for short.
 
 Here, the value of `u:satisfies` is a separate named graph, which is interpreted as a query graph (although it's important that it is not explicitly given an `rdf:type` of `u:Query`). But the value of `u:satisfies` could just have well have been `{ "@id": "ul:/ipfs/...EUkcMf#_:c14n2" }` - a reference to the query graph of the previous message, so long as `...EUkcMf` is resolvable over IPFS.
 
@@ -130,21 +124,21 @@ This time, Styx will respond with something like:
 		"u:instanceOf": { "@type": "@id" },
 		"prov:value": { "@container": "@list" }
 	},
-	"u:instanceOf": "ul:/ipfs/...vRcDyz#_:c14n5",
+	"u:instanceOf": "ul:/ipfs/...sWffFp#_:c14n5",
 	"@graph": {
 		"@type": "prov:Entity",
-		"u:satisfies": { "@id": "ul:/ipfs/...vRcDyz#_:c14n1" },
+		"u:satisfies": { "@id": "ul:/ipfs/...sWffFp#_:c14n1" },
 		"prov:value": [
 			{
-				"@id": "ul:/ipfs/...vRcDyz#_:c14n7",
+				"@id": "ul:/ipfs/...sWffFp#_:c14n7",
 				"rdf:value": { "@id": "ul:/ipfs/...vHC3rQ#_:c14n0" }
 			},
 			{
-				"@id": "ul:/ipfs/...vRcDyz#_:c14n4",
+				"@id": "ul:/ipfs/...sWffFp#_:c14n4",
 				"rdf:value": "Mount Fuji"
 			},
 			{
-				"@id": "ul:/ipfs/...vRcDyz#_:c14n0",
+				"@id": "ul:/ipfs/...sWffFp#_:c14n0",
 				"rdf:value": true
 			}
 		],
@@ -158,15 +152,15 @@ This time, Styx will respond with something like:
 			"prov:hadMember": [
 				{
 					"@id": "ul:/ipfs/...vHC3rQ#/0",
-					"u:instanceOf": "ul:/ipfs/...vRcDyz#/5"
+					"u:instanceOf": "ul:/ipfs/...sWffFp#/5"
 				},
 				{
 					"@id": "ul:/ipfs/...vHC3rQ#/1",
-					"u:instanceOf": "ul:/ipfs/...vRcDyz#/6"
+					"u:instanceOf": "ul:/ipfs/...sWffFp#/6"
 				},
 				{
 					"@id": "ul:/ipfs/...vHC3rQ#/2",
-					"u:instanceOf": "ul:/ipfs/...vRcDyz#/7"
+					"u:instanceOf": "ul:/ipfs/...sWffFp#/7"
 				}
 			]
 		}
@@ -201,9 +195,6 @@ In the same way that we retrieved provenance by querying for it directly, we ret
 	"@graph": {
 		"@type": "prov:Bundle",
 		"dcterms:extent": 5,
-		"prov:value": {},
-		"prov:generatedAtTime": {},
-		"prov:wasAttributedTo": {},
 		"u:enumerates": {
 			"@graph": {
 				"@type": "Volcano",

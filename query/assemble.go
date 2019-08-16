@@ -14,24 +14,25 @@ import (
 // MakeConstraintGraph populates, scores, sorts, and connects a new constraint graph
 func MakeConstraintGraph(
 	quads []*ld.Quad,
-	graph string,
-	indices []int,
+	label string,
+	graph []int,
+	indices map[string]bool,
 	txn *badger.Txn,
 ) (g *ConstraintGraph, err error) {
 	indexMap := types.IndexMap{}
 
 	g = &ConstraintGraph{}
 
-	for _, index := range indices {
+	for _, index := range graph {
 		quad := quads[index]
-		label := "@default"
-		if quad.Graph != nil && quad.Graph.GetValue() != "" {
-			label = quad.Graph.GetValue()
-		}
 
-		if label != graph {
-			continue
-		}
+		// value := ""
+		// if quad.Graph != nil {
+		// 	value = quad.Graph.GetValue()
+		// }
+		// if value != label {
+		// 	continue
+		// }
 
 		s, S := getAttribute(quad.Subject)
 		p, P := getAttribute(quad.Predicate)
@@ -41,7 +42,7 @@ func MakeConstraintGraph(
 		if !S && !P && !O {
 			continue
 		} else if S && P && O {
-			return nil, fmt.Errorf("Cannot handle all-blank triple: %s %d", graph, index)
+			return nil, fmt.Errorf("Cannot handle all-blank triple: %s %d", label, index)
 		} else if (S && !P && !O) || (!S && P && !O) || (!S && !P && O) {
 			// Only one of the terms is a blank node, so this is a first-degree constraint.
 			c = &Constraint{Index: index}
@@ -78,24 +79,31 @@ func MakeConstraintGraph(
 			// If they're different, we insert two second-degree constraints.
 			if !O && s == p {
 				c = &Constraint{Index: index, Place: pSP}
+
 				if c.N, c.n, err = getID(quad.Object, indexMap, txn); err != nil {
 					return
 				}
+
 				g.insertDZ(s, c, txn)
 			} else if !P && o == s {
 				c = &Constraint{Index: index, Place: pOS}
+
 				if c.N, c.n, err = getID(quad.Predicate, indexMap, txn); err != nil {
 					return
 				}
+
 				g.insertDZ(o, c, txn)
 			} else if !S && p == o {
 				c = &Constraint{Index: index, Place: pPO}
+
 				if c.N, c.n, err = getID(quad.Subject, indexMap, txn); err != nil {
 					return
 				}
+
 				g.insertDZ(p, c, txn)
 			} else if S && P && !O {
 				u, v := &Constraint{Index: index, Place: pS}, &Constraint{Index: index, Place: pP}
+
 				if u.M, u.m, err = getID(quad.Predicate, indexMap, txn); err != nil {
 					return
 				} else if u.N, u.n, err = getID(quad.Object, indexMap, txn); err != nil {
@@ -158,14 +166,38 @@ func MakeConstraintGraph(
 	}
 
 	// Score the variables
-	for _, id := range g.Slice {
-		if err = g.Index[id].Score(txn); err != nil {
+	for _, p := range g.Slice {
+		u := g.Index[p]
+		if err = u.Score(txn); err != nil {
 			return
 		}
+
+		// Set the initial value of each variable.
+		// This will get overwritten to be nil if/when
+		// previous dependencies propagate their assignments.
+		u.Value = u.Root
 	}
 
 	// Sort self
 	sort.Stable(g)
+
+	if indices != nil && len(indices) > 0 {
+		// Shuffle the index variables into the upper postitions
+		// while preserving sort order
+		upper := make([]string, 0, len(indices))
+		lower := make([]string, 0, len(g.Slice)-len(indices))
+		for _, u := range g.Slice {
+			if b, has := indices[u]; has && b {
+				upper = append(upper, u)
+			} else {
+				lower = append(lower, u)
+			}
+		}
+		g.Slice = append(upper, lower...)
+		g.Pivot = len(indices)
+	} else {
+		g.Pivot = len(g.Slice)
+	}
 
 	// Invert the slice index
 	g.Map = map[string]int{}
@@ -250,12 +282,12 @@ func getAttribute(node ld.Node) (string, bool) {
 	return "", false
 }
 
-func getID(node ld.Node, indices types.IndexMap, txn *badger.Txn) (hasID HasID, bytes []byte, err error) {
+func getID(node ld.Node, indexMap types.IndexMap, txn *badger.Txn) (hasID HasID, bytes []byte, err error) {
 	var index *types.Index
 	if blank, isBlank := node.(*ld.BlankNode); isBlank {
 		hasID = BlankNode(blank.Attribute)
 		return
-	} else if index, err = indices.Get(node, txn); err == badger.ErrKeyNotFound {
+	} else if index, err = indexMap.Get(node, txn); err == badger.ErrKeyNotFound {
 		return
 	} else if err != nil {
 		return

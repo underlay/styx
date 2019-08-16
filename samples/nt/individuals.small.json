@@ -16,7 +16,6 @@
 			"@id": "nt:Joseph",
 			"nt:childOf": [{ "@id": "nt:Heli" }, { "@id": "nt:JacobSonOfMatthan" }],
 			"nt:description": {
-				"@language": "en",
 				"@value": "the earthly father of Jesus"
 			},
 			"nt:parentOf": { "@id": "nt:Jesus" },
@@ -37,7 +36,6 @@
 				{
 					"@id": "nt:Rachel",
 					"nt:description": {
-						"@language": "en",
 						"@value": "one of Jacob's wives"
 					},
 					"nt:parentOf": [

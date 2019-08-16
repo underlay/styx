@@ -174,7 +174,9 @@ func ParseMessage(input io.Reader) ([]*ld.Quad, map[string][]int, error) {
 	scanner := bufio.NewScanner(input)
 
 	quads := []*ld.Quad{}
-	graphs := map[string][]int{}
+
+	// graphs *always* has an entry for the default graph, even if it's empty.
+	graphs := map[string][]int{"": []int{}}
 
 	// scan N-Quad input lines
 	lineNumber := 0
@@ -220,9 +222,9 @@ func ParseMessage(input io.Reader) ([]*ld.Quad, map[string][]int, error) {
 		} else {
 			language := unescape(match[9])
 			var datatype string
-			if match[9] != "" {
+			if match[8] != "" {
 				datatype = unescape(match[8])
-			} else if match[8] != "" {
+			} else if match[9] != "" {
 				datatype = ld.RDFLangString
 			} else {
 				datatype = ld.XSDString
@@ -231,8 +233,7 @@ func ParseMessage(input io.Reader) ([]*ld.Quad, map[string][]int, error) {
 			object = ld.NewLiteral(unescaped, datatype, language)
 		}
 
-		// get graph name ('@default' is used for the default graph)
-		name := "@default"
+		name := ""
 		if match[10] != "" {
 			name = unescape(match[10])
 		} else if match[11] != "" {

@@ -44,7 +44,6 @@ func (value *Value) ToJSON() (r interface{}) {
 		} else if d == "" || d == ld.XSDString {
 			r = v
 		} else if d == ld.XSDBoolean {
-			r = v == "true"
 			if v == "true" {
 				r = true
 			} else if v == "false" {
@@ -135,9 +134,9 @@ func (index *Index) Get(place uint8) uint64 {
 type IndexMap map[string]*Index
 
 // Commit writes the contents of the index map to badger
-func (indices IndexMap) Commit(txn *badger.Txn) (err error) {
+func (indexMap IndexMap) Commit(txn *badger.Txn) (err error) {
 	var val []byte
-	for v, index := range indices {
+	for v, index := range indexMap {
 		key := AssembleKey(IndexPrefix, []byte(v), nil, nil)
 		if val, err = proto.Marshal(index); err != nil {
 			return
@@ -149,9 +148,9 @@ func (indices IndexMap) Commit(txn *badger.Txn) (err error) {
 }
 
 // Get memoizes database lookup for RDF nodes.
-func (indices IndexMap) Get(node ld.Node, txn *badger.Txn) (*Index, error) {
+func (indexMap IndexMap) Get(node ld.Node, txn *badger.Txn) (*Index, error) {
 	value := NodeToValue(cid.Undef, node).GetValue()
-	if index, has := indices[value]; has {
+	if index, has := indexMap[value]; has {
 		return index, nil
 	}
 
@@ -161,11 +160,11 @@ func (indices IndexMap) Get(node ld.Node, txn *badger.Txn) (*Index, error) {
 	} else if val, err := item.ValueCopy(nil); err != nil {
 		return nil, err
 	} else {
-		indices[value] = &Index{}
-		if err = proto.Unmarshal(val, indices[value]); err != nil {
+		indexMap[value] = &Index{}
+		if err = proto.Unmarshal(val, indexMap[value]); err != nil {
 			return nil, err
 		}
-		return indices[value], nil
+		return indexMap[value], nil
 	}
 }
 
