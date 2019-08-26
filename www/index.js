@@ -7,8 +7,11 @@ const fields = [
 	'block[type="blank"]',
 ].map(s => document.querySelector(`#toolbox > ${s} field`))
 
-const QUERY_TYPE = "http://underlay.mit.edu/ns#Query"
+const QUERY = "http://underlay.mit.edu/ns#Query"
+const ENTITY = "http://www.w3.org/ns/prov#Entity"
 const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
+
+const SATISFIES = "http://underlay.mit.edu/ns#satisfies"
 
 const XSD_STRING = "http://www.w3.org/2001/XMLSchema#string"
 const XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean"
@@ -102,29 +105,51 @@ query.addEventListener("click", async () => {
 		console.log(r)
 		const {
 			"@graph": [
-				{ "u:satisfies": q, "prov:value": value, "prov:wasDerivedFrom": prov },
+				{ "u:satisfies": q, "prov:value": values, "prov:wasDerivedFrom": prov },
 			],
 		} = await jsonld.frame(r, frame)
-		render(q, value, prov)
+		render(q, values, prov)
 	} else {
 		console.error(res.statusText)
 	}
 })
 
-function render({ "@id": q }, value, prov) {
+function render({ "@id": q }, values, prov) {
 	const index = q.indexOf("#")
 	result.innerHTML = `<tr><td colspan="2" class="query">&lt;${q}&gt;</td></tr>`
-	if (Array.isArray(value) && value.length > 0 && prov != null) {
-		for (const { "@id": id, "rdf:value": v } of value) {
+	if (Array.isArray(values) && values.length > 0 && prov != null) {
+		const map = {}
+		for (const { "@id": id, "rdf:value": v } of values) {
+			const name = id.slice(index + 1)
+			map[name] = v
+
 			const tr = document.createElement("tr")
 			const td1 = document.createElement("td")
-			td1.innerText = id.slice(index + 1)
+			td1.innerText = name
 			const td2 = document.createElement("td")
 			td2.innerHTML = renderValue(v)
 			tr.appendChild(td1)
 			tr.appendChild(td2)
 			result.appendChild(tr)
 		}
+
+		// for (const block of workspace.getBlocksByType(blank, false)) {
+		// 	const id = block.getFieldValue("id")
+		// 	const { name } = workspace.getVariableById(id)
+		// 	console.log("Block!", name, block)
+		// 	const value = map[name]
+
+		// 	const parent = block.getParent()
+		// 	block.dispose()
+		// 	if (parent !== null) {
+		// 		const newBlock = workspace.newBlock(iri)
+		// 		newBlock.setParent(parent)
+		// 		// if (parent.type === predicate) {
+
+		// 		// } else if (parent.type === node) {
+		// 		// }
+		// 	}
+		// }
 	} else {
 		const tr = document.createElement("tr")
 		const td = document.createElement("td")
@@ -247,7 +272,12 @@ workspace.addChangeListener(() => {
 	workspace.updateToolbox(toolbox)
 
 	if (quads.length === 0) return clear()
-	quads.push(`${g} <${RDF_TYPE}> <${QUERY_TYPE}> .\n`)
+
+	// quads.push(`${g} <${RDF_TYPE}> <${QUERY}> .\n`)
+	quads.push(`_:e <${SATISFIES}> ${g} _:p .`)
+	quads.push(`_:e <${RDF_TYPE}> <${ENTITY}> _:p .`)
+	quads.push(`_:p <${RDF_TYPE}> <${QUERY}> .\n`)
+
 	QUADS = quads.join("\n")
 	query.removeAttribute("disabled")
 })

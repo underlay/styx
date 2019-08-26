@@ -69,7 +69,6 @@ main {
 
 #right div.jsoneditor {
 	border: none;
-	border-bottom: 1px solid lightslategray;
 }
 
 #right div.jsoneditor-menu {
@@ -102,6 +101,10 @@ main {
 
 #right table.jsoneditor-tree tr:first-child {
 	transform: none;
+}
+
+#context {
+	border-top: 1px solid lightslategray;
 }
 
 #context .jsoneditor-menu::before {

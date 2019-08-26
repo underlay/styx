@@ -83,9 +83,10 @@ func (db *DB) HandleMessage(
 	for g := range queries {
 		entity, bundle, target, extent, indices := matchGraph(g, graphs, quads)
 		var graph interface{}
+		t := map[string]interface{}{"@id": fmt.Sprintf("q:%s", target)}
 		if entity {
 			go db.Query(quads, g, graphs[target], data[g], prov[g])
-			entity := makeEntity(fmt.Sprintf("q:%s", target), <-data[g], <-prov[g])
+			entity := makeEntity(t, <-data[g], <-prov[g])
 			entity["prov:wasAttributedTo"] = fmt.Sprintf("ul:/ipns/%s", id)
 			entity["prov:generatedAtTime"] = time.Now().Format(time.RFC3339)
 			graph = entity
@@ -100,15 +101,17 @@ func (db *DB) HandleMessage(
 				s[x] = <-prov[g]
 			}
 			entities := make([]map[string]interface{}, extent)
+
 			for x := 0; x < extent; x++ {
-				entities[x] = makeEntity(fmt.Sprintf("q:%s", target), d[x], s[x])
+				entities[x] = makeEntity(t, d[x], s[x])
 			}
+
 			graph = map[string]interface{}{
 				"@type":                "prov:Bundle",
 				"prov:wasAttributedTo": fmt.Sprintf("ul:/ipns/%s", id),
 				"prov:generatedAtTime": time.Now().Format(time.RFC3339),
 				"dcterms:extent":       extent,
-				"u:enumerates":         target,
+				"u:enumerates":         t,
 				"prov:value":           entities,
 			}
 		} else {
@@ -116,7 +119,7 @@ func (db *DB) HandleMessage(
 			graph = makeGraph(graphs[target], quads, data[g])
 		}
 		responses = append(responses, map[string]interface{}{
-			"u:instanceOf": fmt.Sprintf("q%s", g),
+			"u:instanceOf": fmt.Sprintf("q:%s", g),
 			"@graph":       graph,
 		})
 	}
@@ -193,7 +196,7 @@ func matchGraph(label string, graphs map[string][]int, quads []*ld.Quad) (
 }
 
 func makeEntity(
-	target string,
+	target map[string]interface{},
 	d map[string]*types.Value,
 	p map[int]*types.SourceList,
 ) map[string]interface{} {
@@ -201,7 +204,7 @@ func makeEntity(
 	values := make([]interface{}, 0, len(d))
 	entity := map[string]interface{}{
 		"@type":       "prov:Entity",
-		"u:satisfies": map[string]interface{}{"@id": target},
+		"u:satisfies": target,
 	}
 
 	if len(d) == 0 || len(p) == 0 {
