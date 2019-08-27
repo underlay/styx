@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	cid "github.com/ipfs/go-cid"
+	ipfs "github.com/ipfs/go-ipfs-api"
 	ld "github.com/piprate/json-gold/ld"
 
 	styx "github.com/underlay/styx/db"
@@ -104,6 +105,9 @@ func TestIPFSDocumentLoader(t *testing.T) {
 		"name": "Vincent van Gogh"
 	}`)
 
+	// Replace at your leisure
+	sh := ipfs.NewShell(defaultHost)
+
 	if !sh.IsUp() {
 		t.Error("IPFS Daemon not running")
 		return
@@ -171,19 +175,22 @@ func TestIPFSDocumentLoader(t *testing.T) {
 }
 
 func TestIngest(t *testing.T) {
+	// Replace at your leisure
+	sh := ipfs.NewShell(defaultHost)
+
 	if !sh.IsUp() {
 		t.Error("IPFS Daemon not running")
 		return
 	}
 
 	// Remove old db
-	fmt.Println("removing path", tempPath)
-	if err := os.RemoveAll(tempPath); err != nil {
+	fmt.Println("removing path", defaultPath)
+	if err := os.RemoveAll(defaultPath); err != nil {
 		t.Error(err)
 		return
 	}
 
-	db, err := styx.OpenDB(tempPath)
+	db, err := styx.OpenDB(defaultPath)
 	if err != nil {
 		t.Error(err)
 		return
@@ -212,9 +219,12 @@ func TestIngest(t *testing.T) {
 }
 
 func testQuery(query []byte) error {
+	// Replace at your leisure
+	sh := ipfs.NewShell(defaultHost)
+
 	if !sh.IsUp() {
 		return fmt.Errorf("IPFS Daemon not running")
-	} else if err := os.RemoveAll(tempPath); err != nil {
+	} else if err := os.RemoveAll(defaultPath); err != nil {
 		return err
 	}
 
@@ -223,7 +233,7 @@ func testQuery(query []byte) error {
 		return err
 	}
 
-	db, err := styx.OpenDB(tempPath)
+	db, err := styx.OpenDB(defaultPath)
 	if err != nil {
 		return err
 	}
@@ -312,6 +322,8 @@ func TestBundleQuery(t *testing.T) {
 }
 
 func TestNT(t *testing.T) {
+	// Replace at your leisure
+	sh := ipfs.NewShell(defaultHost)
 	if !sh.IsUp() {
 		t.Error("IPFS Daemon not running")
 		return
@@ -324,13 +336,13 @@ func TestNT(t *testing.T) {
 	}
 
 	// Remove old db
-	fmt.Println("removing path", tempPath)
-	if err := os.RemoveAll(tempPath); err != nil {
+	fmt.Println("removing path", defaultPath)
+	if err := os.RemoveAll(defaultPath); err != nil {
 		t.Error(err)
 		return
 	}
 
-	db, err := styx.OpenDB(tempPath)
+	db, err := styx.OpenDB(defaultPath)
 	if err != nil {
 		t.Error(err)
 		return

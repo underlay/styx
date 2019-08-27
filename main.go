@@ -23,14 +23,14 @@ import (
 )
 
 // Replace at your leisure
-const tempPath = "/tmp/styx"
-const tempPort = "8000"
+const defaultPath = "/tmp/styx"
+const defaultPort = "8000"
+const defaultHost = "localhost:5001"
 
 var path = os.Getenv("STYX_PATH")
 var port = os.Getenv("STYX_PORT")
+var host = os.Getenv("IPFS_HOST")
 
-// Replace at your leisure
-var sh = ipfs.NewShell("localhost:5001")
 var shError = "IPFS Daemon not running"
 
 func walkValues(values []interface{}, files map[string]string) {
@@ -69,12 +69,19 @@ func walk(graph []interface{}, files map[string]string) {
 
 func main() {
 	if path == "" {
-		path = tempPath
+		path = defaultPath
 	}
 
 	if port == "" {
-		port = tempPort
+		port = defaultPort
 	}
+
+	if host == "" {
+		host = defaultHost
+	}
+
+	// Replace at your leisure
+	var sh = ipfs.NewShell(host)
 
 	if !sh.IsUp() {
 		log.Fatal(shError)
