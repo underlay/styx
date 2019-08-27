@@ -87,8 +87,8 @@ func (db *DB) HandleMessage(
 		if entity {
 			go db.Query(quads, g, graphs[target], data[g], prov[g])
 			entity := makeEntity(t, <-data[g], <-prov[g])
-			entity["prov:wasAttributedTo"] = fmt.Sprintf("ul:/ipns/%s", id)
-			entity["prov:generatedAtTime"] = time.Now().Format(time.RFC3339)
+			entity["wasAttributedTo"] = fmt.Sprintf("ul:/ipns/%s", id)
+			entity["generatedAtTime"] = time.Now().Format(time.RFC3339)
 			graph = entity
 		} else if bundle {
 			go db.Enumerate(quads, g, graphs[target], extent, indices, data[g], prov[g])
@@ -107,12 +107,12 @@ func (db *DB) HandleMessage(
 			}
 
 			graph = map[string]interface{}{
-				"@type":                "prov:Bundle",
-				"prov:wasAttributedTo": fmt.Sprintf("ul:/ipns/%s", id),
-				"prov:generatedAtTime": time.Now().Format(time.RFC3339),
-				"dcterms:extent":       extent,
-				"u:enumerates":         t,
-				"prov:value":           entities,
+				"@type":           "Bundle",
+				"wasAttributedTo": fmt.Sprintf("ul:/ipns/%s", id),
+				"generatedAtTime": time.Now().Format(time.RFC3339),
+				"dcterms:extent":  extent,
+				"u:enumerates":    t,
+				"value":           entities,
 			}
 		} else {
 			go db.Query(quads, g, graphs[target], data[g], prov[g])
@@ -203,12 +203,12 @@ func makeEntity(
 
 	values := make([]interface{}, 0, len(d))
 	entity := map[string]interface{}{
-		"@type":       "prov:Entity",
+		"@type":       "Entity",
 		"u:satisfies": target,
 	}
 
 	if len(d) == 0 || len(p) == 0 {
-		entity["prov:value"] = values
+		entity["value"] = values
 		return entity
 	}
 
@@ -219,7 +219,7 @@ func makeEntity(
 		})
 	}
 
-	entity["prov:value"] = values
+	entity["value"] = values
 
 	var size int
 	for _, sourceList := range p {
@@ -236,9 +236,9 @@ func makeEntity(
 		}
 	}
 
-	entity["prov:wasDerivedFrom"] = map[string]interface{}{
-		"@type":          "prov:Collection",
-		"prov:hadMember": sources,
+	entity["wasDerivedFrom"] = map[string]interface{}{
+		"@type":     "Collection",
+		"hadMember": sources,
 	}
 
 	return entity
