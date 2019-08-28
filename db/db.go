@@ -219,6 +219,63 @@ func (db *DB) Enumerate(
 	})
 }
 
+// Ls lists the graphs in the database
+func (db *DB) Ls(index string, extent int, messages chan []byte, dates chan []byte) error {
+	var prefix = make([]byte, 1)
+	prefix[0] = 'g'
+
+	prefetchSize := extent
+	if prefetchSize > 100 {
+		prefetchSize = 100
+	}
+
+	iteratorOptions := badger.IteratorOptions{
+		PrefetchValues: true,
+		PrefetchSize:   prefetchSize,
+		Reverse:        false,
+		AllVersions:    false,
+		Prefix:         prefix,
+	}
+
+	seek := make([]byte, 1+len(index))
+	seek[0] = 'g'
+	copy(seek[1:], index)
+
+	return db.Badger.View(func(txn *badger.Txn) (err error) {
+		iter := txn.NewIterator(iteratorOptions)
+		defer iter.Close()
+
+		i := 0
+		for iter.Seek(seek); iter.Valid() && i < extent; iter.Next() {
+			item := iter.Item()
+
+			// Get the key
+			size := item.KeySize() - 1
+			key := make([]byte, size)
+			copy(key, item.Key()[1:])
+
+			// Key the value
+			size = item.ValueSize()
+			value := make([]byte, size)
+			if value, err = item.ValueCopy(value); err != nil {
+				return
+			}
+
+			messages <- key
+			dates <- value
+
+			i++
+		}
+
+		for ; i < extent; i++ {
+			messages <- nil
+			dates <- nil
+		}
+
+		return
+	})
+}
+
 // Log will print the *entire database contents* to log
 func (db *DB) Log() error {
 	return db.Badger.View(func(txn *badger.Txn) error {

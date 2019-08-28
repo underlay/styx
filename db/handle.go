@@ -27,6 +27,7 @@ var Context = []byte(`{
 }`)
 
 var typeIri = ld.NewIRI(ld.RDFType)
+var graphIri = ld.NewIRI("http://underlay.mit.edu/ns#Graph")
 var queryIri = ld.NewIRI("http://underlay.mit.edu/ns#Query")
 var indexIri = ld.NewIRI("http://underlay.mit.edu/ns#index")
 var enumeratesIri = ld.NewIRI("http://underlay.mit.edu/ns#enumerates")
@@ -85,25 +86,59 @@ func (db *DB) HandleMessage(
 		var graph interface{}
 		t := map[string]interface{}{"@id": fmt.Sprintf("q:%s", target)}
 		if entity {
-			go db.Query(quads, g, graphs[target], data[g], prov[g])
-			entity := makeEntity(t, <-data[g], <-prov[g])
+			data := make(chan map[string]*types.Value)
+			prov := make(chan map[int]*types.SourceList)
+			go db.Query(quads, g, graphs[target], data, prov)
+			entity := makeEntity(t, <-data, <-prov)
 			entity["wasAttributedTo"] = fmt.Sprintf("ul:/ipns/%s", id)
 			entity["generatedAtTime"] = time.Now().Format(time.RFC3339)
 			graph = entity
 		} else if bundle {
-			go db.Enumerate(quads, g, graphs[target], extent, indices, data[g], prov[g])
-			d := make([]map[string]*types.Value, extent)
-			s := make([]map[int]*types.SourceList, extent)
-			for x := range d {
-				d[x] = <-data[g]
-			}
-			for x := range s {
-				s[x] = <-prov[g]
-			}
 			entities := make([]map[string]interface{}, extent)
+			q := quads[graphs[target][0]]
+			b, is := q.Subject.(*ld.BlankNode)
+			if len(graphs[target]) == 1 && is && q.Predicate.Equal(typeIri) && q.Object.Equal(graphIri) {
+				enumerator := fmt.Sprintf("q:%s", b.Attribute)
+				messages := make(chan []byte, extent)
+				dates := make(chan []byte, extent)
+				go db.Ls("", extent, messages, dates)
+				for x := 0; x < extent; x++ {
+					entities[x] = map[string]interface{}{
+						"@type":       "Entity",
+						"u:satisfies": t,
+					}
+					if m, d := <-messages, <-dates; m == nil || d == nil {
+						entities[x]["value"] = []interface{}{}
+					} else {
+						entities[x]["value"] = []interface{}{
+							map[string]interface{}{
+								"@id":          string(m),
+								"u:instanceOf": enumerator,
+								// "dateSubmitted": map[string]interface{}{
+								// 	"@value": string(d),
+								// 	"@type":  "xsd:dateTime",
+								// },
+							},
+						}
+					}
+				}
+			} else {
+				data := make(chan map[string]*types.Value)
+				prov := make(chan map[int]*types.SourceList)
+				go db.Enumerate(quads, g, graphs[target], extent, indices, data, prov)
+				d := make([]map[string]*types.Value, extent)
+				s := make([]map[int]*types.SourceList, extent)
+				for x := range d {
+					d[x] = <-data
+				}
 
-			for x := 0; x < extent; x++ {
-				entities[x] = makeEntity(t, d[x], s[x])
+				for x := range s {
+					s[x] = <-prov
+				}
+
+				for x := 0; x < extent; x++ {
+					entities[x] = makeEntity(t, d[x], s[x])
+				}
 			}
 
 			graph = map[string]interface{}{
@@ -115,9 +150,12 @@ func (db *DB) HandleMessage(
 				"value":           entities,
 			}
 		} else {
-			go db.Query(quads, g, graphs[target], data[g], prov[g])
-			graph = makeGraph(graphs[target], quads, data[g])
+			data := make(chan map[string]*types.Value)
+			prov := make(chan map[int]*types.SourceList)
+			go db.Query(quads, g, graphs[target], data, prov)
+			graph = makeGraph(graphs[target], quads, <-data)
 		}
+
 		responses = append(responses, map[string]interface{}{
 			"u:instanceOf": fmt.Sprintf("q:%s", g),
 			"@graph":       graph,
@@ -247,14 +285,13 @@ func makeEntity(
 func makeGraph(
 	graph []int,
 	quads []*ld.Quad,
-	data chan map[string]*types.Value,
+	data map[string]*types.Value,
 ) []map[string]interface{} {
-	d := <-data
 	nodes := map[string]map[string][]interface{}{}
 	for _, x := range graph {
 		var subject string
 		if s, is := quads[x].Subject.(*ld.BlankNode); is {
-			if value, has := d[s.Attribute]; has {
+			if value, has := data[s.Attribute]; has {
 				if iri, is := value.Node.(*types.Value_Iri); is {
 					subject = iri.Iri
 				} else if blank, is := value.Node.(*types.Value_Blank); is {
@@ -273,7 +310,7 @@ func makeGraph(
 
 		var predicate string
 		if p, is := quads[x].Predicate.(*ld.BlankNode); is {
-			if value, has := d[p.Attribute]; has {
+			if value, has := data[p.Attribute]; has {
 				if iri, is := value.Node.(*types.Value_Iri); is {
 					predicate = iri.Iri
 				}
@@ -288,7 +325,7 @@ func makeGraph(
 
 		var object interface{}
 		if o, is := quads[x].Object.(*ld.BlankNode); is {
-			if value, has := d[o.Attribute]; has {
+			if value, has := data[o.Attribute]; has {
 				object = value.ToJSON()
 			} else {
 				continue
@@ -308,7 +345,7 @@ func makeGraph(
 				} else if o.Value == "false" {
 					object = false
 				} else {
-					object = map[string]interface{}{"@value": o.Value, "@type": d}
+					object = map[string]interface{}{"@value": o.Value, "@type": o.Datatype}
 				}
 			} else if o.Datatype == ld.RDFLangString {
 				object = map[string]interface{}{

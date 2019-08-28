@@ -99,6 +99,25 @@ var bundleQuery = []byte(`{
 	}
 }`)
 
+var graphQuery = []byte(`{
+	"@context": {
+		"@vocab": "http://schema.org/",
+		"dcterms": "http://purl.org/dc/terms/",
+		"prov": "http://www.w3.org/ns/prov#",
+		"u": "http://underlay.mit.edu/ns#"
+	},
+	"@type": "http://underlay.mit.edu/ns#Query",
+	"@graph": {
+		"@type": "prov:Bundle",
+		"dcterms:extent": 3,
+		"u:enumerates": {
+			"@graph": {
+				"@type": "u:Graph"
+			}
+		}
+	}
+}`)
+
 func TestIPFSDocumentLoader(t *testing.T) {
 	data := []byte(`{
 		"@context": { "@vocab": "http://schema.org/" },
@@ -317,6 +336,12 @@ func TestEntityQuery(t *testing.T) {
 
 func TestBundleQuery(t *testing.T) {
 	if err := testQuery(bundleQuery); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGraphQuery(t *testing.T) {
+	if err := testQuery(graphQuery); err != nil {
 		t.Error(err)
 	}
 }

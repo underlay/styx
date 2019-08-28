@@ -15,7 +15,7 @@ import (
 )
 
 func (db *DB) insert(cid cid.Cid, quads []*ld.Quad, graph string, indices []int, txn *badger.Txn) (err error) {
-	graphID := fmt.Sprintf("%s#%s", cid.String(), graph)
+	graphID := fmt.Sprintf("ul:/ipfs/%s#%s", cid.String(), graph)
 	graphKey := types.AssembleKey(types.GraphPrefix, []byte(graphID), nil, nil)
 
 	var item *badger.Item
@@ -38,7 +38,7 @@ func (db *DB) insert(cid cid.Cid, quads []*ld.Quad, graph string, indices []int,
 	indexMap := types.IndexMap{}
 
 	for index, quad := range quads {
-		g := ""
+		var g string
 		if quad.Graph != nil {
 			g = quad.Graph.GetValue()
 		}

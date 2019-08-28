@@ -24,7 +24,7 @@ import (
 
 // Replace at your leisure
 const defaultPath = "/tmp/styx"
-const defaultPort = "8000"
+const defaultPort = "8086"
 const defaultHost = "localhost:5001"
 
 var path = os.Getenv("STYX_PATH")

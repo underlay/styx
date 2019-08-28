@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8" />
+		<title>Styx :: Query</title>
+		<link rel="icon" type="image/png" href="../icon.png" />
+		<link rel="prefetch" href="../gofont/Go-Smallcaps.ttf" as="font" />
+		<link href="../style.css" rel="stylesheet" type="text/css" />
+		<link href="style.css" rel="stylesheet" type="text/css" />
+		<link
+			href="jsoneditor/jsoneditor.min.css"
+			rel="stylesheet"
+			type="text/css"
+		/>
+	</head>
+
+	<body>
+		<header>
+			<h1><a href="../">Styx</a> :: Query</h1>
+		</header>
+		<main>
+			<div id="blocklyArea"></div>
+			<div id="right">
+				<button disabled="" id="query">Query</button>
+				<div id="context"></div>
+				<table id="result"></table>
+			</div>
+		</main>
+		<div id="blocklyDiv"></div>
+		<xml id="toolbox" style="display: none">
+			<button text="New Variable" callbackKey="variable"></button>
+			<block type="node">
+				<value name="subject">
+					<block type="blank">
+						<field name="id">b0</field>
+					</block>
+				</value>
+				<value name="predicate">
+					<block type="predicate">
+						<field name="id">rdf:type</field>
+					</block>
+				</value>
+			</block>
+			<block type="blank-predicate">
+				<field name="id">b0</field>
+			</block>
+			<block type="predicate">
+				<field name="id">rdf:type</field>
+			</block>
+			<block type="blank">
+				<field name="id">b0</field>
+			</block>
+			<block type="iri">
+				<field name="id">schema:Person</field>
+			</block>
+			<block type="text"></block>
+			<block type="math_number"></block>
+			<block type="logic_boolean"></block>
+			<block type="literal">
+				<field name="value">...</field>
+				<field name="type">xsd:</field>
+			</block>
+		</xml>
+	</body>
+	<script src="../jsonld.min.js"></script>
+	<script src="blockly/blockly_compressed.js"></script>
+	<script src="blockly/blocks_compressed.js"></script>
+	<script src="blockly/msg/js/en.js"></script>
+	<script src="jsoneditor/jsoneditor.min.js"></script>
+	<script src="blocks.js"></script>
+	<script src="index.js"></script>
+</html>
