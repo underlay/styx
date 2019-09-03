@@ -6,7 +6,7 @@ Make sure your IPFS daemon is running, and start `./styx`.
 
 ## Usage
 
-It registers a handler for the `/ul/0.1.1/cbor-ld` libp2p protocol so that connections dialed to your IPFS node's PeerId under that protocol will get forwarded to Styx. Underlay messages (RDF datasets expressing queries or data) can then be sent (serialized as cbor-encoded JSON-LD, or as utf-8 `application/n-quads`), and the Styx plugin will process them (storing the quads, pinning n-quads messages to IPFS, and responding to queries).
+Styx registers a handler for the `/ul/0.1.1/cbor-ld` libp2p protocol so that connections dialed to your IPFS node's PeerId under that protocol will get forwarded to Styx. Underlay messages (RDF datasets expressing queries or data) can then be sent (serialized as cbor-encoded JSON-LD, or as utf-8 `application/n-quads`), and the Styx plugin will process them (storing the quads, pinning n-quads messages to IPFS, and responding to queries).
 
 Styx runs an HTTP interface at `http://localhost:8000` that you can also interact with. It supports the following methods:
 - `GET /` serves `www/index.html`, which is a query editor interface built on [Blockly](https://developers.google.com/blockly/).
