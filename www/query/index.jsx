@@ -45,6 +45,8 @@ const context = {
 	u: "http://underlay.mit.edu/ns#",
 }
 
+const contextText = JSON.stringify(context, null, "  ")
+
 const options = {
 	mode: "view",
 	modes: [],
@@ -259,7 +261,7 @@ class Query extends React.Component {
 				</button>
 				<details>
 					<summary>Context</summary>
-					Something small enough to escape casual notice.
+					<pre>{contextText}</pre>
 				</details>
 				<div id="context"></div>
 				{Query.renderResult(q, values, prov)}

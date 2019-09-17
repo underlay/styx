@@ -35,6 +35,20 @@ main {
 
 /*---------*/
 
+details {
+	padding: 2px 8px;
+}
+
+summary {
+	cursor: pointer;
+	user-select: none;
+}
+
+details pre {
+	font-family: inherit;
+	font-size: 14px;
+}
+
 #right div.jsoneditor {
 	border: none;
 }
