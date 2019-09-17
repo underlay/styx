@@ -1,9 +1,17 @@
-const node = "node"
-const blank = "blank"
-const iri = "iri"
-const predicate = "predicate"
-const blankPredicate = "blank-predicate"
-const literal = "literal"
+import * as Blockly from "blockly/core"
+import * as En from "blockly/msg/en"
+import "blockly/blocks"
+
+console.log("Blockly!", Blockly)
+
+Blockly.setLocale(En)
+
+export const node = "node"
+export const blank = "blank"
+export const iri = "iri"
+export const predicate = "predicate"
+export const blankPredicate = "blank-predicate"
+export const literal = "literal"
 
 Blockly.Blocks[node] = {
 	init: function() {

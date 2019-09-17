@@ -13,18 +13,21 @@
 			type="text/css"
 		/>
 	</head>
-
+	<style>
+		details {
+			padding: 2px 8px;
+		}
+		summary {
+			cursor: pointer;
+		}
+	</style>
 	<body>
 		<header>
-			<h1><a href="../">Styx</a> :: Query</h1>
+			<h1>/// <a href="../">Styx</a> :: Query</h1>
 		</header>
 		<main>
 			<div id="blocklyArea"></div>
-			<div id="right">
-				<button disabled="" id="query">Query</button>
-				<div id="context"></div>
-				<table id="result"></table>
-			</div>
+			<div id="right"></div>
 		</main>
 		<div id="blocklyDiv"></div>
 		<xml id="toolbox" style="display: none">
@@ -62,11 +65,10 @@
 			</block>
 		</xml>
 	</body>
-	<script src="../jsonld.min.js"></script>
-	<script src="blockly/blockly_compressed.js"></script>
+	<!-- <script src="blockly/blockly_compressed.js"></script>
 	<script src="blockly/blocks_compressed.js"></script>
-	<script src="blockly/msg/js/en.js"></script>
-	<script src="jsoneditor/jsoneditor.min.js"></script>
-	<script src="blocks.js"></script>
-	<script src="index.js"></script>
+	<script src="blockly/msg/js/en.js"></script> -->
+	<!-- <script src="jsoneditor/jsoneditor.min.js"></script> -->
+	<!-- <script src="blocks.js"></script> -->
+	<script src="lib/index.min.js"></script>
 </html>

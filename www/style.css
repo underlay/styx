@@ -18,14 +18,31 @@ body {
 	flex-direction: column;
 }
 
+body main {
+	flex: 1;
+}
+
 header {
 	background: lavender;
-	display: flex;
 	font-family: "Go Smallcaps";
-	padding: 8px 8px 0 1em;
+	padding: 0.5em 0.5em 0;
 	border-bottom: 1px solid lightslategray;
 }
 
 header h1 {
 	margin: 0;
+	color: #333;
+}
+
+header h1 {
+	user-select: none;
+}
+
+header h1 a {
+	text-decoration: none;
+	color: inherit;
+}
+
+header h1 a:hover {
+	text-decoration: underline;
 }

@@ -1,4 +1,13 @@
-let QUADS = null
+import React from "react"
+import ReactDOM from "react-dom"
+import jsonld from "jsonld"
+
+import * as Blockly from "blockly/core"
+
+import { literal, iri, blank, blankPredicate, predicate } from "./blocks"
+
+const right = document.getElementById("right")
+
 let VARIABLE = 0
 
 const fields = [
@@ -44,9 +53,9 @@ const options = {
 	search: false,
 }
 
-const contextElement = document.getElementById("context")
-const contextEditor = new JSONEditor(contextElement, options, context)
-contextEditor.collapseAll()
+// const contextElement = document.getElementById("context")
+// const contextEditor = new JSONEditor(contextElement, options, context)
+// contextEditor.collapseAll()
 
 const toolbox = document.getElementById("toolbox")
 const area = document.getElementById("blocklyArea")
@@ -71,7 +80,7 @@ const resize = _ => {
 	Blockly.svgResize(workspace)
 }
 
-window.addEventListener("resize", resize, false)
+addEventListener("resize", resize, false)
 resize()
 
 Blockly.svgResize(workspace)
@@ -85,91 +94,6 @@ const frame = {
 	"u:satisfies": {},
 	"prov:value": {},
 	"prov:wasDerivedFrom": {},
-}
-
-const result = document.getElementById("result")
-const query = document.getElementById("query")
-query.addEventListener("click", async () => {
-	if (QUADS === null) return
-	console.log(QUADS)
-	const res = await fetch("/", {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/n-quads",
-		},
-		body: QUADS,
-	})
-
-	if (res.status === 200) {
-		const r = await res.json()
-		console.log(r)
-		const {
-			"@graph": [
-				{ "u:satisfies": q, "prov:value": values, "prov:wasDerivedFrom": prov },
-			],
-		} = await jsonld.frame(r, frame)
-		render(q, values, prov)
-	} else {
-		console.error(res.statusText)
-	}
-})
-
-function render({ "@id": q }, values, prov) {
-	const index = q.indexOf("#")
-	result.innerHTML = `<tr><td colspan="2" class="query">&lt;${q}&gt;</td></tr>`
-	if (Array.isArray(values) && values.length > 0 && prov != null) {
-		const map = {}
-		for (const { "@id": id, "rdf:value": v } of values) {
-			const name = id.slice(index + 1)
-			map[name] = v
-
-			const tr = document.createElement("tr")
-			const td1 = document.createElement("td")
-			td1.innerText = name
-			const td2 = document.createElement("td")
-			td2.innerHTML = renderValue(v)
-			tr.appendChild(td1)
-			tr.appendChild(td2)
-			result.appendChild(tr)
-		}
-
-		// for (const block of workspace.getBlocksByType(blank, false)) {
-		// 	const id = block.getFieldValue("id")
-		// 	const { name } = workspace.getVariableById(id)
-		// 	console.log("Block!", name, block)
-		// 	const value = map[name]
-
-		// 	const parent = block.getParent()
-		// 	block.dispose()
-		// 	if (parent !== null) {
-		// 		const newBlock = workspace.newBlock(iri)
-		// 		newBlock.setParent(parent)
-		// 		// if (parent.type === predicate) {
-
-		// 		// } else if (parent.type === node) {
-		// 		// }
-		// 	}
-		// }
-	} else {
-		const tr = document.createElement("tr")
-		const td = document.createElement("td")
-		td.setAttribute("colspan", 2)
-		td.innerText = "No results"
-		tr.appendChild(td)
-		result.appendChild(tr)
-	}
-}
-
-function renderValue(value) {
-	if (typeof value === "object") {
-		if (value.hasOwnProperty("@id")) {
-			return `&lt;${value["@id"]}&gt;`
-		} else if (value.hasOwnProperty("@value")) {
-			return JSON.stringify(value["@value"])
-		}
-	} else {
-		return JSON.stringify(value)
-	}
 }
 
 function walk(block, quads, nodes, g) {
@@ -243,11 +167,6 @@ const escape = s =>
 		.replace(/\r/g, "\\r")
 		.replace(/\t/g, "\\t")
 
-const clear = () => {
-	QUADS = null
-	query.setAttribute("disabled", true)
-}
-
 workspace.createVariable("b0", null, "0")
 workspace.registerButtonCallback("variable", _ => {
 	const name = `b${++VARIABLE}`
@@ -258,26 +177,139 @@ workspace.registerButtonCallback("variable", _ => {
 	}
 })
 
-workspace.addChangeListener(() => {
-	const nodes = []
-	const quads = []
-	const g = "_:q"
-
-	for (const block of workspace.getTopBlocks(true)) {
-		if (block.rendered) {
-			walk(block, quads, nodes, g)
+class Query extends React.Component {
+	constructor(props) {
+		super(props)
+		this.state = {
+			disabled: true,
+			quads: null,
+			q: null,
+			values: null,
+			prov: null,
 		}
 	}
 
-	workspace.updateToolbox(toolbox)
+	componentDidMount() {
+		workspace.addChangeListener(() => {
+			const nodes = []
+			const quads = []
+			const g = "_:q"
 
-	if (quads.length === 0) return clear()
+			for (const block of workspace.getTopBlocks(true)) {
+				if (block.rendered) {
+					walk(block, quads, nodes, g)
+				}
+			}
 
-	// quads.push(`${g} <${RDF_TYPE}> <${QUERY}> .\n`)
-	quads.push(`_:e <${SATISFIES}> ${g} _:p .`)
-	quads.push(`_:e <${RDF_TYPE}> <${ENTITY}> _:p .`)
-	quads.push(`_:p <${RDF_TYPE}> <${QUERY}> .\n`)
+			workspace.updateToolbox(toolbox)
 
-	QUADS = quads.join("\n")
-	query.removeAttribute("disabled")
-})
+			if (quads.length === 0) {
+				this.setState({ disabled: true, quads: null })
+			} else {
+				// quads.push(`${g} <${RDF_TYPE}> <${QUERY}> .\n`)
+				quads.push(`_:e <${SATISFIES}> ${g} _:p .`)
+				quads.push(`_:e <${RDF_TYPE}> <${ENTITY}> _:p .`)
+				quads.push(`_:p <${RDF_TYPE}> <${QUERY}> .\n`)
+
+				this.setState({ quads: quads.join("\n"), disabled: false })
+			}
+		})
+	}
+
+	handleClick = async () => {
+		if (this.state.quads === null) {
+			return
+		}
+
+		console.log(this.state.quads)
+
+		const res = await fetch("/", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/n-quads",
+			},
+			body: this.state.quads,
+		})
+
+		if (res.status === 200) {
+			const r = await res.json()
+			console.log(r)
+			const {
+				"@graph": [
+					{
+						"u:satisfies": q,
+						"prov:value": values,
+						"prov:wasDerivedFrom": prov,
+					},
+				],
+			} = await jsonld.frame(r, frame)
+			this.setState({ q, values, prov })
+		} else {
+			console.error(res.statusText)
+			this.setState({ q: null, values: null, prov: null })
+		}
+	}
+
+	render() {
+		const { disabled, q, values, prov } = this.state
+		return (
+			<React.Fragment>
+				<button disabled={disabled} id="query" onClick={this.handleClick}>
+					Query
+				</button>
+				<details>
+					<summary>Context</summary>
+					Something small enough to escape casual notice.
+				</details>
+				<div id="context"></div>
+				{Query.renderResult(q, values, prov)}
+			</React.Fragment>
+		)
+	}
+
+	static renderResult(q, values, prov) {
+		if (q === null || values === null) {
+			return null
+		}
+
+		const index = q["@id"].indexOf("#")
+
+		return (
+			<table>
+				<tbody>
+					<tr>
+						<td colSpan="2" className="query">
+							&lt;{q["@id"]}&gt;
+						</td>
+					</tr>
+					{Array.isArray(values) && values.length > 0 && prov !== null ? (
+						values.map(({ "@id": id, "rdf:value": v }, key) => (
+							<tr key={key}>
+								<td>{id.slice(index + 1)}</td>
+								<td>{Query.renderValue(v)}</td>
+							</tr>
+						))
+					) : (
+						<td>
+							<td colSpan="2">No results</td>
+						</td>
+					)}
+				</tbody>
+			</table>
+		)
+	}
+
+	static renderValue(value) {
+		if (typeof value === "object") {
+			if (value.hasOwnProperty("@id")) {
+				return `<${value["@id"]}>`
+			} else if (value.hasOwnProperty("@value")) {
+				return JSON.stringify(value["@value"])
+			}
+		} else {
+			return JSON.stringify(value)
+		}
+	}
+}
+
+ReactDOM.render(<Query />, right)

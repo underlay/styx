@@ -71,8 +71,9 @@ main {
 	transform: none;
 }
 
-#context {
+details {
 	border-top: 1px solid lightslategray;
+	border-bottom: 1px solid lightslategray;
 }
 
 #context .jsoneditor-menu::before {
@@ -113,9 +114,8 @@ main {
 	cursor: not-allowed;
 }
 
-#result {
+#right table {
 	display: block;
-	border-top: 1px solid lightslategray;
 	flex: 1;
 	white-space: pre-line;
 	font-size: 12px;
