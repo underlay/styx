@@ -4,6 +4,8 @@ import jsonld from "jsonld"
 
 import * as Blockly from "blockly/core"
 
+import { RDF_TYPE, XSD_BOOLEAN, XSD_DOUBLE } from "explore/src/utils"
+
 import { literal, iri, blank, blankPredicate, predicate } from "./blocks"
 
 const right = document.getElementById("right")
@@ -18,22 +20,7 @@ const fields = [
 
 const QUERY = "http://underlay.mit.edu/ns#Query"
 const ENTITY = "http://www.w3.org/ns/prov#Entity"
-const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
-
 const SATISFIES = "http://underlay.mit.edu/ns#satisfies"
-
-const XSD_STRING = "http://www.w3.org/2001/XMLSchema#string"
-const XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean"
-const XSD_INTEGER = "http://www.w3.org/2001/XMLSchema#integer"
-const XSD_DOUBLE = "http://www.w3.org/2001/XMLSchema#double"
-const XSD_DATE = "http://www.w3.org/2001/XMLSchema#date"
-const XSD_DATETIME = "http://www.w3.org/2001/XMLSchema#dateTime"
-const FONT_SIZE = 12
-
-const TAB = 2
-const CHAR = 7.2
-const LINE_HEIGHT = 18
-const FONT_FAMILY = "Monaco, monospace"
 
 const context = {
 	schema: "http://schema.org/",
@@ -41,23 +28,12 @@ const context = {
 	rdfs: "http://www.w3.org/2000/01/rdf-schema#",
 	rdf: "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
 	xsd: "http://www.w3.org/2001/XMLSchema#",
-	nt: "http://semanticbible.org/ns/2006/NTNames#",
+	dcterms: "http://purl.org/dc/terms/",
+	dc: "http://purl.org/dc/elements/1.1/",
 	u: "http://underlay.mit.edu/ns#",
 }
 
 const contextText = JSON.stringify(context, null, "  ")
-
-const options = {
-	mode: "view",
-	modes: [],
-	navigationBar: false,
-	statusBar: false,
-	search: false,
-}
-
-// const contextElement = document.getElementById("context")
-// const contextEditor = new JSONEditor(contextElement, options, context)
-// contextEditor.collapseAll()
 
 const toolbox = document.getElementById("toolbox")
 const area = document.getElementById("blocklyArea")

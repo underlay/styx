@@ -47,4 +47,21 @@ module.exports = {
 			},
 		],
 	},
+
+	optimization: {
+		splitChunks: {
+			cacheGroups: {
+				blockly: {
+					test: /[\\/]node_modules[\\/](blockly)[\\/]/,
+					name: "lib/blockly",
+					chunks: "all",
+				},
+				commons: {
+					name: "lib/commons",
+					chunks: "initial",
+					minChunks: 2,
+				},
+			},
+		},
+	},
 }

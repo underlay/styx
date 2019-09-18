@@ -2,8 +2,6 @@ import * as Blockly from "blockly/core"
 import * as En from "blockly/msg/en"
 import "blockly/blocks"
 
-console.log("Blockly!", Blockly)
-
 Blockly.setLocale(En)
 
 export const node = "node"
