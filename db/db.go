@@ -71,10 +71,10 @@ func (db *DB) IngestJSONLd(doc interface{}, loader ld.DocumentLoader, store Docu
 	}
 
 	return db.Badger.Update(func(txn *badger.Txn) (err error) {
-		for g, graph := range graphs {
+		for label, graph := range graphs {
 			if len(graph) == 0 {
 				continue
-			} else if err = db.insert(cid, quads, g, graph, txn); err != nil {
+			} else if err = db.insert(cid, quads, label, graph, txn); err != nil {
 				return
 			}
 		}
@@ -83,9 +83,9 @@ func (db *DB) IngestJSONLd(doc interface{}, loader ld.DocumentLoader, store Docu
 }
 
 // Ingest inserts a specific graph into the database
-func (db *DB) Ingest(cid cid.Cid, quads []*ld.Quad, g string, graph []int) error {
+func (db *DB) Ingest(cid cid.Cid, quads []*ld.Quad, label string, graph []int) error {
 	return db.Badger.Update(func(txn *badger.Txn) (err error) {
-		return db.insert(cid, quads, g, graph, txn)
+		return db.insert(cid, quads, label, graph, txn)
 	})
 }
 
@@ -155,7 +155,7 @@ func (db *DB) Enumerate(
 	label string,
 	graph []int,
 	extent int,
-	indices map[string]bool,
+	domain map[string]ld.Node,
 	data chan map[string]*types.Value,
 	prov chan map[int]*types.SourceList,
 ) (err error) {
@@ -172,7 +172,7 @@ func (db *DB) Enumerate(
 		}()
 
 		var g *query.ConstraintGraph
-		g, err = query.MakeConstraintGraph(quads, label, graph, indices, txn)
+		g, err = query.MakeConstraintGraph(quads, label, graph, domain, txn)
 		defer g.Close()
 		if err != nil {
 			return

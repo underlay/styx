@@ -14,8 +14,8 @@ import (
 	types "github.com/underlay/styx/types"
 )
 
-func (db *DB) insert(cid cid.Cid, quads []*ld.Quad, graph string, indices []int, txn *badger.Txn) (err error) {
-	graphID := fmt.Sprintf("ul:/ipfs/%s#%s", cid.String(), graph)
+func (db *DB) insert(cid cid.Cid, quads []*ld.Quad, label string, graph []int, txn *badger.Txn) (err error) {
+	graphID := fmt.Sprintf("ul:/ipfs/%s#%s", cid.String(), label)
 	graphKey := types.AssembleKey(types.GraphPrefix, []byte(graphID), nil, nil)
 
 	var item *badger.Item
@@ -43,7 +43,7 @@ func (db *DB) insert(cid cid.Cid, quads []*ld.Quad, graph string, indices []int,
 			g = quad.Graph.GetValue()
 		}
 
-		if g != graph {
+		if g != label {
 			continue
 		}
 

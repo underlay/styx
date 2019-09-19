@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -43,155 +42,6 @@ var sampleData = []byte(`{
 		}
 	}
 }`)
-
-var simpleQuery = []byte(`{
-	"@context": {
-		"@vocab": "http://schema.org/"
-	},
-	"@type": "http://underlay.mit.edu/ns#Query",
-	"@graph": {
-		"@type": "Person",
-		"birthDate": { },
-		"knows": {
-			"name": "Jane Doe"
-		}
-	}
-}`)
-
-var entityQuery = []byte(`{
-	"@context": {
-		"@vocab": "http://schema.org/",
-		"prov": "http://www.w3.org/ns/prov#",
-		"u": "http://underlay.mit.edu/ns#"
-	},
-	"@type": "http://underlay.mit.edu/ns#Query",
-	"@graph": {
-		"@type": "prov:Entity",
-		"u:satisfies": {
-			"@graph": {
-				"@type": "Person",
-				"birthDate": { },
-				"knows": {
-					"name": "Jane Doe"
-				}
-			}
-		}
-	}
-}`)
-
-var bundleQuery = []byte(`{
-	"@context": {
-		"@vocab": "http://schema.org/",
-		"dcterms": "http://purl.org/dc/terms/",
-		"prov": "http://www.w3.org/ns/prov#",
-		"u": "http://underlay.mit.edu/ns#"
-	},
-	"@type": "http://underlay.mit.edu/ns#Query",
-	"@graph": {
-		"@type": "prov:Bundle",
-		"dcterms:extent": 3,
-		"u:enumerates": {
-			"@graph": {
-				"@type": "Person",
-				"name": { }
-			}
-		}
-	}
-}`)
-
-var graphQuery = []byte(`{
-	"@context": {
-		"@vocab": "http://schema.org/",
-		"dcterms": "http://purl.org/dc/terms/",
-		"prov": "http://www.w3.org/ns/prov#",
-		"u": "http://underlay.mit.edu/ns#"
-	},
-	"@type": "http://underlay.mit.edu/ns#Query",
-	"@graph": {
-		"@type": "prov:Bundle",
-		"dcterms:extent": 3,
-		"u:enumerates": {
-			"@graph": {
-				"@type": "u:Graph"
-			}
-		}
-	}
-}`)
-
-func TestIPFSDocumentLoader(t *testing.T) {
-	data := []byte(`{
-		"@context": { "@vocab": "http://schema.org/" },
-		"name": "Vincent van Gogh"
-	}`)
-
-	// Replace at your leisure
-	sh := ipfs.NewShell(defaultHost)
-
-	if !sh.IsUp() {
-		t.Error("IPFS Daemon not running")
-		return
-	}
-
-	checkExpanded := func(result []interface{}) {
-		if len(result) == 1 {
-			if v, match := result[0].(map[string]interface{}); match {
-				if v, has := v["http://schema.org/name"]; has {
-					if v, match := v.([]interface{}); match && len(v) == 1 {
-						if v, match := v[0].(map[string]interface{}); match {
-							if v, has := v["@value"]; has && v == "Vincent van Gogh" {
-								return
-							}
-						}
-					}
-				}
-			}
-		}
-		t.Error("IPFS document loaded did not expand document correctly")
-		return
-	}
-
-	cidIpfs, err := sh.Add(bytes.NewReader(data))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	cidIpld, err := sh.DagPut(data, "json", "cbor")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	fmt.Println(cidIpfs, cidIpld)
-
-	proc := ld.NewJsonLdProcessor()
-	options := ld.NewJsonLdOptions("")
-	options.DocumentLoader = loader.NewShellDocumentLoader(sh)
-
-	ipfsURI := "ipfs://" + cidIpfs
-	ipfsResult, err := proc.Expand(ipfsURI, options)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	checkExpanded(ipfsResult)
-
-	dwebIpfsURI := "dweb:/ipfs/" + cidIpfs
-	dwebIpfsResult, err := proc.Expand(dwebIpfsURI, options)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	checkExpanded(dwebIpfsResult)
-
-	dwebIpldURI := "dweb:/ipld/" + cidIpld
-	dwebIpldResult, err := proc.Expand(dwebIpldURI, options)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	checkExpanded(dwebIpldResult)
-}
 
 func TestIngest(t *testing.T) {
 	// Replace at your leisure
@@ -323,25 +173,145 @@ func testQuery(query []byte) error {
 }
 
 func TestSimpleQuery(t *testing.T) {
-	if err := testQuery(simpleQuery); err != nil {
+	if err := testQuery([]byte(`{
+	"@context": {
+		"@vocab": "http://schema.org/"
+	},
+	"@type": "http://underlay.mit.edu/ns#Query",
+	"@graph": {
+		"@type": "Person",
+		"birthDate": { },
+		"knows": {
+			"name": "Jane Doe"
+		}
+	}
+}`)); err != nil {
 		t.Error(err)
 	}
 }
 
 func TestEntityQuery(t *testing.T) {
-	if err := testQuery(entityQuery); err != nil {
+	if err := testQuery([]byte(`{
+	"@context": {
+		"@vocab": "http://schema.org/",
+		"prov": "http://www.w3.org/ns/prov#",
+		"u": "http://underlay.mit.edu/ns#"
+	},
+	"@type": "u:Query",
+	"@graph": {
+		"@type": "prov:Entity",
+		"u:satisfies": {
+			"@graph": {
+				"@type": "Person",
+				"birthDate": { },
+				"knows": {
+					"name": "Jane Doe"
+				}
+			}
+		}
+	}
+}`)); err != nil {
 		t.Error(err)
 	}
 }
 
 func TestBundleQuery(t *testing.T) {
-	if err := testQuery(bundleQuery); err != nil {
+	if err := testQuery([]byte(`{
+	"@context": {
+		"@vocab": "http://schema.org/",
+		"dcterms": "http://purl.org/dc/terms/",
+		"prov": "http://www.w3.org/ns/prov#",
+		"u": "http://underlay.mit.edu/ns#"
+	},
+	"@type": "u:Query",
+	"@graph": {
+		"@type": "prov:Bundle",
+		"dcterms:extent": 3,
+		"u:enumerates": {
+			"@graph": {
+				"@type": "Person",
+				"name": { }
+			}
+		}
+	}
+}`)); err != nil {
 		t.Error(err)
 	}
 }
 
 func TestGraphQuery(t *testing.T) {
-	if err := testQuery(graphQuery); err != nil {
+	if err := testQuery([]byte(`{
+	"@context": {
+		"dcterms": "http://purl.org/dc/terms/",
+		"prov": "http://www.w3.org/ns/prov#",
+		"u": "http://underlay.mit.edu/ns#"
+	},
+	"@type": "u:Query",
+	"@graph": {
+		"@type": "prov:Bundle",
+		"dcterms:extent": 3,
+		"u:enumerates": {
+			"@graph": {
+				"@type": "u:Graph"
+			}
+		}
+	}
+}`)); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestDomainQuery(t *testing.T) {
+	if err := testQuery([]byte(`{
+	"@context": {
+		"@vocab": "http://schema.org/",
+		"dcterms": "http://purl.org/dc/terms/",
+		"prov": "http://www.w3.org/ns/prov#",
+		"u": "http://underlay.mit.edu/ns#"
+	},
+	"@type": "u:Query",
+	"@graph": {
+		"@type": "prov:Bundle",
+		"dcterms:extent": 3,
+		"u:domain": { "@id": "_:b0" },
+		"u:enumerates": {
+			"@graph": {
+				"@id": "_:b0",
+				"@type": "Person",
+				"name": { "@id": "_:b1" }
+			}
+		}
+	}
+}`)); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestIndexQuery(t *testing.T) {
+	if err := testQuery([]byte(`{
+	"@context": {
+		"@vocab": "http://schema.org/",
+		"dcterms": "http://purl.org/dc/terms/",
+		"prov": "http://www.w3.org/ns/prov#",
+		"u": "http://underlay.mit.edu/ns#"
+	},
+	"@type": "u:Query",
+	"@graph": {
+		"@type": "prov:Bundle",
+		"dcterms:extent": 2,
+		"u:domain": {
+			"@id": "_:b0",
+			"u:index": { "@id": "ul:/ipfs/QmRyaXPZpXxXBcdrikHTjnLr2w6rQK9bChsB7V1bUZv1er#_:c14n1" }
+		},
+		"u:enumerates": {
+			"@graph": {
+				"@id": "_:b0",
+				"@type": "Person",
+				"name": { "@id": "_:b1" }
+			}
+		}
+	}
+}`)); err != nil {
 		t.Error(err)
 	}
 }

@@ -8,7 +8,7 @@ import { RDF_TYPE, XSD_BOOLEAN, XSD_DOUBLE } from "explore/src/utils"
 
 import { literal, iri, blank, blankPredicate, predicate } from "./blocks"
 
-const right = document.getElementById("right")
+const panel = document.getElementById("panel")
 
 let VARIABLE = 0
 
@@ -229,7 +229,7 @@ class Query extends React.Component {
 	}
 
 	render() {
-		const { disabled, q, values, prov } = this.state
+		const { disabled, q, values, prov, quads } = this.state
 		return (
 			<React.Fragment>
 				<button disabled={disabled} id="query" onClick={this.handleClick}>
@@ -239,6 +239,14 @@ class Query extends React.Component {
 					<summary>Context</summary>
 					<pre>{contextText}</pre>
 				</details>
+				{quads !== null && (
+					<details>
+						<summary>Preview N-Quads</summary>
+						<div style={{ overflowX: "scroll" }}>
+							<pre style={{ position: "relative" }}>{quads}</pre>
+						</div>
+					</details>
+				)}
 				<div id="context"></div>
 				{Query.renderResult(q, values, prov)}
 			</React.Fragment>
@@ -290,4 +298,4 @@ class Query extends React.Component {
 	}
 }
 
-ReactDOM.render(<Query />, right)
+ReactDOM.render(<Query />, panel)

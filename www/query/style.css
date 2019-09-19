@@ -12,28 +12,13 @@ main {
 	position: absolute;
 }
 
-#right {
+#panel {
 	flex: 1;
 	display: flex;
 	flex-direction: column;
 	border-left: 1px solid lightslategray;
 	background-color: snow;
 }
-
-/*---------*/
-
-/* #context {
-	height: 30px;
-	border-bottom: 1px solid lightslategray;
-}
-
-#context div {
-	padding: 6px 8px;
-	user-select: none;
-	-moz-user-select: none;
-} */
-
-/*---------*/
 
 details {
 	padding: 2px 8px;
@@ -49,53 +34,9 @@ details pre {
 	font-size: 14px;
 }
 
-#right div.jsoneditor {
-	border: none;
-}
-
-#right div.jsoneditor-menu {
-	border-bottom: 1px solid #eee;
-	display: flex;
-	background-color: inherit;
-	height: 30px;
-}
-
-#right .jsoneditor-menu::before {
-	flex: 1;
-	padding: 2px 6px;
-	color: #1a1a1a;
-	align-self: end;
-}
-
-#right div.jsoneditor-menu button[type="button"] {
-	filter: invert(0.6);
-	margin: 0;
-}
-
-#right div.jsoneditor-outer.has-main-menu-bar {
-	margin-top: -30px;
-	padding-top: 30px;
-}
-
-#right table.jsoneditor-tree tr {
-	transform: translateX(-24px);
-}
-
-#right table.jsoneditor-tree tr:first-child {
-	transform: none;
-}
-
 details {
 	border-top: 1px solid lightslategray;
 	border-bottom: 1px solid lightslategray;
-}
-
-#context .jsoneditor-menu::before {
-	content: "Edit Context";
-}
-
-#json .jsoneditor-menu::before {
-	content: "Preview Query";
 }
 
 /*---------*/
@@ -128,7 +69,7 @@ details {
 	cursor: not-allowed;
 }
 
-#right table {
+#panel table {
 	display: block;
 	flex: 1;
 	white-space: pre-line;

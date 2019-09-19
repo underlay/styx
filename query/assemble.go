@@ -16,7 +16,7 @@ func MakeConstraintGraph(
 	quads []*ld.Quad,
 	label string,
 	graph []int,
-	indices map[string]bool,
+	domain map[string]ld.Node,
 	txn *badger.Txn,
 ) (g *ConstraintGraph, err error) {
 	indexMap := types.IndexMap{}
@@ -181,20 +181,48 @@ func MakeConstraintGraph(
 	// Sort self
 	sort.Stable(g)
 
-	if indices != nil && len(indices) > 0 {
-		// Shuffle the index variables into the upper postitions
-		// while preserving sort order
-		upper := make([]string, 0, len(indices))
-		lower := make([]string, 0, len(g.Slice)-len(indices))
-		for _, u := range g.Slice {
-			if b, has := indices[u]; has && b {
-				upper = append(upper, u)
-			} else {
-				lower = append(lower, u)
+	domainSize := len(domain)
+	if domain != nil && domainSize > 0 {
+		domainIndex := domainSize
+		domainIds := make(map[string][]byte, domainIndex)
+		for p, node := range domain {
+			if _, has := g.Index[p]; !has {
+				domainSize--
+			} else if node == nil {
+				domainIds[p] = nil
+				domainIndex--
+			} else if _, domainIds[p], err = getID(node, indexMap, txn); err != nil {
+				return
+			} else if domainIds[p] == nil {
+				domainIndex--
 			}
 		}
-		g.Slice = append(upper, lower...)
-		g.Pivot = len(indices)
+
+		// Shuffle the domain variables into the upper postitions
+		// while preserving sort order
+		upper := make([]string, 0, domainSize) // !!!
+		index := make([]string, 0, domainIndex)
+		lower := make([]string, 0, len(g.Slice)-domainSize)
+		for _, p := range g.Slice {
+			if value, has := domainIds[p]; has && value == nil {
+				upper = append(upper, p)
+			} else if has {
+				u := g.Index[p]
+				if u.Root = u.CS.Seek(value); u.Root == nil {
+					return g, ErrEmptyIntersect
+				}
+				u.Value = u.Root
+				index = append(index, p)
+			} else {
+				lower = append(lower, p)
+			}
+		}
+		g.Slice = append(append(upper, index...), lower...)
+		if domainSize == 0 {
+			g.Pivot = len(g.Slice)
+		} else {
+			g.Pivot = domainSize
+		}
 	} else {
 		g.Pivot = len(g.Slice)
 	}
