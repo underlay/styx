@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"log"
+	"regexp"
 
 	badger "github.com/dgraph-io/badger"
 	proto "github.com/golang/protobuf/proto"
@@ -94,13 +95,17 @@ func (db *DB) Query(
 	quads []*ld.Quad,
 	label string,
 	graph []int,
+	variables chan []string,
 	data chan map[string]*types.Value,
 	prov chan map[int]*types.SourceList,
 ) (err error) {
 	return db.Badger.View(func(txn *badger.Txn) (err error) {
 		d := map[string]*types.Value{}
 		var s map[int]*types.SourceList
+		var slice []string
+
 		defer func() {
+			variables <- slice
 			data <- d
 			prov <- s
 		}()
@@ -111,6 +116,8 @@ func (db *DB) Query(
 		if err != nil {
 			return
 		}
+
+		slice = g.Slice
 
 		if err = g.Solve(txn); err != nil {
 			return
@@ -156,13 +163,16 @@ func (db *DB) Enumerate(
 	graph []int,
 	extent int,
 	domain map[string]ld.Node,
+	variables chan []string,
 	data chan map[string]*types.Value,
 	prov chan map[int]*types.SourceList,
 ) (err error) {
 	return db.Badger.View(func(txn *badger.Txn) (err error) {
+		var slice []string
 		d := make([]map[string]*types.Value, extent)
 		sources := make([]map[int]*types.SourceList, extent)
 		defer func() {
+			variables <- slice
 			for _, v := range d {
 				data <- v
 			}
@@ -177,6 +187,8 @@ func (db *DB) Enumerate(
 		if err != nil {
 			return
 		}
+
+		slice = g.Slice
 
 		if err = g.Solve(txn); err != nil {
 			return
@@ -219,10 +231,12 @@ func (db *DB) Enumerate(
 	})
 }
 
+var regexGraphIri = regexp.MustCompile("^ul:\\/ipfs\\/[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{46}#(_:[a-zA-Z0-9]+)?$")
+
 // Ls lists the graphs in the database
-func (db *DB) Ls(index string, extent int, messages chan []byte, dates chan []byte) error {
+func (db *DB) Ls(index ld.Node, extent int, messages chan []byte, dates chan []byte) error {
 	var prefix = make([]byte, 1)
-	prefix[0] = 'g'
+	prefix[0] = types.GraphPrefix
 
 	prefetchSize := extent
 	if prefetchSize > 100 {
@@ -237,13 +251,18 @@ func (db *DB) Ls(index string, extent int, messages chan []byte, dates chan []by
 		Prefix:         prefix,
 	}
 
-	seek := make([]byte, 1+len(index))
-	seek[0] = 'g'
-	copy(seek[1:], index)
-
 	return db.Badger.View(func(txn *badger.Txn) (err error) {
 		iter := txn.NewIterator(iteratorOptions)
 		defer iter.Close()
+
+		var seek []byte
+		if iri, is := index.(*ld.IRI); is && index != nil && regexGraphIri.MatchString(iri.Value) {
+			seek = make([]byte, 1+len(iri.Value))
+			copy(seek[1:], []byte(iri.Value))
+		} else {
+			seek = make([]byte, 1)
+		}
+		seek[0] = 'g'
 
 		i := 0
 		for iter.Seek(seek); iter.Valid() && i < extent; iter.Next() {

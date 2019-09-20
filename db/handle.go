@@ -78,19 +78,22 @@ func (db *DB) HandleMessage(
 		var graph interface{}
 		t := map[string]interface{}{"@id": fmt.Sprintf("q:%s", target)}
 		if entity {
+			variables := make(chan []string)
 			data := make(chan map[string]*types.Value)
 			prov := make(chan map[int]*types.SourceList)
-			go db.Query(quads, label, graphs[target], data, prov)
-			entity := makeEntity(t, <-data, <-prov)
+			go db.Query(quads, label, graphs[target], variables, data, prov)
+			entity := makeEntity(t, <-variables, <-data, <-prov)
 			entity["wasAttributedTo"] = fmt.Sprintf("ul:/ipns/%s", id)
 			entity["generatedAtTime"] = time.Now().Format(time.RFC3339)
 			graph = entity
 		} else if bundle {
 			entities := make([]map[string]interface{}, extent)
-			if !matchBundle(graphs[target], quads, t, entities, db) {
+			if !matchBundle(graphs[target], extent, domain, quads, t, entities, db) {
+				variables := make(chan []string)
 				data := make(chan map[string]*types.Value)
 				prov := make(chan map[int]*types.SourceList)
-				go db.Enumerate(quads, label, graphs[target], extent, domain, data, prov)
+				go db.Enumerate(quads, label, graphs[target], extent, domain, variables, data, prov)
+				v := <-variables
 				d := make([]map[string]*types.Value, extent)
 				s := make([]map[int]*types.SourceList, extent)
 				for x := range d {
@@ -102,7 +105,7 @@ func (db *DB) HandleMessage(
 				}
 
 				for x := 0; x < extent; x++ {
-					entities[x] = makeEntity(t, d[x], s[x])
+					entities[x] = makeEntity(t, v, d[x], s[x])
 				}
 			}
 
@@ -115,9 +118,10 @@ func (db *DB) HandleMessage(
 				"value":           entities,
 			}
 		} else {
+			variables := make(chan []string)
 			data := make(chan map[string]*types.Value)
 			prov := make(chan map[int]*types.SourceList)
-			go db.Query(quads, label, graphs[target], data, prov)
+			go db.Query(quads, label, graphs[target], variables, data, prov)
 			graph = makeGraph(graphs[target], quads, <-data)
 		}
 
@@ -143,6 +147,7 @@ func (db *DB) HandleMessage(
 
 func makeEntity(
 	target map[string]interface{},
+	variables []string,
 	d map[string]*types.Value,
 	p map[int]*types.SourceList,
 ) map[string]interface{} {
@@ -158,10 +163,10 @@ func makeEntity(
 		return entity
 	}
 
-	for p, value := range d {
+	for _, p := range variables {
 		values = append(values, map[string]interface{}{
 			"@id":       fmt.Sprintf("q:%s", p),
-			"rdf:value": value.ToJSON(),
+			"rdf:value": d[p].ToJSON(),
 		})
 	}
 

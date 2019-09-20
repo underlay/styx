@@ -261,6 +261,33 @@ func TestGraphQuery(t *testing.T) {
 	}
 }
 
+func TestGraphIndexQuery(t *testing.T) {
+	if err := testQuery([]byte(`{
+	"@context": {
+		"dcterms": "http://purl.org/dc/terms/",
+		"prov": "http://www.w3.org/ns/prov#",
+		"u": "http://underlay.mit.edu/ns#"
+	},
+	"@type": "u:Query",
+	"@graph": {
+		"@type": "prov:Bundle",
+		"dcterms:extent": 3,
+		"u:domain": {
+			"@id": "_:b0",
+			"u:index": { "@id": "ul:/ipfs/QmRyaXPZpXxXBcdrikHTjnLr2w6rQK9bChsB7V1bUZv1er#_:c14n0" }
+		},
+		"u:enumerates": {
+			"@graph": {
+				"@id": "_:b0",
+				"@type": "u:Graph"
+			}
+		}
+	}
+}`)); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestDomainQuery(t *testing.T) {
 	if err := testQuery([]byte(`{
 	"@context": {
@@ -308,6 +335,30 @@ func TestIndexQuery(t *testing.T) {
 				"@id": "_:b0",
 				"@type": "Person",
 				"name": { "@id": "_:b1" }
+			}
+		}
+	}
+}`)); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestIndexQuery2(t *testing.T) {
+	if err := testQuery([]byte(`{
+	"@context": {
+		"dcterms": "http://purl.org/dc/terms/",
+		"prov": "http://www.w3.org/ns/prov#",
+		"u": "http://underlay.mit.edu/ns#"
+	},
+	"@type": "u:Query",
+	"@graph": {
+		"@type": "prov:Bundle",
+		"dcterms:extent": 2,
+		"u:domain": { "@id": "_:b0" },
+		"u:enumerates": {
+			"@graph": {
+				"@id": "ul:/ipfs/QmRyaXPZpXxXBcdrikHTjnLr2w6rQK9bChsB7V1bUZv1er#_:c14n1",
+				"_:b0": {}
 			}
 		}
 	}

@@ -81,6 +81,7 @@ func GetStringOptions(loader ld.DocumentLoader) *ld.JsonLdOptions {
 	options.CompactArrays = true
 	options.Algorithm = types.Algorithm
 	options.Format = types.Format
+	options.ProduceGeneralizedRdf = true
 	return options
 }
 

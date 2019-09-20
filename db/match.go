@@ -102,36 +102,50 @@ func matchGraph(label string, graphs map[string][]int, quads []*ld.Quad) (
 	return
 }
 
-func matchBundle(graph []int, quads []*ld.Quad, t map[string]interface{}, entities []map[string]interface{}, db *DB) bool {
-	extent := len(entities)
-	q := quads[graph[0]]
-	b, is := q.Subject.(*ld.BlankNode)
-	if len(graph) == 1 && is && q.Predicate.Equal(typeIri) && q.Object.Equal(graphIri) {
-		enumerator := fmt.Sprintf("q:%s", b.Attribute)
-		messages := make(chan []byte, extent)
-		dates := make(chan []byte, extent)
-		go db.Ls("", extent, messages, dates)
-		for x := 0; x < extent; x++ {
-			entities[x] = map[string]interface{}{
-				"@type":       "Entity",
-				"u:satisfies": t,
-			}
-			if m, d := <-messages, <-dates; m == nil || d == nil {
-				entities[x]["value"] = []interface{}{}
+func matchBundle(
+	graph []int,
+	extent int,
+	domain map[string]ld.Node,
+	quads []*ld.Quad,
+	t map[string]interface{},
+	entities []map[string]interface{},
+	db *DB,
+) bool {
+	if len(graph) == 1 {
+		q := quads[graph[0]]
+		if b, is := q.Subject.(*ld.BlankNode); is && q.Predicate.Equal(typeIri) && q.Object.Equal(graphIri) {
+			enumerator := fmt.Sprintf("q:%s", b.Attribute)
+			messages := make(chan []byte, extent)
+			dates := make(chan []byte, extent)
+			if domain != nil {
+				go db.Ls(domain[b.Attribute], extent, messages, dates)
 			} else {
-				entities[x]["value"] = []interface{}{
-					map[string]interface{}{
-						"@id":          string(m),
-						"u:instanceOf": enumerator,
-						// "dateSubmitted": map[string]interface{}{
-						// 	"@value": string(d),
-						// 	"@type":  "xsd:dateTime",
-						// },
-					},
+				go db.Ls(nil, extent, messages, dates)
+			}
+
+			for x := 0; x < extent; x++ {
+				entities[x] = map[string]interface{}{
+					"@type":       "Entity",
+					"u:satisfies": t,
+				}
+				if m, d := <-messages, <-dates; m == nil || d == nil {
+					entities[x]["value"] = []interface{}{}
+				} else {
+					entities[x]["value"] = []interface{}{
+						map[string]interface{}{
+							"@id":          string(m),
+							"u:instanceOf": enumerator,
+							// "dateSubmitted": map[string]interface{}{
+							// 	"@value": string(d),
+							// 	"@type":  "xsd:dateTime",
+							// },
+						},
+					}
 				}
 			}
+			return true
 		}
-		return true
 	}
+
 	return false
 }
