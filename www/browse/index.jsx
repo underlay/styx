@@ -1,64 +1,55 @@
 import React from "react"
 import ReactDOM from "react-dom"
-import jsonld from "jsonld"
 
 import Message from "explore"
 
 import { base58 } from "explore/src/utils.js"
+import listGraphs from "./fetch"
 
 const main = document.querySelector("main")
 
 const title = document.title
 const url = location.origin + location.pathname
 
-const options = {
-	method: "POST",
-	headers: { "Content-Type": "application/ld+json" },
-	body: JSON.stringify({
-		"@context": {
-			dcterms: "http://purl.org/dc/terms/",
-			prov: "http://www.w3.org/ns/prov#",
-			rdfs: "http://www.w3.org/2000/01/rdf-schema#",
-			rdf: "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-			xsd: "http://www.w3.org/2001/XMLSchema#",
-			u: "http://underlay.mit.edu/ns#",
-		},
-		"@type": "u:Query",
-		"@graph": {
-			"@type": "prov:Bundle",
-			"dcterms:extent": 5,
-			"u:enumerates": {
-				"@graph": {
-					"@type": "u:Graph",
-				},
-			},
-		},
-	}),
-}
+const graphURI = /^ul:\/ipfs\/[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{46}#(_:[a-zA-Z0-9-]+)?$/
 
 class Browse extends React.Component {
+	static Gateway = "http://localhost:8080"
+	static PageSize = 10
+	static Null = { index: null, graphs: null, cid: null, focus: null }
 	constructor(props) {
 		super(props)
 		const match = base58.exec(location.search.slice(1))
 		if (match === null) {
-			this.state = { messages: null, cid: null, focus: null }
+			let index = null
+			if (location.search.indexOf("?index=") === 0) {
+				const uri = decodeURIComponent(location.search.slice(7))
+				if (graphURI.test(uri)) {
+					index = uri
+				}
+			}
+			this.state = { ...Browse.Null, index }
 		} else if (location.hash === "" && location.href.slice(-1) === "#") {
-			this.state = { messages: null, cid: match[0], focus: "" }
+			this.state = { ...Browse.Null, cid: match[0], focus: "" }
 		} else if (location.hash === "") {
-			this.state = { messages: null, cid: match[0], focus: null }
+			this.state = { ...Browse.Null, cid: match[0] }
 		} else {
 			this.state = {
-				messages: null,
+				...Browse.Null,
 				cid: match[0],
 				focus: location.hash.slice(1),
 			}
 		}
 
 		history.replaceState(
-			{ cid: this.state.cid, focus: this.state.focus },
+			{ index: this.state.index, cid: this.state.cid, focus: this.state.focus },
 			title,
 			url +
-				(this.state.cid === null ? "" : "?" + this.state.cid) +
+				(this.state.cid === null
+					? this.state.index === null
+						? ""
+						: "?index=" + encodeURIComponent(this.state.index)
+					: "?" + this.state.cid) +
 				(this.state.focus === null ? "" : "#" + this.state.focus)
 		)
 	}
@@ -84,60 +75,22 @@ class Browse extends React.Component {
 		})
 
 		if (this.state.cid === null) {
-			this.fetchMessages()
+			this.listGraphs(this.state.index)
 		}
 	}
 
 	componentDidUpdate(prevProps, prevState) {
-		if (this.state.cid === null && this.state.messages === null) {
-			this.fetchMessages()
+		if (
+			this.state.cid === null &&
+			(this.state.graphs === null || this.state.index !== prevState.index)
+		) {
+			this.listGraphs(this.state.index)
 		}
 	}
 
-	async fetchMessages() {
-		const res = await fetch("/", options)
-		const doc = await res.json()
-		const [
-			{
-				"@graph": [
-					{
-						"http://www.w3.org/ns/prov#value": [{ "@list": values }],
-					},
-				],
-				"http://underlay.mit.edu/ns#instanceOf": [{ "@id": q }],
-			},
-		] = await jsonld.expand(doc)
-
-		const urls = []
-		for (const {
-			"http://www.w3.org/ns/prov#value": [
-				{
-					"@list": [value],
-				},
-			],
-		} of values) {
-			if (value === undefined) {
-				break
-			}
-			const { "@id": id } = value
-			urls.push(new URL(id))
-		}
-
-		const messages = []
-
-		urls.reduce((previous, { pathname, hash }, i) => {
-			const cid = pathname.split("/").pop()
-			if (previous !== null && cid === previous.cid) {
-				previous.graphs.push(hash.slice(1))
-				return previous
-			} else {
-				const message = { cid, graphs: [hash.slice(1)] }
-				messages.push(message)
-				return message
-			}
-		}, null)
-
-		this.setState({ messages })
+	async listGraphs(index) {
+		const urls = await listGraphs(Browse.PageSize + 1, index)
+		this.setState({ graphs: urls })
 	}
 
 	handleFocus = focus => {
@@ -153,8 +106,17 @@ class Browse extends React.Component {
 		}
 	}
 
+	handleClick = ({ target: { value: index } }) => {
+		history.pushState(
+			{ cid: null, focus: null, index },
+			title,
+			url + "?index=" + encodeURIComponent(index)
+		)
+		this.setState({ index })
+	}
+
 	render() {
-		const { messages, cid, focus } = this.state
+		const { graphs, cid, focus } = this.state
 		if (cid !== null) {
 			return (
 				<Message
@@ -163,25 +125,38 @@ class Browse extends React.Component {
 					onFocus={this.handleFocus}
 				/>
 			)
-		} else if (messages === null) {
+		} else if (graphs === null) {
 			return <p>Loading...</p>
-		} else if (messages.length === 0) {
+		} else if (graphs.length === 0) {
 			return <p>No graphs found</p>
 		} else {
-			return <React.Fragment>{messages.map(this.renderMessage)}</React.Fragment>
+			return <ul>{graphs.map(this.renderGraph)}</ul>
 		}
 	}
 
-	renderMessage = ({ cid, graphs }) => (
-		<fieldset key={cid}>
-			<legend>
-				<span>{cid}</span> ·
-			</legend>
-			<a href={`?${cid}`}>View</a>
-			<br />
-			<a href={`http://localhost:8080/ipfs/${cid}`}>Download</a>
-		</fieldset>
-	)
+	renderGraph = (url, index) => {
+		if (url === null) {
+			return null
+		} else if (index === Browse.PageSize) {
+			return (
+				<li key={url}>
+					<a href={`?index=${encodeURIComponent(url)}`}>Next page</a>
+				</li>
+			)
+		} else {
+			const path = url.split("/").pop()
+			const [cid] = path.split("#")
+			return (
+				<li key={url}>
+					<div>
+						<span>{url}</span>
+						<a href={`?${path}`}>View</a> |{" "}
+						<a href={`${Browse.Gateway}/ipfs/${cid}`}>Download</a>
+					</div>
+				</li>
+			)
+		}
+	}
 }
 
 ReactDOM.render(<Browse />, main)

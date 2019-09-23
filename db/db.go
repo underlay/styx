@@ -262,7 +262,7 @@ func (db *DB) Ls(index ld.Node, extent int, messages chan []byte, dates chan []b
 		} else {
 			seek = make([]byte, 1)
 		}
-		seek[0] = 'g'
+		seek[0] = types.GraphPrefix
 
 		i := 0
 		for iter.Seek(seek); iter.Valid() && i < extent; iter.Next() {

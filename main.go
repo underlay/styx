@@ -118,6 +118,7 @@ func main() {
 			m, params, err := mime.ParseMediaType(ct)
 			if err != nil {
 				res.WriteHeader(400)
+				res.Write([]byte(err.Error()))
 				return
 			}
 
@@ -125,9 +126,11 @@ func main() {
 			var reader io.Reader
 			if m == "application/ld+json" {
 				decoder := json.NewDecoder(req.Body)
+
 				var doc interface{}
 				if err := decoder.Decode(&doc); err != nil {
 					res.WriteHeader(400)
+					res.Write([]byte(err.Error()))
 					return
 				}
 
@@ -135,9 +138,11 @@ func main() {
 				rdf, err := proc.Normalize(doc, options)
 				if s, is := rdf.(string); !is || err != nil {
 					res.WriteHeader(400)
+					res.Write([]byte(err.Error()))
 					return
 				} else if c, err := store(strings.NewReader(s)); err != nil {
 					res.WriteHeader(500)
+					res.Write([]byte(err.Error()))
 					return
 				} else {
 					cid = c
@@ -146,9 +151,11 @@ func main() {
 			} else if m == "application/n-quads" {
 				if b, err := ioutil.ReadAll(req.Body); err != nil {
 					res.WriteHeader(500)
+					res.Write([]byte(err.Error()))
 					return
 				} else if c, err := store(bytes.NewReader(b)); err != nil {
 					res.WriteHeader(400)
+					res.Write([]byte(err.Error()))
 					return
 				} else {
 					cid = c
@@ -160,6 +167,7 @@ func main() {
 				u, err := uuid.NewRandom()
 				if err != nil {
 					res.WriteHeader(500)
+					res.Write([]byte(err.Error()))
 					return
 				}
 				base := fmt.Sprintf("uuid://%s/", u.String())
@@ -172,22 +180,27 @@ func main() {
 						break
 					} else if err != nil {
 						res.WriteHeader(400)
+						res.Write([]byte(err.Error()))
 						return
 					} else if name := p.FormName(); name == req.URL.RawQuery {
 						if doc, err := ld.DocumentFromReader(p); err != nil {
 							res.WriteHeader(400)
+							res.Write([]byte(err.Error()))
 							return
 						} else if expanded, err := proc.Expand(doc, opts); err != nil {
 							res.WriteHeader(400)
+							res.Write([]byte(err.Error()))
 							return
 						} else if flattened, err := proc.Flatten(expanded, nil, opts); err != nil {
 							res.WriteHeader(400)
+							res.Write([]byte(err.Error()))
 							return
 						} else {
 							graph = flattened.([]interface{})
 						}
 					} else if c, err := store(p); err != nil {
 						res.WriteHeader(400)
+						res.Write([]byte(err.Error()))
 						return
 					} else {
 						id := base + name
@@ -202,9 +215,11 @@ func main() {
 				rdf, err := proc.Normalize(graph, options)
 				if s, is := rdf.(string); !is || err != nil {
 					res.WriteHeader(400)
+					res.Write([]byte(err.Error()))
 					return
 				} else if c, err := store(strings.NewReader(s)); err != nil {
 					res.WriteHeader(500)
+					res.Write([]byte(err.Error()))
 					return
 				} else {
 					cid = c
@@ -212,11 +227,13 @@ func main() {
 				}
 			} else {
 				res.WriteHeader(415)
+				res.Write([]byte(err.Error()))
 				return
 			}
 
 			if quads, graphs, err := styx.ParseMessage(reader); err != nil {
 				res.WriteHeader(400)
+				res.Write([]byte(err.Error()))
 			} else if r := db.HandleMessage(peerID.ID, cid, quads, graphs); res == nil {
 				res.WriteHeader(204)
 			} else {
