@@ -5,7 +5,7 @@ main {
 }
 
 #blocklyArea {
-	flex: 2;
+	flex: 1;
 }
 
 #blocklyDiv {
@@ -13,7 +13,7 @@ main {
 }
 
 #panel {
-	flex: 1;
+	width: 480px;
 	display: flex;
 	flex-direction: column;
 	border-left: 1px solid lightslategray;

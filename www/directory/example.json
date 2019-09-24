@@ -1,0 +1,506 @@
+[
+  {
+    "@graph": [
+      {
+        "@type": [
+          "http://www.w3.org/ns/prov#Bundle"
+        ],
+        "dcterms:extent": [
+          {
+            "@value": 5
+          }
+        ],
+        "http://www.w3.org/ns/prov#generatedAtTime": [
+          {
+            "@type": "http://www.w3.org/2001/XMLSchema#dateTime",
+            "@value": "2019-09-23T21:29:19-04:00"
+          }
+        ],
+        "http://underlay.mit.edu/ns#enumerates": [
+          {
+            "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b3"
+          }
+        ],
+        "http://www.w3.org/ns/prov#value": [
+          {
+            "@list": [
+              {
+                "@type": [
+                  "http://www.w3.org/ns/prov#Entity"
+                ],
+                "http://underlay.mit.edu/ns#satisfies": [
+                  {
+                    "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b3"
+                  }
+                ],
+                "http://www.w3.org/ns/prov#value": [
+                  {
+                    "@list": [
+                      {
+                        "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b2",
+                        "http://www.w3.org/1999/02/22-rdf-syntax-ns#value": [
+                          {
+                            "@id": "http://schema.org/associatedMedia"
+                          }
+                        ]
+                      },
+                      {
+                        "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b4",
+                        "http://www.w3.org/1999/02/22-rdf-syntax-ns#value": [
+                          {
+                            "@id": "http://priorartarchive.org/doc/366540b5-a451-44b7-81a8-e2839ea656d5"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "http://www.w3.org/ns/prov#wasDerivedFrom": [
+                  {
+                    "@type": [
+                      "http://www.w3.org/ns/prov#Collection"
+                    ],
+                    "http://www.w3.org/ns/prov#hadMember": [
+                      {
+                        "@id": "ul:/ipfs/QmNs1XffSPkvxfLV6dAkbYVwc8VP7rY3ya4tj2yBgHCCvy#/36",
+                        "http://underlay.mit.edu/ns#instanceOf": [
+                          {
+                            "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#/6"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "@type": [
+                  "http://www.w3.org/ns/prov#Entity"
+                ],
+                "http://underlay.mit.edu/ns#satisfies": [
+                  {
+                    "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b3"
+                  }
+                ],
+                "http://www.w3.org/ns/prov#value": [
+                  {
+                    "@list": [
+                      {
+                        "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b2",
+                        "http://www.w3.org/1999/02/22-rdf-syntax-ns#value": [
+                          {
+                            "@id": "http://schema.org/mainEntity"
+                          }
+                        ]
+                      },
+                      {
+                        "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b4",
+                        "http://www.w3.org/1999/02/22-rdf-syntax-ns#value": [
+                          {
+                            "@id": "http://priorartarchive.org/doc/366540b5-a451-44b7-81a8-e2839ea656d5"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "http://www.w3.org/ns/prov#wasDerivedFrom": [
+                  {
+                    "@type": [
+                      "http://www.w3.org/ns/prov#Collection"
+                    ],
+                    "http://www.w3.org/ns/prov#hadMember": [
+                      {
+                        "@id": "ul:/ipfs/QmNs1XffSPkvxfLV6dAkbYVwc8VP7rY3ya4tj2yBgHCCvy#/38",
+                        "http://underlay.mit.edu/ns#instanceOf": [
+                          {
+                            "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#/6"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "@type": [
+                  "http://www.w3.org/ns/prov#Entity"
+                ],
+                "http://underlay.mit.edu/ns#satisfies": [
+                  {
+                    "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b3"
+                  }
+                ],
+                "http://www.w3.org/ns/prov#value": [
+                  {
+                    "@list": [
+                      {
+                        "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b2",
+                        "http://www.w3.org/1999/02/22-rdf-syntax-ns#value": [
+                          {
+                            "@id": "http://www.w3.org/ns/prov#used"
+                          }
+                        ]
+                      },
+                      {
+                        "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b4",
+                        "http://www.w3.org/1999/02/22-rdf-syntax-ns#value": [
+                          {
+                            "@id": "ul:/ipfs/QmNs1XffSPkvxfLV6dAkbYVwc8VP7rY3ya4tj2yBgHCCvy#_:c14n0"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "http://www.w3.org/ns/prov#wasDerivedFrom": [
+                  {
+                    "@type": [
+                      "http://www.w3.org/ns/prov#Collection"
+                    ],
+                    "http://www.w3.org/ns/prov#hadMember": [
+                      {
+                        "@id": "ul:/ipfs/QmNs1XffSPkvxfLV6dAkbYVwc8VP7rY3ya4tj2yBgHCCvy#/46",
+                        "http://underlay.mit.edu/ns#instanceOf": [
+                          {
+                            "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#/6"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "@type": [
+                  "http://www.w3.org/ns/prov#Entity"
+                ],
+                "http://underlay.mit.edu/ns#satisfies": [
+                  {
+                    "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b3"
+                  }
+                ],
+                "http://www.w3.org/ns/prov#value": [
+                  {
+                    "@list": []
+                  }
+                ]
+              },
+              {
+                "@type": [
+                  "http://www.w3.org/ns/prov#Entity"
+                ],
+                "http://underlay.mit.edu/ns#satisfies": [
+                  {
+                    "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b3"
+                  }
+                ],
+                "http://www.w3.org/ns/prov#value": [
+                  {
+                    "@list": []
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "http://www.w3.org/ns/prov#wasAttributedTo": [
+          {
+            "@id": "ul:/ipns/QmYxMiLd4GXeW8FTSFGUiaY8imCksY6HH9LBq86gaFiwXG"
+          }
+        ]
+      }
+    ],
+    "http://underlay.mit.edu/ns#instanceOf": [
+      {
+        "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b0"
+      }
+    ]
+  },
+  {
+    "@graph": [
+      {
+        "@type": [
+          "http://www.w3.org/ns/prov#Bundle"
+        ],
+        "dcterms:extent": [
+          {
+            "@value": 5
+          }
+        ],
+        "http://www.w3.org/ns/prov#generatedAtTime": [
+          {
+            "@type": "http://www.w3.org/2001/XMLSchema#dateTime",
+            "@value": "2019-09-23T21:29:19-04:00"
+          }
+        ],
+        "http://underlay.mit.edu/ns#enumerates": [
+          {
+            "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b7"
+          }
+        ],
+        "http://www.w3.org/ns/prov#value": [
+          {
+            "@list": [
+              {
+                "@type": [
+                  "http://www.w3.org/ns/prov#Entity"
+                ],
+                "http://underlay.mit.edu/ns#satisfies": [
+                  {
+                    "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b7"
+                  }
+                ],
+                "http://www.w3.org/ns/prov#value": [
+                  {
+                    "@list": [
+                      {
+                        "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b2",
+                        "http://www.w3.org/1999/02/22-rdf-syntax-ns#value": [
+                          {
+                            "@id": "http://schema.org/name"
+                          }
+                        ]
+                      },
+                      {
+                        "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b8",
+                        "http://www.w3.org/1999/02/22-rdf-syntax-ns#value": [
+                          {
+                            "@value": "1d1b47ed-19f6-4040-8d06-4ace2449a8cd.pdf"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "http://www.w3.org/ns/prov#wasDerivedFrom": [
+                  {
+                    "@type": [
+                      "http://www.w3.org/ns/prov#Collection"
+                    ],
+                    "http://www.w3.org/ns/prov#hadMember": [
+                      {
+                        "@id": "ul:/ipfs/QmNs1XffSPkvxfLV6dAkbYVwc8VP7rY3ya4tj2yBgHCCvy#/26",
+                        "http://underlay.mit.edu/ns#instanceOf": [
+                          {
+                            "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#/0"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "@type": [
+                  "http://www.w3.org/ns/prov#Entity"
+                ],
+                "http://underlay.mit.edu/ns#satisfies": [
+                  {
+                    "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b7"
+                  }
+                ],
+                "http://www.w3.org/ns/prov#value": [
+                  {
+                    "@list": [
+                      {
+                        "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b2",
+                        "http://www.w3.org/1999/02/22-rdf-syntax-ns#value": [
+                          {
+                            "@id": "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
+                          }
+                        ]
+                      },
+                      {
+                        "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b8",
+                        "http://www.w3.org/1999/02/22-rdf-syntax-ns#value": [
+                          {
+                            "@id": "http://schema.org/MediaObject"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "http://www.w3.org/ns/prov#wasDerivedFrom": [
+                  {
+                    "@type": [
+                      "http://www.w3.org/ns/prov#Collection"
+                    ],
+                    "http://www.w3.org/ns/prov#hadMember": [
+                      {
+                        "@id": "ul:/ipfs/QmNs1XffSPkvxfLV6dAkbYVwc8VP7rY3ya4tj2yBgHCCvy#/28",
+                        "http://underlay.mit.edu/ns#instanceOf": [
+                          {
+                            "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#/0"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "@type": [
+                  "http://www.w3.org/ns/prov#Entity"
+                ],
+                "http://underlay.mit.edu/ns#satisfies": [
+                  {
+                    "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b7"
+                  }
+                ],
+                "http://www.w3.org/ns/prov#value": [
+                  {
+                    "@list": [
+                      {
+                        "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b2",
+                        "http://www.w3.org/1999/02/22-rdf-syntax-ns#value": [
+                          {
+                            "@id": "http://ns.adobe.com/pdf/1.3/PDFVersion"
+                          }
+                        ]
+                      },
+                      {
+                        "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b8",
+                        "http://www.w3.org/1999/02/22-rdf-syntax-ns#value": [
+                          {
+                            "@value": "1.5"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "http://www.w3.org/ns/prov#wasDerivedFrom": [
+                  {
+                    "@type": [
+                      "http://www.w3.org/ns/prov#Collection"
+                    ],
+                    "http://www.w3.org/ns/prov#hadMember": [
+                      {
+                        "@id": "ul:/ipfs/QmNs1XffSPkvxfLV6dAkbYVwc8VP7rY3ya4tj2yBgHCCvy#/9",
+                        "http://underlay.mit.edu/ns#instanceOf": [
+                          {
+                            "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#/0"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "@type": [
+                  "http://www.w3.org/ns/prov#Entity"
+                ],
+                "http://underlay.mit.edu/ns#satisfies": [
+                  {
+                    "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b7"
+                  }
+                ],
+                "http://www.w3.org/ns/prov#value": [
+                  {
+                    "@list": [
+                      {
+                        "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b2",
+                        "http://www.w3.org/1999/02/22-rdf-syntax-ns#value": [
+                          {
+                            "@id": "http://ns.adobe.com/pdf/1.3/docinfo:created"
+                          }
+                        ]
+                      },
+                      {
+                        "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b8",
+                        "http://www.w3.org/1999/02/22-rdf-syntax-ns#value": [
+                          {
+                            "@value": "2019-01-10T18:16:26Z"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "http://www.w3.org/ns/prov#wasDerivedFrom": [
+                  {
+                    "@type": [
+                      "http://www.w3.org/ns/prov#Collection"
+                    ],
+                    "http://www.w3.org/ns/prov#hadMember": [
+                      {
+                        "@id": "ul:/ipfs/QmNs1XffSPkvxfLV6dAkbYVwc8VP7rY3ya4tj2yBgHCCvy#/10",
+                        "http://underlay.mit.edu/ns#instanceOf": [
+                          {
+                            "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#/0"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "@type": [
+                  "http://www.w3.org/ns/prov#Entity"
+                ],
+                "http://underlay.mit.edu/ns#satisfies": [
+                  {
+                    "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b7"
+                  }
+                ],
+                "http://www.w3.org/ns/prov#value": [
+                  {
+                    "@list": [
+                      {
+                        "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b2",
+                        "http://www.w3.org/1999/02/22-rdf-syntax-ns#value": [
+                          {
+                            "@id": "http://ns.adobe.com/pdf/1.3/docinfo:creator_tool"
+                          }
+                        ]
+                      },
+                      {
+                        "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b8",
+                        "http://www.w3.org/1999/02/22-rdf-syntax-ns#value": [
+                          {
+                            "@value": "LaTeX with hyperref"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "http://www.w3.org/ns/prov#wasDerivedFrom": [
+                  {
+                    "@type": [
+                      "http://www.w3.org/ns/prov#Collection"
+                    ],
+                    "http://www.w3.org/ns/prov#hadMember": [
+                      {
+                        "@id": "ul:/ipfs/QmNs1XffSPkvxfLV6dAkbYVwc8VP7rY3ya4tj2yBgHCCvy#/11",
+                        "http://underlay.mit.edu/ns#instanceOf": [
+                          {
+                            "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#/0"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "http://www.w3.org/ns/prov#wasAttributedTo": [
+          {
+            "@id": "ul:/ipns/QmYxMiLd4GXeW8FTSFGUiaY8imCksY6HH9LBq86gaFiwXG"
+          }
+        ]
+      }
+    ],
+    "http://underlay.mit.edu/ns#instanceOf": [
+      {
+        "@id": "ul:/ipfs/QmUTNcRTxLRoZMtwQsQkPW7bfAZ2LMhZxBWut4EktEc5gz#_:b5"
+      }
+    ]
+  }
+]

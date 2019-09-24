@@ -6,28 +6,86 @@
 		<link rel="icon" type="image/png" href="../icon.png" />
 		<link rel="prefetch" href="gofont/Go-Smallcaps.ttf" as="font" />
 		<link href="../style.css" rel="stylesheet" type="text/css" />
-		<link href="lib/explore.css" rel="stylesheet" type="text/css" />
 
 		<script defer src="../lib/commons.min.js"></script>
 		<script defer src="lib/index.min.js"></script>
 	</head>
 	<style>
-		li div {
-			padding-right: 1em;
-			display: flex;
-			white-space: break-spaces;
+		main {
+			overflow: scroll;
 		}
-		li div span {
-			flex: 1;
+
+		main div {
+			margin: 0 auto;
+			padding: 6em 1em;
+			width: 512px;
+		}
+
+		main div input {
+			font-family: Monaco, monospace;
+			margin-right: 4px;
+			border-width: 2px;
+			font-size: inherit;
+		}
+
+		main div input[type="text"] {
+			border-style: inset;
+			padding: 2px;
+			border-radius: 2px;
+			width: 46ch;
+		}
+
+		main div input[type="submit"] {
+			padding: 2px 8px;
+		}
+
+		main div ul li a {
+			white-space: pre;
+		}
+
+		main table {
+			white-space: pre;
+			margin: 1em;
+			font-size: smaller;
+		}
+
+		main table td {
+			padding: 2px 8px;
+			vertical-align: initial;
+		}
+
+		main table td a {
+			color: inherit;
+			text-decoration: inherit;
+			border-bottom: 1px solid lightgray;
+		}
+
+		main table td a:hover {
+			background-color: rgb(240, 240, 240);
+		}
+
+		main table td button {
+			border: none;
+			background: none;
 			font-family: inherit;
+			font-size: inherit;
+			cursor: pointer;
+			color: dimgray;
+		}
+
+		main table td button:hover {
+			background-color: rgb(240, 240, 240);
+			color: black;
+		}
+
+		.syntax {
+			color: darkgray;
 		}
 	</style>
 	<body>
 		<header>
 			<h1>/// <a href="../">Styx</a> :: Browse</h1>
 		</header>
-		<main class="explore">
-			<p>Loading...</p>
-		</main>
+		<main></main>
 	</body>
 </html>

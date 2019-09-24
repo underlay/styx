@@ -1,160 +1,292 @@
 import React from "react"
 import ReactDOM from "react-dom"
 
-import Message from "explore"
-
-import { base58 } from "explore/src/utils.js"
-import listGraphs from "./fetch"
+import { object, predicateQuery, leafQuery } from "./query"
 
 const main = document.querySelector("main")
 
 const title = document.title
 const url = location.origin + location.pathname
 
-const graphURI = /^ul:\/ipfs\/[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{46}#(_:[a-zA-Z0-9-]+)?$/
-
 class Browse extends React.Component {
-	static Gateway = "http://localhost:8080"
-	static PageSize = 10
-	static Null = { index: null, graphs: null, cid: null, focus: null }
+	static LeafPageSize = 1
+	static PredicatePageSize = 3
+	static Examples = [
+		"<http://schema.org/DigitalDocument>",
+		'"text/plain"',
+		"<dweb:/ipfs/QmfCtdbfajVvzTsoUDMLBWvJtnh6mpA6SQTBwrMWCEhmdt>",
+	]
+
+	static Null = {
+		value: null,
+		id: null,
+		predicates: null,
+		leaves: null,
+	}
+
 	constructor(props) {
 		super(props)
-		const match = base58.exec(location.search.slice(1))
-		if (match === null) {
-			let index = null
-			if (location.search.indexOf("?index=") === 0) {
-				const uri = decodeURIComponent(location.search.slice(7))
-				if (graphURI.test(uri)) {
-					index = uri
-				}
-			}
-			this.state = { ...Browse.Null, index }
-		} else if (location.hash === "" && location.href.slice(-1) === "#") {
-			this.state = { ...Browse.Null, cid: match[0], focus: "" }
-		} else if (location.hash === "") {
-			this.state = { ...Browse.Null, cid: match[0] }
+		const id = decodeURIComponent(location.hash.slice(1))
+		if (object.test(id)) {
+			this.state = { ...Browse.Null, id }
 		} else {
-			this.state = {
-				...Browse.Null,
-				cid: match[0],
-				focus: location.hash.slice(1),
-			}
+			this.state = { ...Browse.Null, value: "" }
 		}
 
-		history.replaceState(
-			{ index: this.state.index, cid: this.state.cid, focus: this.state.focus },
-			title,
-			url +
-				(this.state.cid === null
-					? this.state.index === null
-						? ""
-						: "?index=" + encodeURIComponent(this.state.index)
-					: "?" + this.state.cid) +
-				(this.state.focus === null ? "" : "#" + this.state.focus)
-		)
+		const hash = this.state.id === null ? "" : location.hash
+		history.replaceState({ id }, title, url + hash)
 	}
 
 	componentDidMount() {
 		addEventListener("hashchange", () => {
-			const state = {}
-			if (location.hash === "" && location.href.slice(-1) === "#") {
-				state.focus = ""
-			} else if (location.hash === "") {
-				state.focus = null
+			const id = decodeURIComponent(location.hash.slice(1))
+			if (object.test(id)) {
+				this.setState({ ...Browse.Null, id }, () => this.fetchPredicates())
+				history.replaceState({ id: this.state.id }, title, url + location.hash)
 			} else {
-				state.focus = location.hash.slice(1)
+				this.setState({ ...Browse.Null, value: this.state.value || "" })
+				history.replaceState({ id: this.state.id }, title, url)
 			}
-
-			history.replaceState(
-				{ cid: this.state.cid, focus: state.focus },
-				title,
-				url + location.search + (state.focus === null ? "" : "#" + state.focus)
-			)
-
-			this.setState(state)
 		})
 
-		if (this.state.cid === null) {
-			this.listGraphs(this.state.index)
+		if (this.state.id !== null) {
+			this.fetchPredicates()
 		}
 	}
 
-	componentDidUpdate(prevProps, prevState) {
-		if (
-			this.state.cid === null &&
-			(this.state.graphs === null || this.state.index !== prevState.index)
-		) {
-			this.listGraphs(this.state.index)
-		}
-	}
-
-	async listGraphs(index) {
-		const urls = await listGraphs(Browse.PageSize + 1, index)
-		this.setState({ graphs: urls })
-	}
-
-	handleFocus = focus => {
-		if (focus === null) {
-			history.pushState(
-				{ cid: this.state.cid, focus },
-				title,
-				url + location.search
-			)
-			this.setState({ focus })
-		} else {
-			location.hash = focus
-		}
-	}
-
-	handleClick = ({ target: { value: index } }) => {
-		history.pushState(
-			{ cid: null, focus: null, index },
-			title,
-			url + "?index=" + encodeURIComponent(index)
+	async fetchPredicates() {
+		const predicates = await predicateQuery(
+			this.state.id,
+			Browse.PredicatePageSize + 1,
+			null,
+			null
 		)
-		this.setState({ index })
+		this.setState({ predicates }, () => this.fetchLeaves())
 	}
+
+	async fetchLeaves() {
+		const { id, predicates } = this.state
+		const leaves = await leafQuery(
+			id,
+			predicates.map(p => p.slice(0, Browse.PredicatePageSize)),
+			Browse.LeafPageSize + 1,
+			null,
+			null
+		)
+		this.setState({ leaves })
+	}
+
+	handleSubmit = event => {
+		event.preventDefault()
+		if (object.test(this.state.value)) {
+			location.hash = `#${encodeURIComponent(this.state.value)}`
+		}
+	}
+
+	handleChange = ({ target: { value } }) => this.setState({ value })
 
 	render() {
-		const { graphs, cid, focus } = this.state
-		if (cid !== null) {
+		const { id, value } = this.state
+		if (id === null) {
+			const disabled = !object.test(value)
 			return (
-				<Message
-					path={"/ipfs/" + cid}
-					focus={focus}
-					onFocus={this.handleFocus}
-				/>
+				<div>
+					<p>Enter an RDF term:</p>
+					<form onSubmit={this.handleSubmit}>
+						<input type="text" value={value} onChange={this.handleChange} />
+						<input type="submit" disabled={disabled} value="Go" />
+					</form>
+					<p>Examples:</p>
+					<ul>
+						{Browse.Examples.map(term => (
+							<li key={term}>
+								<a href={`#${encodeURIComponent(term)}`}>{term}</a>
+							</li>
+						))}
+					</ul>
+				</div>
 			)
-		} else if (graphs === null) {
-			return <p>Loading...</p>
-		} else if (graphs.length === 0) {
-			return <p>No graphs found</p>
 		} else {
-			return <ul>{graphs.map(this.renderGraph)}</ul>
+			return (
+				<table>
+					<tbody>{this.renderRows()}</tbody>
+				</table>
+			)
 		}
 	}
 
-	renderGraph = (url, index) => {
-		if (url === null) {
-			return null
-		} else if (index === Browse.PageSize) {
+	renderRows() {
+		const { id, predicates, leaves } = this.state
+		if (predicates === null && leaves === null) {
 			return (
-				<li key={url}>
-					<a href={`?index=${encodeURIComponent(url)}`}>Next page</a>
-				</li>
+				<React.Fragment>
+					<tr>
+						<td colSpan="5">{id}</td>
+					</tr>
+					<tr>
+						<td colSpan="5">Loading...</td>
+					</tr>
+				</React.Fragment>
+			)
+		} else if (predicates !== null && leaves === null) {
+			const [l, r] = predicates
+			const height = Math.min(
+				Math.max(l.length, r.length),
+				Browse.PredicatePageSize
+			)
+			const rows = []
+			for (let i = 0; i < height; i++) {
+				rows.push(
+					<tr key={i}>
+						{i < l.length ? (
+							<React.Fragment>
+								<td>{this.renderValue(l[i][1])}</td>
+								<td>{this.renderPredicate(l[i][0])}</td>
+							</React.Fragment>
+						) : i === l.length ? (
+							<td colSpan="2" rowSpan={height - l.length}></td>
+						) : null}
+						{i === 0 ? <td rowSpan={height}>{id}</td> : null}
+						{i < r.length ? (
+							<React.Fragment>
+								<td>{this.renderPredicate(r[i][0])}</td>
+								<td>{this.renderValue(r[i][1])}</td>
+							</React.Fragment>
+						) : i === r.length ? (
+							<td colSpan="2" rowSpan={height - r.length}></td>
+						) : null}
+					</tr>
+				)
+			}
+
+			return rows
+		} else if (predicates !== null && leaves !== null) {
+			const [lp, rp] = predicates
+			const [ll, rl] = leaves
+			const leftLeafCells = []
+			const leftPredicateCells = []
+			const rightLeafCells = []
+			const rightPredicateCells = []
+
+			for (let i = 0; i < lp.length; i++) {
+				if (i === Browse.PredicatePageSize) {
+					leftLeafCells.push(<td></td>)
+					leftPredicateCells.push(
+						<td>
+							<button>...more</button>
+						</td>
+					)
+				} else {
+					for (let j = 0; j < ll[i].length; j++) {
+						if (j === 0) {
+							leftPredicateCells.push(
+								<td rowSpan={ll[i].length}>{this.renderPredicate(lp[i][0])}</td>
+							)
+						} else {
+							leftPredicateCells.push(null)
+						}
+						if (j === Browse.LeafPageSize) {
+							leftLeafCells.push(
+								<td>
+									<button>...more</button>
+								</td>
+							)
+						} else {
+							leftLeafCells.push(<td>{this.renderValue(ll[i][j])}</td>)
+						}
+					}
+				}
+			}
+
+			for (let i = 0; i < rp.length; i++) {
+				if (i === Browse.PredicatePageSize) {
+					rightLeafCells.push(<td></td>)
+					rightPredicateCells.push(
+						<td>
+							<button>...more</button>
+						</td>
+					)
+				} else {
+					for (let j = 0; j < rl[i].length; j++) {
+						if (j === 0) {
+							rightPredicateCells.push(
+								<td rowSpan={rl[i].length}>{this.renderPredicate(rp[i][0])}</td>
+							)
+						} else {
+							rightPredicateCells.push(null)
+						}
+						if (j === Browse.LeafPageSize) {
+							rightLeafCells.push(
+								<td>
+									<button>...more</button>
+								</td>
+							)
+						} else {
+							rightLeafCells.push(<td>{this.renderValue(rl[i][j])}</td>)
+						}
+					}
+				}
+			}
+
+			if (leftLeafCells.length > rightLeafCells.length) {
+				const rowSpan = leftLeafCells.length - rightLeafCells.length
+				rightPredicateCells.push(<td colSpan="2" rowSpan={rowSpan}></td>)
+				rightLeafCells.push(null)
+				for (let i = 1; i < rowSpan; i++) {
+					rightPredicateCells.push(null)
+					rightLeafCells.push(null)
+				}
+			} else if (leftLeafCells.length < rightLeafCells.length) {
+				const rowSpan = rightLeafCells.length - leftLeafCells.length
+				leftLeafCells.push(<td colSpan="2" rowSpan={rowSpan}></td>)
+				leftPredicateCells.push(null)
+				for (let i = 1; i < rowSpan; i++) {
+					leftPredicateCells.push(null)
+					leftLeafCells.push(null)
+				}
+			}
+
+			const rows = []
+			const height = Math.max(rightLeafCells.length, leftLeafCells.length)
+			for (let i = 0; i < height; i++) {
+				const row = (
+					<tr key={i}>
+						{leftLeafCells[i]}
+						{leftPredicateCells[i]}
+						{i === 0 ? <td rowSpan={height}>{id}</td> : null}
+						{rightPredicateCells[i]}
+						{rightLeafCells[i]}
+					</tr>
+				)
+				rows.push(row)
+			}
+			return rows
+		}
+	}
+
+	renderPredicate(id) {
+		return (
+			<span>
+				<span className="syntax">&lt;</span>
+				{id}
+				<span className="syntax">&gt;</span>
+			</span>
+		)
+	}
+
+	renderValue(value) {
+		if (typeof value["@id"] === "string") {
+			return (
+				<React.Fragment>
+					<span className="syntax">&lt;</span>
+					<a href={`#${encodeURIComponent(`<${value["@id"]}>`)}`}>
+						{value["@id"]}
+					</a>
+					<span className="syntax">&gt;</span>
+				</React.Fragment>
 			)
 		} else {
-			const path = url.split("/").pop()
-			const [cid] = path.split("#")
-			return (
-				<li key={url}>
-					<div>
-						<span>{url}</span>
-						<a href={`?${path}`}>View</a> |{" "}
-						<a href={`${Browse.Gateway}/ipfs/${cid}`}>Download</a>
-					</div>
-				</li>
-			)
+			return <span>{JSON.stringify(value["@value"])}</span>
 		}
 	}
 }

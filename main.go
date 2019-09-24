@@ -1,11 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"mime"
 	"mime/multipart"
@@ -113,12 +111,13 @@ func main() {
 	dir := http.Dir(wd + "/www")
 	fs := http.FileServer(dir)
 	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
+
 		if req.Method == "POST" && req.URL.Path == "/" {
 			ct := req.Header.Get("Content-Type")
 			m, params, err := mime.ParseMediaType(ct)
 			if err != nil {
 				res.WriteHeader(400)
-				res.Write([]byte(err.Error()))
+				res.Write([]byte(err.Error() + "\n"))
 				return
 			}
 
@@ -130,7 +129,7 @@ func main() {
 				var doc interface{}
 				if err := decoder.Decode(&doc); err != nil {
 					res.WriteHeader(400)
-					res.Write([]byte(err.Error()))
+					res.Write([]byte(err.Error() + "\n"))
 					return
 				}
 
@@ -138,28 +137,27 @@ func main() {
 				rdf, err := proc.Normalize(doc, options)
 				if s, is := rdf.(string); !is || err != nil {
 					res.WriteHeader(400)
-					res.Write([]byte(err.Error()))
+					res.Write([]byte(err.Error() + "\n"))
 					return
 				} else if c, err := store(strings.NewReader(s)); err != nil {
 					res.WriteHeader(500)
-					res.Write([]byte(err.Error()))
+					res.Write([]byte(err.Error() + "\n"))
 					return
 				} else {
 					cid = c
 					reader = strings.NewReader(s)
 				}
 			} else if m == "application/n-quads" {
-				if b, err := ioutil.ReadAll(req.Body); err != nil {
-					res.WriteHeader(500)
-					res.Write([]byte(err.Error()))
-					return
-				} else if c, err := store(bytes.NewReader(b)); err != nil {
+				if c, err := store(req.Body); err != nil {
 					res.WriteHeader(400)
-					res.Write([]byte(err.Error()))
+					res.Write([]byte(err.Error() + "\n"))
+					return
+				} else if reader, err = sh.Cat(c.String()); err != nil {
+					res.WriteHeader(400)
+					res.Write([]byte(err.Error() + "\n"))
 					return
 				} else {
 					cid = c
-					reader = bytes.NewReader(b)
 				}
 			} else if boundary, has := params["boundary"]; m == "multipart/form-data" && has {
 				r := multipart.NewReader(req.Body, boundary)
@@ -167,7 +165,7 @@ func main() {
 				u, err := uuid.NewRandom()
 				if err != nil {
 					res.WriteHeader(500)
-					res.Write([]byte(err.Error()))
+					res.Write([]byte(err.Error() + "\n"))
 					return
 				}
 				base := fmt.Sprintf("uuid://%s/", u.String())
@@ -180,27 +178,27 @@ func main() {
 						break
 					} else if err != nil {
 						res.WriteHeader(400)
-						res.Write([]byte(err.Error()))
+						res.Write([]byte(err.Error() + "\n"))
 						return
 					} else if name := p.FormName(); name == req.URL.RawQuery {
 						if doc, err := ld.DocumentFromReader(p); err != nil {
 							res.WriteHeader(400)
-							res.Write([]byte(err.Error()))
+							res.Write([]byte(err.Error() + "\n"))
 							return
 						} else if expanded, err := proc.Expand(doc, opts); err != nil {
 							res.WriteHeader(400)
-							res.Write([]byte(err.Error()))
+							res.Write([]byte(err.Error() + "\n"))
 							return
 						} else if flattened, err := proc.Flatten(expanded, nil, opts); err != nil {
 							res.WriteHeader(400)
-							res.Write([]byte(err.Error()))
+							res.Write([]byte(err.Error() + "\n"))
 							return
 						} else {
 							graph = flattened.([]interface{})
 						}
 					} else if c, err := store(p); err != nil {
 						res.WriteHeader(400)
-						res.Write([]byte(err.Error()))
+						res.Write([]byte(err.Error() + "\n"))
 						return
 					} else {
 						id := base + name
@@ -215,11 +213,11 @@ func main() {
 				rdf, err := proc.Normalize(graph, options)
 				if s, is := rdf.(string); !is || err != nil {
 					res.WriteHeader(400)
-					res.Write([]byte(err.Error()))
+					res.Write([]byte(err.Error() + "\n"))
 					return
 				} else if c, err := store(strings.NewReader(s)); err != nil {
 					res.WriteHeader(500)
-					res.Write([]byte(err.Error()))
+					res.Write([]byte(err.Error() + "\n"))
 					return
 				} else {
 					cid = c
@@ -227,18 +225,18 @@ func main() {
 				}
 			} else {
 				res.WriteHeader(415)
-				res.Write([]byte(err.Error()))
+				res.Write([]byte(err.Error() + "\n"))
 				return
 			}
 
 			if quads, graphs, err := styx.ParseMessage(reader); err != nil {
 				res.WriteHeader(400)
-				res.Write([]byte(err.Error()))
+				res.Write([]byte(err.Error() + "\n"))
 			} else if r := db.HandleMessage(peerID.ID, cid, quads, graphs); res == nil {
 				res.WriteHeader(204)
 			} else {
+				res.Header().Add("Content-Type", "application/ld+json")
 				res.WriteHeader(200)
-
 				encoder := json.NewEncoder(res)
 				encoder.Encode(r)
 			}

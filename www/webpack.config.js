@@ -10,13 +10,17 @@ const exclude = /(?:\.min\.js$|dist\/)/
 
 module.exports = {
 	entry: {
-		"browse/lib/index": [
+		"directory/lib/index": [
 			"@babel/polyfill",
-			path.resolve(__dirname, "browse", "index.jsx"),
+			path.resolve(__dirname, "directory", "index.jsx"),
 		],
 		"query/lib/index": [
 			"@babel/polyfill",
 			path.resolve(__dirname, "query", "index.jsx"),
+		],
+		"browse/lib/index": [
+			"@babel/polyfill",
+			path.resolve(__dirname, "browse", "index.jsx"),
 		],
 	},
 
