@@ -16,7 +16,8 @@ func MakeConstraintGraph(
 	quads []*ld.Quad,
 	label string,
 	graph []int,
-	domain map[string]ld.Node,
+	domain []string,
+	index []ld.Node,
 	txn *badger.Txn,
 ) (g *ConstraintGraph, err error) {
 	indexMap := types.IndexMap{}
@@ -25,14 +26,6 @@ func MakeConstraintGraph(
 
 	for _, index := range graph {
 		quad := quads[index]
-
-		// value := ""
-		// if quad.Graph != nil {
-		// 	value = quad.Graph.GetValue()
-		// }
-		// if value != label {
-		// 	continue
-		// }
 
 		s, S := getAttribute(quad.Subject)
 		p, P := getAttribute(quad.Predicate)
@@ -185,7 +178,8 @@ func MakeConstraintGraph(
 	if domain != nil && domainSize > 0 {
 		domainIndex := domainSize
 		domainIds := make(map[string][]byte, domainIndex)
-		for p, node := range domain {
+		for i, p := range domain {
+			node := index[i]
 			if _, has := g.Index[p]; !has {
 				domainSize--
 			} else if node == nil {

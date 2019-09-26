@@ -74,7 +74,7 @@ func (db *DB) HandleMessage(
 	responses := make([]map[string]interface{}, 0, len(queries))
 
 	for label := range queries {
-		entity, bundle, target, extent, domain := matchGraph(label, graphs, quads)
+		entity, bundle, target, extent, domain, index := matchGraph(label, graphs, quads)
 		var graph interface{}
 		t := map[string]interface{}{"@id": fmt.Sprintf("q:%s", target)}
 		if entity {
@@ -88,11 +88,11 @@ func (db *DB) HandleMessage(
 			graph = entity
 		} else if bundle {
 			entities := make([]map[string]interface{}, extent)
-			if !matchBundle(graphs[target], extent, domain, quads, t, entities, db) {
+			if !handleBundle(graphs[target], extent, domain, index, quads, t, entities, db) {
 				variables := make(chan []string)
 				data := make(chan map[string]*types.Value)
 				prov := make(chan map[int]*types.SourceList)
-				go db.Enumerate(quads, label, graphs[target], extent, domain, variables, data, prov)
+				go db.Enumerate(quads, label, graphs[target], extent, domain, index, variables, data, prov)
 				v := <-variables
 				d := make([]map[string]*types.Value, extent)
 				s := make([]map[int]*types.SourceList, extent)
@@ -122,7 +122,9 @@ func (db *DB) HandleMessage(
 			data := make(chan map[string]*types.Value)
 			prov := make(chan map[int]*types.SourceList)
 			go db.Query(quads, label, graphs[target], variables, data, prov)
+			_ = <-variables
 			graph = makeGraph(graphs[target], quads, <-data)
+			_ = <-prov
 		}
 
 		responses = append(responses, map[string]interface{}{

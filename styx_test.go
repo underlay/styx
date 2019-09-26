@@ -221,12 +221,14 @@ func TestBundleQuery(t *testing.T) {
 		"@vocab": "http://schema.org/",
 		"dcterms": "http://purl.org/dc/terms/",
 		"prov": "http://www.w3.org/ns/prov#",
-		"u": "http://underlay.mit.edu/ns#"
+		"u": "http://underlay.mit.edu/ns#",
+		"u:index": { "@container": "@list" }
 	},
 	"@type": "u:Query",
 	"@graph": {
 		"@type": "prov:Bundle",
 		"dcterms:extent": 3,
+		"u:index": [],
 		"u:enumerates": {
 			"@graph": {
 				"@type": "Person",
@@ -244,12 +246,14 @@ func TestGraphQuery(t *testing.T) {
 	"@context": {
 		"dcterms": "http://purl.org/dc/terms/",
 		"prov": "http://www.w3.org/ns/prov#",
-		"u": "http://underlay.mit.edu/ns#"
+		"u": "http://underlay.mit.edu/ns#",
+		"u:index": { "@container": "@list" }
 	},
 	"@type": "u:Query",
 	"@graph": {
 		"@type": "prov:Bundle",
 		"dcterms:extent": 3,
+		"u:index": [],
 		"u:enumerates": {
 			"@graph": {
 				"@type": "u:Graph"
@@ -266,15 +270,17 @@ func TestGraphIndexQuery(t *testing.T) {
 	"@context": {
 		"dcterms": "http://purl.org/dc/terms/",
 		"prov": "http://www.w3.org/ns/prov#",
-		"u": "http://underlay.mit.edu/ns#"
+		"rdf" "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+		"u": "http://underlay.mit.edu/ns#",
+		"u:index": { "@container": "@list" }
 	},
 	"@type": "u:Query",
 	"@graph": {
 		"@type": "prov:Bundle",
 		"dcterms:extent": 3,
-		"u:domain": {
+		"u:index": {
 			"@id": "_:b0",
-			"u:index": { "@id": "ul:/ipfs/QmRyaXPZpXxXBcdrikHTjnLr2w6rQK9bChsB7V1bUZv1er#_:c14n0" }
+			"rdf:value": { "@id": "ul:/ipfs/QmRyaXPZpXxXBcdrikHTjnLr2w6rQK9bChsB7V1bUZv1er#_:c14n0" }
 		},
 		"u:enumerates": {
 			"@graph": {
@@ -294,13 +300,14 @@ func TestDomainQuery(t *testing.T) {
 		"@vocab": "http://schema.org/",
 		"dcterms": "http://purl.org/dc/terms/",
 		"prov": "http://www.w3.org/ns/prov#",
-		"u": "http://underlay.mit.edu/ns#"
+		"u": "http://underlay.mit.edu/ns#",
+		"u:index": { "@container": "@list" }
 	},
 	"@type": "u:Query",
 	"@graph": {
 		"@type": "prov:Bundle",
 		"dcterms:extent": 3,
-		"u:domain": { "@id": "_:b0" },
+		"u:index": { "@id": "_:b0" },
 		"u:enumerates": {
 			"@graph": {
 				"@id": "_:b0",
@@ -320,15 +327,17 @@ func TestIndexQuery(t *testing.T) {
 		"@vocab": "http://schema.org/",
 		"dcterms": "http://purl.org/dc/terms/",
 		"prov": "http://www.w3.org/ns/prov#",
-		"u": "http://underlay.mit.edu/ns#"
+		"rdf" "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+		"u": "http://underlay.mit.edu/ns#",
+		"u:index": { "@container": "@list" }
 	},
 	"@type": "u:Query",
 	"@graph": {
 		"@type": "prov:Bundle",
 		"dcterms:extent": 2,
-		"u:domain": {
+		"u:index": {
 			"@id": "_:b0",
-			"u:index": { "@id": "ul:/ipfs/QmRyaXPZpXxXBcdrikHTjnLr2w6rQK9bChsB7V1bUZv1er#_:c14n1" }
+			"rdf:value": { "@id": "ul:/ipfs/QmRyaXPZpXxXBcdrikHTjnLr2w6rQK9bChsB7V1bUZv1er#_:c14n1" }
 		},
 		"u:enumerates": {
 			"@graph": {
@@ -348,13 +357,14 @@ func TestIndexQuery2(t *testing.T) {
 	"@context": {
 		"dcterms": "http://purl.org/dc/terms/",
 		"prov": "http://www.w3.org/ns/prov#",
-		"u": "http://underlay.mit.edu/ns#"
+		"u": "http://underlay.mit.edu/ns#",
+		"u:index": { "@container": "@list" }
 	},
 	"@type": "u:Query",
 	"@graph": {
 		"@type": "prov:Bundle",
 		"dcterms:extent": 2,
-		"u:domain": { "@id": "_:b0" },
+		"u:index": { "@id": "_:b0" },
 		"u:enumerates": {
 			"@graph": {
 				"@id": "ul:/ipfs/QmRyaXPZpXxXBcdrikHTjnLr2w6rQK9bChsB7V1bUZv1er#_:c14n1",
