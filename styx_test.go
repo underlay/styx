@@ -270,7 +270,7 @@ func TestGraphIndexQuery(t *testing.T) {
 	"@context": {
 		"dcterms": "http://purl.org/dc/terms/",
 		"prov": "http://www.w3.org/ns/prov#",
-		"rdf" "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+		"rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
 		"u": "http://underlay.mit.edu/ns#",
 		"u:index": { "@container": "@list" }
 	},
@@ -327,7 +327,7 @@ func TestIndexQuery(t *testing.T) {
 		"@vocab": "http://schema.org/",
 		"dcterms": "http://purl.org/dc/terms/",
 		"prov": "http://www.w3.org/ns/prov#",
-		"rdf" "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+		"rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
 		"u": "http://underlay.mit.edu/ns#",
 		"u:index": { "@container": "@list" }
 	},

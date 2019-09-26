@@ -37,6 +37,10 @@ module.exports = {
 		new CopyPlugin([
 			{
 				from: path.resolve(__dirname, "node_modules", "explore", "index.css"),
+				to: path.resolve(__dirname, "directory", "lib", "explore.css"),
+			},
+			{
+				from: path.resolve(__dirname, "node_modules", "explore", "index.css"),
 				to: path.resolve(__dirname, "browse", "lib", "explore.css"),
 			},
 		]),

@@ -10,6 +10,7 @@ const context = {
 	prov: "http://www.w3.org/ns/prov#",
 	rdf: "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
 	u: "http://underlay.mit.edu/ns#",
+	"u:index": { "@container": "@list" },
 }
 
 const initialBody = extent => ({
@@ -18,6 +19,7 @@ const initialBody = extent => ({
 	"@graph": {
 		"@type": "prov:Bundle",
 		"dcterms:extent": extent,
+		"u:index": [],
 		"u:enumerates": {
 			"@graph": { "@type": "u:Graph" },
 		},
@@ -30,9 +32,9 @@ const nextBody = (extent, index) => ({
 	"@graph": {
 		"@type": "prov:Bundle",
 		"dcterms:extent": extent,
-		"u:domain": {
+		"u:index": {
 			"@id": "_:b0",
-			"u:index": { "@id": index },
+			"rdf:value": { "@id": index },
 		},
 		"u:enumerates": {
 			"@graph": {

@@ -6,76 +6,78 @@
 		<link rel="icon" type="image/png" href="../icon.png" />
 		<link rel="prefetch" href="gofont/Go-Smallcaps.ttf" as="font" />
 		<link href="../style.css" rel="stylesheet" type="text/css" />
+		<link href="lib/explore.css" rel="stylesheet" type="text/css" />
 
 		<script defer src="../lib/commons.min.js"></script>
 		<script defer src="lib/index.min.js"></script>
 	</head>
 	<style>
 		main {
-			overflow: scroll;
+			display: flex;
+			flex-direction: column;
 		}
 
-		main div {
+		main .empty {
 			margin: 0 auto;
 			padding: 6em 1em;
-			width: 512px;
+			width: 640px;
 		}
 
-		main div input {
+		main .empty form {
+			display: flex;
+		}
+
+		main .empty input {
 			font-family: Monaco, monospace;
 			margin-right: 4px;
 			border-width: 2px;
 			font-size: inherit;
 		}
 
-		main div input[type="text"] {
+		main .empty input[type="text"] {
+			flex: 1;
 			border-style: inset;
 			padding: 2px;
 			border-radius: 2px;
-			width: 46ch;
 		}
 
-		main div input[type="submit"] {
+		main .empty input[type="submit"] {
 			padding: 2px 8px;
 		}
 
-		main div ul li a {
+		main .empty ul li a {
 			white-space: pre;
 		}
 
-		main table {
-			white-space: pre;
-			margin: 1em;
-			font-size: smaller;
-		}
-
-		main table td {
-			padding: 2px 8px;
-			vertical-align: initial;
-		}
-
-		main table td a {
-			color: inherit;
-			text-decoration: inherit;
+		main section {
+			display: flex;
 			border-bottom: 1px solid lightgray;
+			background-color: lavenderblush;
+			padding: 2px 4px 1px;
+			font-size: 12px;
+			color: #666;
 		}
 
-		main table td a:hover {
-			background-color: rgb(240, 240, 240);
+		main section .path {
+			flex: 1;
 		}
 
-		main table td button {
+		main section button {
 			border: none;
 			background: none;
 			font-family: inherit;
 			font-size: inherit;
+			color: inherit;
 			cursor: pointer;
-			color: dimgray;
 		}
 
-		main table td button:hover {
-			background-color: rgb(240, 240, 240);
-			color: black;
+		main section button:hover {
+			text-decoration: underline;
+			color: #333;
+		}
+
+		main .graph {
+			flex: 1;
 		}
 
 		.syntax {
@@ -86,6 +88,6 @@
 		<header>
 			<h1>/// <a href="../">Styx</a> :: Browse</h1>
 		</header>
-		<main></main>
+		<main class="explore"></main>
 	</body>
 </html>

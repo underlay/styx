@@ -12,6 +12,7 @@
 		"blockly": "^2.20190722.1",
 		"explore": "github:underlay/explore",
 		"jsonld": "^1.8.0",
+		"n3": "^1.2.1",
 		"react": "^16.9.0",
 		"react-dom": "^16.9.0",
 		"uuid": "^3.3.3"

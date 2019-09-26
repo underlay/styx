@@ -1,233 +1,134 @@
 import jsonld from "jsonld"
+window.jsonld = jsonld
 
-const iri = "(?:<([^:]+:[^>]*)>)"
-const plain = '"([^"\\\\]*(?:\\\\.[^"\\\\]*)*)"'
-const datatype = `(?:\\^\\^${iri})`
-const language = "(?:@([a-z]+(?:-[a-zA-Z0-9]+)*))"
-const literal = `(?:${plain}(?:${datatype}|${language})?)`
-export const object = new RegExp(`^(?:${iri}|${literal})$`)
-
-export const baseOptions = {
+const baseOptions = {
 	method: "POST",
-	headers: { "Content-Type": "application/ld+json" },
+	headers: { "Content-Type": "application/n-quads" },
 }
 
-const context = {
-	dcterms: "http://purl.org/dc/terms/",
-	prov: "http://www.w3.org/ns/prov#",
-	rdf: "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-	u: "http://underlay.mit.edu/ns#",
-}
+export const RDFValue = "http://www.w3.org/1999/02/22-rdf-syntax-ns#value"
 
-function makeQuery(extent, index, enumerator) {
-	const domain = { "@id": predicateId }
-	if (index && index !== null) {
-		domain["u:index"] = { "@id": index }
-	}
-	return {
-		"@type": "u:Query",
-		"@graph": {
-			"@type": "prov:Bundle",
-			"dcterms:extent": extent,
-			"u:domain": domain,
-			"u:enumerates": { "@graph": enumerator },
+function makeBundle(quads, q, extent, index, enumerator) {
+	quads.push(
+		`_:${q} <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://underlay.mit.edu/ns#Query> .`,
+		`_:${q}-b <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/ns/prov#Bundle> _:${q} .`,
+		`_:${q}-b <http://purl.org/dc/terms/extent> "${extent}"^^<http://www.w3.org/2001/XMLSchema#integer> _:${q} .`
+	)
+	const head = index.reduceRight(
+		(head, { "@id": id, [RDFValue]: value }, i) => {
+			const next = `_:${q}-${i}`
+			quads.push(
+				`${next} <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <${id}> _:${q} .`,
+				`${next} <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> ${head} _:${q} .`
+			)
+			if (value !== undefined) {
+				quads.push(`<${id}> <${RDFValue}> ${parseValue(value)} _:${q} .`)
+			}
+			return next
 		},
-	}
-}
-
-function makeLeftPredicate(quads, term, extent, index) {
-	quads.push(
-		"_:l <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://underlay.mit.edu/ns#Query> .",
-		"_:l-bundle <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/ns/prov#Bundle> _:l .",
-		`_:l-bundle <http://purl.org/dc/terms/extent> "${extent}"^^<http://www.w3.org/2001/XMLSchema#integer> _:l .`,
-		`_:l-bundle <http://underlay.mit.edu/ns#domain> _:predicate _:l .`,
-		"_:l-bundle <http://underlay.mit.edu/ns#enumerates> _:l-enumerator _:l .",
-		`_:subject _:predicate ${term} _:l-enumerator .`
+		"<http://www.w3.org/1999/02/22-rdf-syntax-ns#nil>"
 	)
-
-	if (index !== null) {
-		quads.push(`_:predicate <http://underlay.mit.edu/ns#index> ${index} _:l .`)
-	}
-}
-
-function makeRightPredicate(quads, term, extent, index) {
 	quads.push(
-		"_:r <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://underlay.mit.edu/ns#Query> .",
-		"_:r-bundle <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/ns/prov#Bundle> _:r .",
-		`_:r-bundle <http://purl.org/dc/terms/extent> "${extent}"^^<http://www.w3.org/2001/XMLSchema#integer> _:r .`,
-		`_:r-bundle <http://underlay.mit.edu/ns#domain> _:predicate _:r .`,
-		"_:r-bundle <http://underlay.mit.edu/ns#enumerates> _:r-enumerator _:r .",
-		`${term} _:predicate _:object _:r-enumerator .`
+		`_:${q}-b <http://underlay.mit.edu/ns#index> ${head} _:${q} .`,
+		`_:${q}-b <http://underlay.mit.edu/ns#enumerates> ${enumerator} _:${q} .`
 	)
-
-	if (index !== null) {
-		quads.push(`_:predicate <http://underlay.mit.edu/ns#index> ${index} _:r .`)
-	}
 }
 
-export async function predicateQuery(term, extent, left, right) {
-	const [_, uri, value, datatype, language] = object.exec(term)
-
-	const quads = []
-	makeLeftPredicate(quads, term, extent, left)
-	if (uri !== undefined) {
-		makeRightPredicate(quads, term, extent, right)
-	}
-	quads.push("")
-
-	const res = await fetch("/", {
-		method: "POST",
-		headers: { "Content-Type": "application/n-quads" },
-		body: quads.join("\n"),
-	})
-
-	const doc = await res.json()
-
-	const predicates = {}
-	for (const {
-		"@graph": [
-			{
-				"http://www.w3.org/ns/prov#value": [{ "@list": values }],
-			},
-		],
-		"http://underlay.mit.edu/ns#instanceOf": [{ "@id": q }],
-	} of await jsonld.expand(doc)) {
-		const parity = q.slice(q.indexOf("#"))
-		predicates[parity] = []
-
-		for (const {
-			"http://www.w3.org/ns/prov#value": [{ "@list": assignments }],
-		} of values) {
-			if (assignments.length === 0) {
-				break
-			}
-
-			const {
-				"http://www.w3.org/1999/02/22-rdf-syntax-ns#value": [
-					{ "@id": predicate },
-				],
-			} = assignments.find(
-				({ "@id": id }) => id.slice(id.indexOf("#")) === "#_:predicate"
-			)
-
-			const {
-				"http://www.w3.org/1999/02/22-rdf-syntax-ns#value": [value],
-			} = assignments.find(
-				({ "@id": id }) => id.slice(id.indexOf("#")) !== "#_:predicate"
-			)
-
-			predicates[parity].push([predicate, value])
+function parseValue(value) {
+	if (typeof value === "string") {
+		return JSON.stringify(value)
+	} else if (typeof value === "number") {
+		if (value === parseInt(value)) {
+			return `"${value}"^^<http://www.w3.org/2001/XMLSchema#integer>`
+		} else {
+			return `"${value}"^^<http://www.w3.org/2001/XMLSchema#double>`
+		}
+	} else if (typeof value === "boolean") {
+		return `"${value}"^^<http://www.w3.org/2001/XMLSchema#boolean>`
+	} else if (typeof value === "object") {
+		const { "@value": v, "@type": t, "@language": l } = value
+		if (l !== undefined) {
+			return `${JSON.stringify(v)}@${l}`
+		} else if (t === "http://www.w3.org/2001/XMLSchema#string") {
+			return JSON.stringify(v)
+		} else if (t !== undefined) {
+			return `${JSON.stringify(v)}^^<${t}>`
+		} else {
+			return JSON.stringify(v)
 		}
 	}
-
-	return [predicates["#_:l"] || [], predicates["#_:r"] || []]
 }
 
-function makeLeftLeaf(quads, graph, term, predicate, extent, index) {
-	quads.push(
-		`_:${graph} <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://underlay.mit.edu/ns#Query> .`,
-		`_:${graph}-bundle <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/ns/prov#Bundle> _:${graph} .`,
-		`_:${graph}-bundle <http://purl.org/dc/terms/extent> "${extent}"^^<http://www.w3.org/2001/XMLSchema#integer> _:${graph} .`,
-		`_:${graph}-bundle <http://underlay.mit.edu/ns#domain> _:${graph}-value _:${graph} .`,
-		`_:${graph}-bundle <http://underlay.mit.edu/ns#enumerates> _:${graph}-enumerator _:${graph} .`,
-		`_:${graph}-value <${predicate}> ${term} _:${graph}-enumerator .`
-	)
-
-	if (index !== null) {
-		quads.push(
-			`_:${graph}-value <http://underlay.mit.edu/ns#index> ${index} _:${graph} .`
-		)
-	}
-}
-
-function makeRightLeaf(quads, graph, term, predicate, extent, index) {
-	quads.push(
-		`_:${graph} <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://underlay.mit.edu/ns#Query> .`,
-		`_:${graph}-bundle <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/ns/prov#Bundle> _:${graph} .`,
-		`_:${graph}-bundle <http://purl.org/dc/terms/extent> "${extent}"^^<http://www.w3.org/2001/XMLSchema#integer> _:${graph} .`,
-		`_:${graph}-bundle <http://underlay.mit.edu/ns#domain> _:${graph}-value _:${graph} .`,
-		`_:${graph}-bundle <http://underlay.mit.edu/ns#enumerates> _:${graph}-enumerator _:${graph} .`,
-		`${term} <${predicate}> _:${graph}-value _:${graph}-enumerator .`
-	)
-
-	if (index !== null) {
-		quads.push(
-			`_:${graph}-value <http://underlay.mit.edu/ns#index> ${index} _:${graph} .`
-		)
-	}
-}
-
-export async function leafQuery(
+/**
+ *
+ * @param {string} id
+ * @param {number} subjectExtent
+ * @param {number} subjectIndex
+ * @param {Array} objectExtent
+ * @param {Array} objectIndex
+ * @param {N3Store} store
+ */
+export default async function query(
 	id,
-	[leftPredicates, rightPredicates],
-	extent,
-	left,
-	right
+	subjectExtent,
+	subjectIndex,
+	objectExtent,
+	objectIndex,
+	store
 ) {
-	const [_, uri, value, datatype, language] = object.exec(id)
-
 	const quads = []
-
-	for (let i = 0; i < leftPredicates.length; i++) {
-		const [predicate, value] = leftPredicates[i]
-		makeLeftLeaf(quads, `l${i}`, id, predicate, extent, left)
-	}
-
-	if (uri !== undefined) {
-		for (let i = 0; i < rightPredicates.length; i++) {
-			const [predicate, value] = rightPredicates[i]
-			makeRightLeaf(quads, `r${i}`, id, predicate, extent, right)
-		}
-	}
-
+	makeBundle(quads, "s", subjectExtent, subjectIndex, "_:s-e")
+	quads.push(`<${id}> _:predicate _:object _:s-e .`)
+	makeBundle(quads, "o", objectExtent, objectIndex, "_:o-e")
+	quads.push(`_:subject _:predicate <${id}> _:o-e .`)
 	quads.push("")
 
-	const res = await fetch("/", {
-		method: "POST",
-		headers: { "Content-Type": "application/n-quads" },
-		body: quads.join("\n"),
-	})
-
+	const res = await fetch("/", { ...baseOptions, body: quads.join("\n") })
 	const doc = await res.json()
+	const s = doc["@graph"].find(({ "u:instanceOf": id }) => id === "q:_:s")
+	const o = doc["@graph"].find(({ "u:instanceOf": id }) => id === "q:_:o")
 
-	const leaves = {}
-	for (const {
-		"@graph": [
-			{
-				"http://www.w3.org/ns/prov#value": [{ "@list": values }],
-			},
-		],
-		"http://underlay.mit.edu/ns#instanceOf": [{ "@id": q }],
-	} of await jsonld.expand(doc)) {
-		const hash = q.slice(q.indexOf("#") + 1)
-		leaves[hash] = []
+	for (const { value, wasDerivedFrom } of s["@graph"].value) {
+		if (value === undefined || value.length === 0) {
+			break
+		}
 
-		for (const {
-			"http://www.w3.org/ns/prov#value": [{ "@list": assignments }],
-		} of values) {
-			if (assignments.length === 0) {
-				break
-			}
+		const {
+			"rdf:value": { "@id": predicate },
+		} = value.find(({ "@id": id }) => id === "q:_:predicate")
 
-			const [
-				{
-					"http://www.w3.org/1999/02/22-rdf-syntax-ns#value": [value],
-				},
-			] = assignments
+		const { "rdf:value": object } = value.find(
+			({ "@id": id }) => id === "q:_:object"
+		)
 
-			leaves[hash].push(value)
+		const {
+			hadMember: [{ "@id": graph }],
+		} = wasDerivedFrom
+
+		if (typeof object === "object" && typeof object["@id"] === "string") {
+			store.addQuad(id, predicate, object["@id"], graph)
+		} else {
+			store.addQuad(id, predicate, parseValue(object), graph)
 		}
 	}
 
-	const leftLeaves = new Array({ length: leftPredicates.length })
-	for (let i = 0; i < leftPredicates.length; i++) {
-		leftLeaves[i] = leaves[`_:l${i}`]
-	}
+	for (const { value, wasDerivedFrom } of o["@graph"].value) {
+		if (value === undefined || value.length === 0) {
+			break
+		}
 
-	const rightLeaves = new Array(rightPredicates.length)
-	for (let i = 0; i < rightPredicates.length; i++) {
-		rightLeaves[i] = leaves[`_:r${i}`]
-	}
+		const {
+			"rdf:value": { "@id": subject },
+		} = value.find(({ "@id": id }) => id === "q:_:subject")
 
-	return [leftLeaves, rightLeaves]
+		const {
+			"rdf:value": { "@id": predicate },
+		} = value.find(({ "@id": id }) => id === "q:_:predicate")
+
+		const {
+			hadMember: [{ "@id": graph }],
+		} = wasDerivedFrom
+
+		store.addQuad(subject, predicate, id, graph)
+	}
 }
