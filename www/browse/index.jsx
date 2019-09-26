@@ -140,13 +140,11 @@ class Browse extends React.Component {
 	}
 	renderGraph() {
 		const { store, id } = this.state
-		console.log(store && store.size)
 		if (store === null) {
 			return <p>Loading...</p>
 		} else if (store.size === 0) {
-			return <p>No data found for id {id}</p>
+			return <p>No data found for {id}</p>
 		} else {
-			// return null
 			return (
 				<Graph
 					focus={id}
