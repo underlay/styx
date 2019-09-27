@@ -2,10 +2,10 @@
 
 ## Table of Contents
 
-- [Data Model](#Data_Model)
-- [Installing](#Installing)
-- [Writing Data](#Writing_Data)
-- [Reading Data](#Reading_Data)
+- [Data Model](#data-model)
+- [Installing](#installing)
+- [Writing Data](#writing-ata)
+- [Reading Data](#reading-data)
 
 ## Data Model
 
