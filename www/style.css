@@ -28,6 +28,7 @@ header {
 	font-family: "Go Smallcaps";
 	padding: 0.5em 0.5em 0;
 	border-bottom: 1px solid lightslategray;
+	height: 37px;
 }
 
 header h1 {
