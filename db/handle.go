@@ -121,9 +121,9 @@ func (db *DB) HandleMessage(
 			variables := make(chan []string)
 			data := make(chan map[string]*types.Value)
 			prov := make(chan map[int]*types.SourceList)
-			go db.Query(quads, label, graphs[target], variables, data, prov)
+			go db.Query(quads, label, graphs[label], variables, data, prov)
 			_ = <-variables
-			graph = makeGraph(graphs[target], quads, <-data)
+			graph = makeGraph(graphs[label], quads, <-data)
 			_ = <-prov
 		}
 
@@ -202,6 +202,7 @@ func makeGraph(
 	quads []*ld.Quad,
 	data map[string]*types.Value,
 ) []map[string]interface{} {
+	log.Println("data", data)
 	nodes := map[string]map[string][]interface{}{}
 	for _, x := range graph {
 		var subject string

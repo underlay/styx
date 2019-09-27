@@ -114,14 +114,18 @@ func (db *DB) Query(
 		g, err = query.MakeConstraintGraph(quads, label, graph, nil, nil, txn)
 		defer g.Close()
 		if err != nil {
+			log.Println("error making constraint graph", err.Error())
 			return
 		}
 
 		slice = g.Slice
 
 		if err = g.Solve(txn); err != nil {
+			log.Println("Error while solving", err.Error())
 			return
 		}
+
+		log.Println("Solved actually")
 
 		if s, err = g.GetSources(); err != nil {
 			return
