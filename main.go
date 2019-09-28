@@ -103,12 +103,9 @@ func main() {
 
 	store := styx.MakeShellDocumentStore(sh)
 
-	wd, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
+	os.MkdirAll(path+"/www", os.ModeDir)
 
-	dir := http.Dir(wd + "/www")
+	dir := http.Dir(path + "/www")
 	fs := http.FileServer(dir)
 	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
 
