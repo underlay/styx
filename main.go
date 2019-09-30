@@ -104,8 +104,8 @@ func main() {
 	store := styx.MakeShellDocumentStore(sh)
 
 	os.MkdirAll(path+"/www", os.ModeDir)
-
 	dir := http.Dir(path + "/www")
+
 	fs := http.FileServer(dir)
 	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
 
@@ -242,6 +242,6 @@ func main() {
 		fs.ServeHTTP(res, req)
 	})
 
-	log.Printf("Listening on port %s\n", port)
+	log.Printf("Serving %s/www at http://localhost:%s\n", path, port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }

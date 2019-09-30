@@ -92,8 +92,13 @@ class Browse extends React.Component {
 
 	handleChange = ({ target: { value } }) => this.setState({ value })
 
-	handleSelect = id => {}
-	handleUnselect = id => {}
+	handleSelect = id => {
+		console.log("select", id)
+		if (this.state.id !== id) {
+			this.setState({ id })
+		}
+	}
+	handleUnselect = id => console.log("unselect", id)
 	handleMouseOver = id => {}
 	handleMouseOut = id => {}
 	handleMount = cy => {}

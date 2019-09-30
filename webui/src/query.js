@@ -83,7 +83,10 @@ export default async function query(
 	quads.push(`_:subject _:predicate <${id}> _:o-e .`)
 	quads.push("")
 
-	const res = await fetch("/", { ...baseOptions, body: quads.join("\n") })
+	const res = await fetch("http://localhost:8086", {
+		...baseOptions,
+		body: quads.join("\n"),
+	})
 	const doc = await res.json()
 	const s = doc["@graph"].find(({ "u:instanceOf": id }) => id === "q:_:s")
 	const o = doc["@graph"].find(({ "u:instanceOf": id }) => id === "q:_:o")

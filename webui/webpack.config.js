@@ -10,17 +10,17 @@ const exclude = /(?:\.min\.js$|dist\/)/
 
 module.exports = {
 	entry: {
-		"directory/lib/index": [
+		"www/directory/index": [
 			"@babel/polyfill",
-			path.resolve(__dirname, "directory", "index.jsx"),
+			path.resolve(__dirname, "src", "directory.jsx"),
 		],
-		"query/lib/index": [
+		"www/query/index": [
 			"@babel/polyfill",
-			path.resolve(__dirname, "query", "index.jsx"),
+			path.resolve(__dirname, "src", "query.jsx"),
 		],
-		"browse/lib/index": [
+		"www/browse/index": [
 			"@babel/polyfill",
-			path.resolve(__dirname, "browse", "index.jsx"),
+			path.resolve(__dirname, "src", "browse.jsx"),
 		],
 	},
 
@@ -37,11 +37,7 @@ module.exports = {
 		new CopyPlugin([
 			{
 				from: path.resolve(__dirname, "node_modules", "explore", "index.css"),
-				to: path.resolve(__dirname, "directory", "lib", "explore.css"),
-			},
-			{
-				from: path.resolve(__dirname, "node_modules", "explore", "index.css"),
-				to: path.resolve(__dirname, "browse", "lib", "explore.css"),
+				to: path.resolve(__dirname, "www", "explore.css"),
 			},
 		]),
 	],
@@ -61,11 +57,11 @@ module.exports = {
 			cacheGroups: {
 				blockly: {
 					test: /[\\/]node_modules[\\/](blockly)[\\/]/,
-					name: "lib/blockly",
+					name: "www/blockly",
 					chunks: "all",
 				},
 				commons: {
-					name: "lib/commons",
+					name: "www/commons",
 					chunks: "initial",
 					minChunks: 2,
 				},

@@ -127,8 +127,8 @@ class Directory extends React.Component {
 			)
 		} else if (graphs === null) {
 			return <p>Loading...</p>
-		} else if (graphs.length === 0) {
-			return <p>No graphs found</p>
+		} else if (graphs.indexOf(null) === 0) {
+			return <p>The database is empty!</p>
 		} else {
 			return <ul>{graphs.map(this.renderGraph)}</ul>
 		}

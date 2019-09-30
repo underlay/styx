@@ -2,10 +2,42 @@
 
 ## Table of Contents
 
-- [Data Model](#data-model)
 - [Installing](#installing)
+- [Data Model](#data-model)
 - [Writing Data](#writing-ata)
 - [Reading Data](#reading-data)
+
+## Installing
+
+Styx is written in Go, so you need to [have Go installed](https://golang.org/doc/install). Then you should be able to install it with
+
+```
+go get github.com/underlay/styx
+```
+
+Styx is just a really fancy index for graph data that is ultimately stored in an IPFS repo. This IPFS repo doesn't have to be online or anything (although that's the responsible thing to do if you're storing data other people might want!), it just has to follow the [IPFS HTTP API spec](https://docs.ipfs.io/reference/api/http/) for file storage and retrieval.
+
+You can do this [installing a prebuilt IPFS binary](https://docs.ipfs.io/guides/guides/install/), but you can also [build it from source](https://github.com/ipfs/go-ipfs#build-from-source) or even run [js-ipfs with Node](https://github.com/ipfs/go-ipfs#build-from-source). You'll need to initialize a repo somewhere and start the daemon in the background.
+
+### Environment Variables
+
+- `IPFS_HOST` (`localhost:5001`): the HTTP API endpoint of your IPFS daemon (just the hostname, port, and pathname - not the protocol)
+- `STYX_PATH` (`/tmp/styx`): the absolute path of a directory that Styx will store data in (and look for existing data in)
+- `STYX_PORT` (`8086`): the localhost port that Styx will serve its WebUI from
+
+If you have an IPFS daemon running, then you shouldn't have to set any of these - just running `styx` will open a new database at `/tmp/styx` and start serving the WebUI at [`http://localhost:8086/`](http://localhost:8086/)
+
+```
+~ $ styx
+2019/09/27 12:14:21 Opening badger database at /tmp/styx
+badger 2019/09/27 12:14:21 INFO: All 1 tables opened in 0s
+badger 2019/09/27 12:14:21 INFO: Replaying file id: 0 at offset: 7431
+badger 2019/09/27 12:14:21 INFO: Replay took: 1.645545ms
+badger 2019/09/27 12:14:21 DEBUG: Value log discard stats empty
+2019/09/27 12:14:21 Listening on port 8086
+```
+
+Styx is build on the [Badger](https://github.com/dgraph-io/badger) key/value store, so everything that it writes to `STYX_PATH` will be Badger database files.
 
 ## Data Model
 
@@ -94,45 +126,13 @@ In JSON-LD, named graphs are represented with a special `@graph` syntax:
 
 This interpretation of the "meaning" of the graph label - where the graph label is used as a means of reification - is not official. The RDF working group couldn't come to concensus on the semantics of RDF Datasets even though they standardized the syntax. More background is available in the working group note [On Semantics of RDF Datasets](https://www.w3.org/TR/rdf11-datasets/), but the emerging concensus in ensuing years is that this approach (using the graph label to refer to the graph) is the most sane interpretation.
 
-As a result, **Styx restricts RDF Datasets to named graphs with blank graph names**. This means you can't insert datasets with URI graph labels - Styx won't allow it. This was a deliberate decision to strengthen these chosen semantics: the graph label referent is always the named graph itself, and only as represented in the dataset. This is less clear if graph labels can be URIs, which suggest global scope or universality.
+As a result, Styx restricts RDF Datasets to named graphs with blank graph names. This means you can't insert datasets with URI graph labels - Styx won't allow it. This was a deliberate decision to strengthen these chosen semantics: the graph label referent is always the named graph itself, and only as represented in the dataset. This is less clear if graph labels can be URIs, which suggest global scope or universality.
 
 ### Content Addressing
 
+These RDF Datasets are the atomic unit of data in Styx.
+
 Styx is built to play well with the distributed web, in particular [IPFS](https://ipfs.io/).
-
-When you write graphs or datasets to Styx, it remembers which
-
-## Installing
-
-Styx is written in Go, so you need to [have Go installed](https://golang.org/doc/install). Then you should be able to install it with
-
-```
-go get github.com/underlay/styx
-```
-
-Styx is just a really fancy index for graph data that is ultimately stored in an IPFS repo. This IPFS repo doesn't have to be online or anything (although that's the responsible thing to do if you're storing data other people might want!), it just has to follow the [IPFS HTTP API spec](https://docs.ipfs.io/reference/api/http/) for file storage and retrieval.
-
-You can do this [installing a prebuilt IPFS binary](https://docs.ipfs.io/guides/guides/install/), but you can also [build it from source](https://github.com/ipfs/go-ipfs#build-from-source) or even run [js-ipfs with Node](https://github.com/ipfs/go-ipfs#build-from-source). You'll need to initialize a repo somewhere and start the daemon in the background.
-
-### Environment Variables
-
-- `IPFS_HOST` (`localhost:5001`): the HTTP API endpoint of your IPFS daemon (just the hostname, port, and pathname - not the protocol)
-- `STYX_PATH` (`/tmp/styx`): the absolute path of a directory that Styx will store data in (and look for existing data in)
-- `STYX_PORT` (`8086`): the localhost port that Styx will serve its WebUI from
-
-If you have an IPFS daemon running, then you shouldn't have to set any of these - just running `styx` will open a new database at `/tmp/styx` and start serving the WebUI at [`http://localhost:8086/`](http://localhost:8086/)
-
-```
-~ $ styx
-2019/09/27 12:14:21 Opening badger database at /tmp/styx
-badger 2019/09/27 12:14:21 INFO: All 1 tables opened in 0s
-badger 2019/09/27 12:14:21 INFO: Replaying file id: 0 at offset: 7431
-badger 2019/09/27 12:14:21 INFO: Replay took: 1.645545ms
-badger 2019/09/27 12:14:21 DEBUG: Value log discard stats empty
-2019/09/27 12:14:21 Listening on port 8086
-```
-
-Styx is build on the [Badger](https://github.com/dgraph-io/badger) key/value store, so everything that it writes to `STYX_PATH` will be Badger database files.
 
 ## Writing Data
 
