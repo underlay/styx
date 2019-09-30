@@ -2,13 +2,17 @@ package db
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"log"
 	"regexp"
+	"strings"
 
 	badger "github.com/dgraph-io/badger"
 	proto "github.com/golang/protobuf/proto"
 	cid "github.com/ipfs/go-cid"
+	files "github.com/ipfs/go-ipfs-files"
+	core "github.com/ipfs/interface-go-ipfs-core"
 	ld "github.com/piprate/json-gold/ld"
 
 	query "github.com/underlay/styx/query"
@@ -20,6 +24,10 @@ const SequenceBandwidth = 512
 
 // DB is the general styx database wrapper
 type DB struct {
+	Path     string
+	ID       string
+	Loader   ld.DocumentLoader
+	API      core.UnixfsAPI
 	Badger   *badger.DB
 	Sequence *badger.Sequence
 }
@@ -33,7 +41,11 @@ func (db *DB) Close() error {
 }
 
 // OpenDB opens a styx database
-func OpenDB(path string) (*DB, error) {
+func OpenDB(path string, id string, loader ld.DocumentLoader, api core.UnixfsAPI) (*DB, error) {
+	if path == "" {
+		path = DefaultPath
+	}
+
 	log.Println("Opening badger database at", path)
 	opts := badger.DefaultOptions(path)
 	if db, err := badger.Open(opts); err != nil {
@@ -42,6 +54,10 @@ func OpenDB(path string) (*DB, error) {
 		return nil, err
 	} else {
 		return &DB{
+			Path:     path,
+			ID:       id,
+			Loader:   loader,
+			API:      api,
 			Badger:   db,
 			Sequence: seq,
 		}, nil
@@ -51,22 +67,26 @@ func OpenDB(path string) (*DB, error) {
 // IngestJSONLd takes a JSON-LD document and ingests it.
 // This is mostly a convenience method for testing;
 // actual messages should get handled at HandleMessage.
-func (db *DB) IngestJSONLd(doc interface{}, loader ld.DocumentLoader, store DocumentStore) error {
-	options := GetStringOptions(loader)
+func (db *DB) IngestJSONLd(doc interface{}) error {
+	options := GetStringOptions(db.Loader)
 
 	proc := ld.NewJsonLdProcessor()
 
-	normalized, err := proc.Normalize(doc, options)
+	var normalized string
+	if n, err := proc.Normalize(doc, options); err != nil {
+		return err
+	} else {
+		normalized = n.(string)
+	}
+
+	resolved, err := db.API.Add(context.Background(), files.NewReaderFile(strings.NewReader(normalized)))
 	if err != nil {
 		return err
 	}
 
-	cid, err := store(bytes.NewReader([]byte(normalized.(string))))
-	if err != nil {
-		return err
-	}
+	cid := resolved.Cid()
 
-	quads, graphs, err := ParseMessage(bytes.NewReader([]byte(normalized.(string))))
+	quads, graphs, err := ParseMessage(strings.NewReader(normalized))
 	if err != nil {
 		return err
 	}

@@ -4,7 +4,7 @@ IPFS_PATH ?= $(HOME)/.ipfs
 STYX_PATH ?= /tmp/styx
 
 clean:
-	rm styx styx.so
+	rm -f styx.so
 
 styx.so:
 	export GOPROXY='https://proxy.golang.org'
@@ -14,9 +14,10 @@ styx.so:
 build: styx.so
 
 www:
+	echo "Writing webui to $(STYX_PATH)/www"
 	rm -rf $(STYX_PATH)/www
 	mkdir -p $(STYX_PATH)/www
-	cp -r webui/www $(STYX_PATH)/.
+	cp -r webui/www $(STYX_PATH)
 
 install: styx.so
 	mkdir -p "$(IPFS_PATH)/plugins/"

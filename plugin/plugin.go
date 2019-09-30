@@ -13,6 +13,7 @@ import (
 	"os"
 	"strings"
 
+	files "github.com/ipfs/go-ipfs-files"
 	plugin "github.com/ipfs/go-ipfs/plugin"
 	core "github.com/ipfs/interface-go-ipfs-core"
 	ld "github.com/piprate/json-gold/ld"
@@ -36,13 +37,9 @@ const NQuadsListenerPort = "4045"
 
 // StyxPlugin is an IPFS deamon plugin
 type StyxPlugin struct {
-	id     string
-	path   string
-	api    string
-	lns    []net.Listener
-	db     *styx.DB
-	loader ld.DocumentLoader
-	store  styx.DocumentStore
+	host string
+	lns  []net.Listener
+	db   *styx.DB
 }
 
 // Compile-time type check (bleh)
@@ -59,7 +56,7 @@ func (sp *StyxPlugin) Version() string {
 }
 
 // Init initializes plugin, satisfying the plugin.Plugin interface.
-func (sp *StyxPlugin) Init() error {
+func (sp *StyxPlugin) Init(env *plugin.Environment) error {
 	return nil
 }
 
@@ -71,7 +68,7 @@ func (sp *StyxPlugin) handleNQuadsConnection(conn net.Conn) {
 		conn.Close()
 	}()
 
-	stringOptions := styx.GetStringOptions(sp.loader)
+	stringOptions := styx.GetStringOptions(sp.db.Loader)
 	proc := ld.NewJsonLdProcessor()
 
 	reader := bufio.NewReader(conn)
@@ -91,7 +88,7 @@ func (sp *StyxPlugin) handleNQuadsConnection(conn net.Conn) {
 			return
 		}
 
-		cid, err := sp.store(bytes.NewReader(b))
+		resolved, err := sp.db.API.Add(context.Background(), files.NewReaderFile(bytes.NewReader(b)))
 		if err != nil {
 			log.Println(err)
 			continue
@@ -99,7 +96,7 @@ func (sp *StyxPlugin) handleNQuadsConnection(conn net.Conn) {
 
 		quads, graphs, err := styx.ParseMessage(bytes.NewReader(b))
 
-		if response := sp.db.HandleMessage(sp.id, cid, quads, graphs); response == nil {
+		if response := sp.db.HandleMessage(resolved.Cid(), quads, graphs); response == nil {
 			continue
 		} else if res, err := proc.ToRDF(response, stringOptions); err != nil {
 			continue
@@ -127,7 +124,7 @@ func (sp *StyxPlugin) handleCborLdConnection(conn net.Conn) {
 	unmarshaller := cbor.NewUnmarshaller(cbor.DecodeOptions{}, conn)
 	proc := ld.NewJsonLdProcessor()
 
-	stringOptions := styx.GetStringOptions(sp.loader)
+	stringOptions := styx.GetStringOptions(sp.db.Loader)
 
 	for {
 		var doc map[string]interface{}
@@ -138,27 +135,29 @@ func (sp *StyxPlugin) handleCborLdConnection(conn net.Conn) {
 		}
 
 		// Convert to RDF
-		normalized, err := proc.Normalize(doc, stringOptions)
+		n, err := proc.Normalize(doc, stringOptions)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
 
-		cid, err := sp.store(strings.NewReader(normalized.(string)))
+		normalized := n.(string)
+
+		resolved, err := sp.db.API.Add(context.Background(), files.NewReaderFile(strings.NewReader(normalized)))
 		if err != nil {
 			log.Println(err)
 			continue
 		}
 
-		log.Println("Received message", cid.String())
+		log.Println("Received message", resolved.String())
 
-		quads, graphs, err := styx.ParseMessage(strings.NewReader(normalized.(string)))
+		quads, graphs, err := styx.ParseMessage(strings.NewReader(normalized))
 		if err != nil {
 			log.Println(err)
 			continue
 		}
 
-		if r := sp.db.HandleMessage(sp.id, cid, quads, graphs); r != nil {
+		if r := sp.db.HandleMessage(resolved.Cid(), quads, graphs); r != nil {
 			marshaller.Marshal(r)
 		}
 	}
@@ -174,7 +173,7 @@ func (sp *StyxPlugin) attach(port string, protocol string, handler func(conn net
 
 	address := "/ip4/127.0.0.1/tcp/" + port
 	go func() error {
-		url := fmt.Sprintf("%s/api/v0/p2p/listen?arg=%s&arg=%s&allow-custom-protocol=true", sp.api, protocol, address)
+		url := fmt.Sprintf("%s/api/v0/p2p/listen?arg=%s&arg=%s&allow-custom-protocol=true", sp.host, protocol, address)
 		res, err := http.Get(url)
 		if err != nil {
 			return err
@@ -200,22 +199,16 @@ func (sp *StyxPlugin) attach(port string, protocol string, handler func(conn net
 
 // Start gets passed a CoreAPI instance, satisfying the plugin.PluginDaemon interface.
 func (sp *StyxPlugin) Start(api core.CoreAPI) error {
-	sp.loader = loader.NewCoreDocumentLoader(api)
-	sp.store = styx.MakeAPIDocumentStore(api.Unixfs())
+	path := os.Getenv("STYX_PATH")
 
 	key, err := api.Key().Self(context.Background())
 	if err != nil {
 		return err
 	}
 
-	sp.id = fmt.Sprintf("ul:/ipns/%s", key.ID().String())
-
-	path := os.Getenv("STYX_PATH")
-	if path == "" {
-		path = sp.path
-	}
-
-	sp.db, err = styx.OpenDB(path)
+	id := fmt.Sprintf("ul:/ipns/%s", key.ID().String())
+	dl := loader.NewCoreDocumentLoader(api)
+	sp.db, err = styx.OpenDB(path, id, dl, api.Unixfs())
 	if err != nil {
 		return err
 	}
@@ -229,6 +222,8 @@ func (sp *StyxPlugin) Start(api core.CoreAPI) error {
 	if err != nil {
 		return err
 	}
+
+	go log.Fatal(sp.db.Serve(styx.DefaultPort))
 
 	return nil
 }
@@ -252,6 +247,5 @@ func (sp *StyxPlugin) Close() error {
 
 // Plugins is an exported list of plugins that will be loaded by go-ipfs.
 var Plugins = []plugin.Plugin{&StyxPlugin{
-	path: "/tmp/badger",
-	api:  "http://localhost:5001",
+	host: "http://localhost:5001",
 }}

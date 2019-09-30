@@ -130,7 +130,7 @@ As a result, Styx restricts RDF Datasets to named graphs with blank graph names.
 
 ### Content Addressing
 
-These RDF Datasets are the atomic unit of data in Styx.
+These RDF Datasets are the atomic unit of data in Styx, and they're addressed by URI versions of their CID
 
 Styx is built to play well with the distributed web, in particular [IPFS](https://ipfs.io/).
 

@@ -34,7 +34,6 @@ var wasAttributedToIri = ld.NewIRI("http://www.w3.org/ns/prov#wasAttributedTo")
 
 // HandleMessage is where all the magic happens.
 func (db *DB) HandleMessage(
-	id string,
 	cid cid.Cid,
 	quads []*ld.Quad,
 	graphs map[string][]int,
@@ -83,7 +82,7 @@ func (db *DB) HandleMessage(
 			prov := make(chan map[int]*types.SourceList)
 			go db.Query(quads, label, graphs[target], variables, data, prov)
 			entity := makeEntity(t, <-variables, <-data, <-prov)
-			entity["wasAttributedTo"] = fmt.Sprintf("ul:/ipns/%s", id)
+			entity["wasAttributedTo"] = fmt.Sprintf("ul:/ipns/%s", db.ID)
 			entity["generatedAtTime"] = time.Now().Format(time.RFC3339)
 			graph = entity
 		} else if bundle {
@@ -111,7 +110,7 @@ func (db *DB) HandleMessage(
 
 			graph = map[string]interface{}{
 				"@type":           "Bundle",
-				"wasAttributedTo": fmt.Sprintf("ul:/ipns/%s", id),
+				"wasAttributedTo": fmt.Sprintf("ul:/ipns/%s", db.ID),
 				"generatedAtTime": time.Now().Format(time.RFC3339),
 				"dcterms:extent":  extent,
 				"u:enumerates":    t,

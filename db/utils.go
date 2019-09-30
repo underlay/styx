@@ -12,6 +12,8 @@ import (
 	ipfs "github.com/ipfs/go-ipfs-api"
 	files "github.com/ipfs/go-ipfs-files"
 	core "github.com/ipfs/interface-go-ipfs-core"
+	coreOptions "github.com/ipfs/interface-go-ipfs-core/options"
+	corePath "github.com/ipfs/interface-go-ipfs-core/path"
 	ld "github.com/piprate/json-gold/ld"
 
 	types "github.com/underlay/styx/types"
@@ -37,31 +39,64 @@ func permuteMinor(permutation uint8, s, p, o []byte) ([]byte, []byte, []byte) {
 	}
 }
 
-// DocumentStore is a function that turns bytes into CIDs (and probably pins them too)
-type DocumentStore = func(reader io.Reader) (cid.Cid, error)
+// HTTPAPI is satisfies core.UnixfsAPI with an HTTP IPFS Shell
+type HTTPAPI struct {
+	Shell *ipfs.Shell
+}
 
-// MakeShellDocumentStore wraps the HTTP API interface
-func MakeShellDocumentStore(sh *ipfs.Shell) DocumentStore {
-	return func(reader io.Reader) (cid.Cid, error) {
-		hash, err := sh.Add(reader)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return cid.Parse(hash)
+// Add a file to IPFS (directories not supported)
+func (api *HTTPAPI) Add(ctx context.Context, node files.Node, options ...coreOptions.UnixfsAddOption) (corePath.Resolved, error) {
+	if file, is := node.(files.File); !is {
+		return nil, nil
+	} else if c, err := api.Shell.Add(file); err != nil {
+		return nil, err
+	} else if d, err := cid.Decode(c); err != nil {
+		return nil, err
+	} else {
+		return corePath.IpfsPath(d), nil
 	}
 }
 
-// MakeAPIDocumentStore wraps the native CoreAPI interface
-func MakeAPIDocumentStore(unixfsAPI core.UnixfsAPI) DocumentStore {
-	return func(reader io.Reader) (cid.Cid, error) {
-		file := files.NewReaderFile(reader)
-		path, err := unixfsAPI.Add(context.Background(), file)
-		if err != nil {
-			return cid.Undef, err
-		}
-		return path.Cid(), nil
+// Get a file from IPFS
+func (api *HTTPAPI) Get(ctx context.Context, path corePath.Path) (files.Node, error) {
+	if reader, err := api.Shell.Cat(path.String()); err != nil {
+		return nil, err
+	} else {
+		return files.NewReaderFile(reader), nil
 	}
 }
+
+// Ls things in places and stuff
+func (api *HTTPAPI) Ls(ctx context.Context, path corePath.Path, options ...coreOptions.UnixfsLsOption) (<-chan core.DirEntry, error) {
+	return nil, nil
+}
+
+// Compile-time type check
+var _ core.UnixfsAPI = (*HTTPAPI)(nil)
+
+// // MakeShellDocumentStore wraps the HTTP API interface
+// func MakeShellDocumentStore(sh *ipfs.Shell) DocumentStore {
+// 	// sh.Add(r io.Reader, options ...func(*ipfs.RequestBuilder) error)
+// 	return func(reader io.Reader) (cid.Cid, error) {
+// 		hash, err := sh.Add(reader)
+// 		if err != nil {
+// 			return cid.Undef, err
+// 		}
+// 		return cid.Parse(hash)
+// 	}
+// }
+
+// // MakeAPIDocumentStore wraps the native CoreAPI interface
+// func MakeAPIDocumentStore(unixfsAPI core.UnixfsAPI) DocumentStore {
+// 	return func(reader io.Reader) (cid.Cid, error) {
+// 		file := files.NewReaderFile(reader)
+// 		path, err := unixfsAPI.Add(context.Background(), file)
+// 		if err != nil {
+// 			return cid.Undef, err
+// 		}
+// 		return path.Cid(), nil
+// 	}
+// }
 
 // GetDatasetOptions returns JsonLdOptions for parsing a document into a dataset
 func GetDatasetOptions(loader ld.DocumentLoader) *ld.JsonLdOptions {

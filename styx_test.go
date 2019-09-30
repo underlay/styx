@@ -52,14 +52,24 @@ func TestIngest(t *testing.T) {
 		return
 	}
 
-	// Remove old db
-	fmt.Println("removing path", defaultPath)
-	if err := os.RemoveAll(defaultPath); err != nil {
+	peerID, err := sh.ID()
+	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	db, err := styx.OpenDB(defaultPath)
+	// Remove old db
+	fmt.Println("removing path", styx.DefaultPath)
+	if err := os.RemoveAll(styx.DefaultPath); err != nil {
+		t.Error(err)
+		return
+	}
+
+	dl := loader.NewShellDocumentLoader(sh)
+
+	api := &styx.HTTPAPI{Shell: sh}
+
+	db, err := styx.OpenDB(styx.DefaultPath, peerID.ID, dl, api)
 	if err != nil {
 		t.Error(err)
 		return
@@ -73,11 +83,7 @@ func TestIngest(t *testing.T) {
 		return
 	}
 
-	dl := loader.NewShellDocumentLoader(sh)
-
-	store := styx.MakeShellDocumentStore(sh)
-
-	if err = db.IngestJSONLd(data, dl, store); err != nil {
+	if err = db.IngestJSONLd(data); err != nil {
 		t.Error(err)
 		return
 	}
@@ -93,7 +99,7 @@ func testQuery(query []byte) error {
 
 	if !sh.IsUp() {
 		return fmt.Errorf("IPFS Daemon not running")
-	} else if err := os.RemoveAll(defaultPath); err != nil {
+	} else if err := os.RemoveAll(styx.DefaultPath); err != nil {
 		return err
 	}
 
@@ -102,7 +108,11 @@ func testQuery(query []byte) error {
 		return err
 	}
 
-	db, err := styx.OpenDB(defaultPath)
+	dl := loader.NewShellDocumentLoader(sh)
+
+	api := &styx.HTTPAPI{Shell: sh}
+
+	db, err := styx.OpenDB(styx.DefaultPath, peerID.ID, dl, api)
 	if err != nil {
 		return err
 	}
@@ -114,11 +124,7 @@ func testQuery(query []byte) error {
 		return err
 	}
 
-	documentLoader := loader.NewShellDocumentLoader(sh)
-
-	store := styx.MakeShellDocumentStore(sh)
-
-	if err := db.IngestJSONLd(data, documentLoader, store); err != nil {
+	if err := db.IngestJSONLd(data); err != nil {
 		return err
 	}
 
@@ -130,7 +136,7 @@ func testQuery(query []byte) error {
 	}
 
 	proc := ld.NewJsonLdProcessor()
-	stringOptions := styx.GetStringOptions(documentLoader)
+	stringOptions := styx.GetStringOptions(dl)
 	rdf, err := proc.ToRDF(queryData, stringOptions)
 	if err != nil {
 		return err
@@ -164,7 +170,7 @@ func testQuery(query []byte) error {
 		fmt.Print("\n")
 	}
 
-	result := db.HandleMessage(peerID.ID, c, quads, graphs)
+	result := db.HandleMessage(c, quads, graphs)
 
 	fmt.Println("Result:")
 	b, err := json.MarshalIndent(result, "", "  ")
@@ -392,22 +398,22 @@ func TestNT(t *testing.T) {
 	}
 
 	// Remove old db
-	fmt.Println("removing path", defaultPath)
-	if err := os.RemoveAll(defaultPath); err != nil {
+	fmt.Println("removing path", styx.DefaultPath)
+	if err := os.RemoveAll(styx.DefaultPath); err != nil {
 		t.Error(err)
 		return
 	}
 
-	db, err := styx.OpenDB(defaultPath)
+	dl := loader.NewShellDocumentLoader(sh)
+	api := &styx.HTTPAPI{Shell: sh}
+
+	db, err := styx.OpenDB(styx.DefaultPath, peerID.ID, dl, api)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
 	defer db.Close()
-
-	dl := loader.NewShellDocumentLoader(sh)
-	store := styx.MakeShellDocumentStore(sh)
 
 	// names, err := openFile("/samples/nt/names.json", dl, store)
 	// if err != nil {
@@ -420,18 +426,18 @@ func TestNT(t *testing.T) {
 	// 	return
 	// }
 
-	individuals, err := openFile("/samples/nt/individuals.json", dl, store)
+	individuals, err := openFile("/samples/nt/individuals.json", dl)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	if err = db.IngestJSONLd(individuals, dl, store); err != nil {
+	if err = db.IngestJSONLd(individuals); err != nil {
 		t.Error(err)
 		return
 	}
 
-	query, err := openFile("/samples/nt/small.json", dl, store)
+	query, err := openFile("/samples/nt/small.json", dl)
 	if err != nil {
 		t.Error(err)
 		return
@@ -471,14 +477,14 @@ func TestNT(t *testing.T) {
 		)
 	}
 
-	result := db.HandleMessage(peerID.ID, c, quads, graphs)
+	result := db.HandleMessage(c, quads, graphs)
 
 	fmt.Println("Result:")
 	b, err := json.MarshalIndent(result, "", "  ")
 	fmt.Println(string(b))
 }
 
-func openFile(path string, dl ld.DocumentLoader, store styx.DocumentStore) (doc map[string]interface{}, err error) {
+func openFile(path string, dl ld.DocumentLoader) (doc map[string]interface{}, err error) {
 	var dir string
 	if dir, err = os.Getwd(); err != nil {
 		return
