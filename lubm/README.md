@@ -5,6 +5,8 @@
 - [AllegroGraph results (archive)](https://web.archive.org/web/20090208165243/http://agraph.franz.com/allegrograph/agraph_bench_lubm50.lhtml)
 - [Stardog results](https://docs.google.com/spreadsheets/d/1oHSWX_0ChZ61ofipZ1CMsW7OhyujioR28AfHzU9d56k/pubhtml#)
 
+## Utils
+
 Generate data
 
 ```
@@ -29,6 +31,10 @@ Count triples
 ```
 find *.owl.nt | xargs wc -l
 ```
+
+## Results
+
+Results measured on an other-wise empty database on a 2017 Macbook Pro with 16 GB 2133 MHz LPDDR3 and a 2.9 GHz Intel Core i7, with Go 1.13 and Badger 1.6.
 
 ## LUBM1
 
