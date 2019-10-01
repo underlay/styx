@@ -1,0 +1,24 @@
+{
+	"@context": {
+		"@vocab": "http://swat.cse.lehigh.edu/onto/univ-bench.owl#",
+		"dcterms": "http://purl.org/dc/terms/",
+		"prov": "http://www.w3.org/ns/prov#",
+		"u": "http://underlay.mit.edu/ns#",
+		"u:index": { "@container": "@list" }
+	},
+	"@type": "u:Query",
+	"@graph": {
+		"@type": "prov:Bundle",
+		"u:index": { "@id": "_:x" },
+		"dcterms:extent": 5,
+		"u:enumerates": {
+			"@graph": {
+				"@id": "_:x",
+				"@type": "GraduateStudent",
+				"takesCourse": {
+					"@id": "http://www.Department0.University0.edu/GraduateCourse0"
+				}
+			}
+		}
+	}
+}

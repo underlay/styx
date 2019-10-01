@@ -1,0 +1,19 @@
+{
+	"@context": {
+		"@vocab": "http://swat.cse.lehigh.edu/onto/univ-bench.owl#"
+	},
+	"@type": "http://underlay.mit.edu/ns#Query",
+	"@graph": {
+		"@type": "GraduateStudent",
+		"undergraduateDegreeFrom": {
+			"@id": "_:uni",
+			"@type": "University"
+		},
+		"memberOf": {
+			"@type": "Department",
+			"subOrganizationOf": {
+				"@id": "_:uni"
+			}
+		}
+	}
+}

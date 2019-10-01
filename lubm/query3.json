@@ -1,0 +1,21 @@
+{
+	"@context": {
+		"@vocab": "http://swat.cse.lehigh.edu/onto/univ-bench.owl#",
+		"u": "http://underlay.mit.edu/ns#"
+	},
+	"@type": "u:Query",
+	"@graph": {
+		"@type": "prov:Bundle",
+		"u:index": { "@id": "_:x" },
+		"dcterms:extent": 7,
+		"u:enumerates": {
+			"@graph": {
+				"@id": "_:x",
+				"@type": "Publication",
+				"publicationAuthor": {
+					"@id": "http://www.Department0.University0.edu/AssistantProfessor0"
+				}
+			}
+		}
+	}
+}
