@@ -108,10 +108,12 @@ export default async function query(
 			hadMember: [{ "@id": graph }],
 		} = wasDerivedFrom
 
-		if (typeof object === "object" && typeof object["@id"] === "string") {
-			store.addQuad(id, predicate, object["@id"], graph)
-		} else {
-			store.addQuad(id, predicate, parseValue(object), graph)
+		if (!(graph in store._graphs)) {
+			if (typeof object === "object" && typeof object["@id"] === "string") {
+				store.addQuad(id, predicate, object["@id"], graph)
+			} else {
+				store.addQuad(id, predicate, parseValue(object), graph)
+			}
 		}
 	}
 
@@ -132,6 +134,8 @@ export default async function query(
 			hadMember: [{ "@id": graph }],
 		} = wasDerivedFrom
 
-		store.addQuad(subject, predicate, id, graph)
+		if (!(graph in store._graphs)) {
+			store.addQuad(subject, predicate, id, graph)
+		}
 	}
 }

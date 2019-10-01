@@ -14,7 +14,7 @@ const url = location.origin + location.pathname
 const graphURI = /^ul:\/ipfs\/[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{46}#(_:[a-zA-Z0-9-]+)?$/
 
 class Directory extends React.Component {
-	static Gateway = "http://localhost:8080"
+	static Gateway = `http://${location.hostname}:8080`
 	static PageSize = 3
 	static Null = { index: null, graphs: null, cid: null, focus: null }
 	constructor(props) {

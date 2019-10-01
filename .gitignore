@@ -2,6 +2,10 @@ styx
 .vscode
 node_modules
 
+*.vlog
+LOCK
+MANIFEST
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
