@@ -36,7 +36,7 @@ find *.owl.nt | xargs wc -l
 
 Results measured on an other-wise empty database on a 2017 Macbook Pro with 16 GB 2133 MHz LPDDR3 and a 2.9 GHz Intel Core i7, with Go 1.13 and Badger 1.6.
 
-## LUBM1
+### LUBM1
 
 103,104 total triples
 
@@ -46,7 +46,7 @@ Results measured on an other-wise empty database on a 2017 Macbook Pro with 16 G
 | query2 | **0.463441ms** | 0.558941 | 0.469040 | 0.462761 | 0.387005 | 0.643515 | 0.456333 | 0.415154 | 0.472529 | 0.381791 | 0.387346 |
 | query3 | **0.158669ms** | 0.214564 | 0.166385 | 0.110453 | 0.141024 | 0.126236 | 0.209382 | 0.177337 | 0.135050 | 0.132056 | 0.174203 |
 
-## LUBM50
+### LUBM50
 
 6,890,640 total triples
 
@@ -56,7 +56,7 @@ Results measured on an other-wise empty database on a 2017 Macbook Pro with 16 G
 | query2 | **2.648918ms** | 2.382153 | 3.141992 | 2.337339 | 2.658253 | 2.695001 | 2.360368 | 2.193803 | 2.70467  | 3.040395 | 2.975206 |
 | query3 | **0.168975ms** | 0.128307 | 0.166007 | 0.169277 | 0.149976 | 0.15824  | 0.155821 | 0.207412 | 0.187419 | 0.173274 | 0.194018 |
 
-## LUBM100
+### LUBM100
 
 13,879,970 total triples
 
