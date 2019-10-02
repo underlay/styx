@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	uuid "github.com/google/uuid"
 	cid "github.com/ipfs/go-cid"
@@ -195,13 +196,24 @@ func (db *DB) Serve(port string) error {
 			if quads, graphs, err := ParseMessage(reader); err != nil {
 				res.WriteHeader(400)
 				res.Write([]byte(err.Error() + "\n"))
-			} else if r := db.HandleMessage(cid, quads, graphs); res == nil {
-				res.WriteHeader(204)
 			} else {
-				res.Header().Add("Content-Type", "application/ld+json")
-				res.WriteHeader(200)
-				encoder := json.NewEncoder(res)
-				encoder.Encode(r)
+				var r map[string]interface{}
+				if logging == "PROD" {
+					r = db.HandleMessage(cid, quads, graphs)
+				} else {
+					start := time.Now()
+					r = db.HandleMessage(cid, quads, graphs)
+					log.Printf("Handled message in %s\n", time.Since(start))
+				}
+
+				if res == nil {
+					res.WriteHeader(204)
+				} else {
+					res.Header().Add("Content-Type", "application/ld+json")
+					res.WriteHeader(200)
+					encoder := json.NewEncoder(res)
+					encoder.Encode(r)
+				}
 			}
 			return
 		}

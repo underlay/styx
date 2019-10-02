@@ -8,7 +8,6 @@ require (
 	github.com/golang/protobuf v1.3.2
 	github.com/google/uuid v1.1.1
 	github.com/ipfs/go-cid v0.0.3
-	github.com/ipfs/go-ipfs v0.4.22
 	github.com/ipfs/go-ipfs-api v0.0.2
 	github.com/ipfs/go-ipfs-files v0.0.4
 	github.com/ipfs/go-ipld-cbor v0.0.3

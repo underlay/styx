@@ -73,21 +73,34 @@ class Browse extends React.Component {
 		addEventListener("hashchange", () => {
 			const id = decodeURIComponent(location.hash.slice(1))
 			if (Browse.validateURI(id) && id !== this.state.id) {
-				history.replaceState({ id: this.state.id }, title, url + location.hash)
-				store.forEach(quad => {
-					if (quad.subject.id !== id && quad.object.id !== id) {
-						store.removeQuad(quad)
-					}
-				})
+				history.replaceState({ id }, title, url + location.hash)
+				if (this.state.store === null) {
+					const store = new N3Store()
+					window.store = store
+					query(
+						id,
+						Browse.SubjectPageSize,
+						[],
+						Browse.ObjectPageSize,
+						[],
+						store
+					).then(() => this.setState({ id, store }))
+				} else {
+					this.state.store.forEach(quad => {
+						if (quad.subject.id !== id && quad.object.id !== id) {
+							store.removeQuad(quad)
+						}
+					})
 
-				query(
-					id,
-					Browse.SubjectPageSize,
-					[],
-					Browse.ObjectPageSize,
-					[],
-					store
-				).then(() => this.setState({ id }))
+					query(
+						id,
+						Browse.SubjectPageSize,
+						[],
+						Browse.ObjectPageSize,
+						[],
+						this.state.store
+					).then(() => this.setState({ id }))
+				}
 			} else {
 				history.replaceState({ id: this.state.id }, title, url)
 				this.setState({ ...Browse.Null, value: this.state.value || "" })
@@ -203,7 +216,7 @@ class Browse extends React.Component {
 					padding: 50,
 				})
 				.run()
-				.on("layoutstop", () => this.cy.animate({ fit: {} }))
+				.on("layoutstop", () => this.cy.animate({ fit: { padding: 50 } }))
 		})
 	}
 

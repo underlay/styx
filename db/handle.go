@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 
 	types "github.com/underlay/styx/types"
 )
+
+var logging = os.Getenv("STYX_ENV")
 
 // Context is the compaction context for CBOR-LD
 var Context = []byte(`{
@@ -39,7 +42,9 @@ func (db *DB) HandleMessage(
 	graphs map[string][]int,
 ) map[string]interface{} {
 
-	log.Println("Handling message", cid.String())
+	if logging != "PROD" {
+		log.Printf("Message: %s\n", cid.String())
+	}
 
 	queries := map[string]bool{}
 	data := map[string]chan map[string]*types.Value{}
