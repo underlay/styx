@@ -83,7 +83,7 @@ export default async function query(
 	quads.push(`_:subject _:predicate <${id}> _:o-e .`)
 	quads.push("")
 
-	const res = await fetch("http://localhost:8086", {
+	const res = await fetch("/", {
 		...baseOptions,
 		body: quads.join("\n"),
 	})
