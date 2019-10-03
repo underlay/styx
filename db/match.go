@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 
 	ld "github.com/piprate/json-gold/ld"
@@ -190,11 +191,15 @@ func handleBundle(
 			enumerator := fmt.Sprintf("q:%s", b.Attribute)
 			messages := make(chan []byte, extent)
 			dates := make(chan []byte, extent)
-			if index != nil && len(index) == 1 {
-				go db.Ls(index[0], extent, messages, dates)
-			} else {
-				go db.Ls(nil, extent, messages, dates)
-			}
+			go func() {
+				var node ld.Node = nil
+				if index != nil && len(index) == 1 {
+					node = index[0]
+				}
+				if err := db.Ls(node, extent, messages, dates); err != nil {
+					log.Println(err.Error())
+				}
+			}()
 
 			for x := 0; x < extent; x++ {
 				entities[x] = map[string]interface{}{

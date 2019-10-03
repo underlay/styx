@@ -70,7 +70,11 @@ func (db *DB) HandleMessage(
 	// the default graph will *not* have *any* of its graphs ingested.
 	if len(queries) == 0 {
 		for label, graph := range graphs {
-			go db.Ingest(cid, quads, label, graph)
+			go func() {
+				if err := db.Ingest(cid, quads, label, graph); err != nil {
+					log.Println(err.Error())
+				}
+			}()
 		}
 		return nil
 	}
@@ -85,7 +89,11 @@ func (db *DB) HandleMessage(
 			variables := make(chan []string)
 			data := make(chan map[string]*types.Value)
 			prov := make(chan map[int]*types.SourceList)
-			go db.Query(quads, label, graphs[target], variables, data, prov)
+			go func() {
+				if err := db.Query(quads, label, graphs[target], variables, data, prov); err != nil {
+					log.Println(err.Error())
+				}
+			}()
 			entity := makeEntity(t, <-variables, <-data, <-prov)
 			entity["wasAttributedTo"] = fmt.Sprintf("ul:/ipns/%s", db.ID)
 			entity["generatedAtTime"] = time.Now().Format(time.RFC3339)
@@ -96,7 +104,11 @@ func (db *DB) HandleMessage(
 				variables := make(chan []string)
 				data := make(chan map[string]*types.Value)
 				prov := make(chan map[int]*types.SourceList)
-				go db.Enumerate(quads, label, graphs[target], extent, domain, index, variables, data, prov)
+				go func() {
+					if err := db.Enumerate(quads, label, graphs[target], extent, domain, index, variables, data, prov); err != nil {
+						log.Println(err.Error())
+					}
+				}()
 				v := <-variables
 				d := make([]map[string]*types.Value, extent)
 				s := make([]map[int]*types.SourceList, extent)
@@ -125,7 +137,11 @@ func (db *DB) HandleMessage(
 			variables := make(chan []string)
 			data := make(chan map[string]*types.Value)
 			prov := make(chan map[int]*types.SourceList)
-			go db.Query(quads, label, graphs[label], variables, data, prov)
+			go func() {
+				if err := db.Query(quads, label, graphs[label], variables, data, prov); err != nil {
+					log.Println(err.Error())
+				}
+			}()
 			_ = <-variables
 			graph = makeGraph(graphs[label], quads, <-data)
 			_ = <-prov
