@@ -51,7 +51,7 @@ const pSPO uint8 = 9
 
 // Variable is a collection of constraints on a particular blank node.
 type Variable struct {
-	CS    ConstraintSet
+	GS    GeneratorSet
 	DZ    ConstraintSet // (almost-always empty) constraints that reference the same variable twice, and one constant
 	D1    ConstraintSet // constraints that reference the variable once, and two constants
 	D2    ConstraintMap // constraints that reference the variable once, a different variable once, and one constant
@@ -90,17 +90,18 @@ func (v *Variable) Close() {
 
 // Sort the constraints by raw count
 func (v *Variable) Sort() {
-	sort.Stable(v.CS)
+	sort.Stable(v.GS)
 }
 
 // Seek to the next intersect value
 func (v *Variable) Seek(value []byte) []byte {
-	return v.CS.Seek(value)
+	next, _ := v.GS.Seek(value)
+	return next
 }
 
 // Next returns the next intersect value
 func (v *Variable) Next() []byte {
-	return v.CS.Next()
+	return v.GS.Next()
 }
 
 // Score cursors, counts, value root, and heuristics
@@ -111,28 +112,30 @@ func (v *Variable) Score(txn *badger.Txn) (err error) {
 		v.Size += len(cs)
 	}
 
-	v.CS = make(ConstraintSet, 0, v.Size)
+	constraints := make(ConstraintSet, 0, v.Size)
 
 	for _, c := range v.DZ {
 		v.Norm += c.Count * c.Count
-		v.CS = append(v.CS, c)
+		constraints = append(constraints, c)
 	}
 
 	for _, c := range v.D1 {
 		v.Norm += c.Count * c.Count
-		v.CS = append(v.CS, c)
+		constraints = append(constraints, c)
 	}
 
 	for _, cs := range v.D2 {
 		for _, c := range cs {
 			v.Norm += c.Count * c.Count
-			v.CS = append(v.CS, c)
+			constraints = append(constraints, c)
 		}
 	}
 
-	v.Sort()
+	sort.Stable(constraints)
 
-	if v.Root = v.CS.Seek(nil); v.Root == nil {
+	v.GS = constraints
+
+	if v.Root, _ = v.GS.Seek(nil); v.Root == nil {
 		err = ErrEmptyIntersect
 	}
 

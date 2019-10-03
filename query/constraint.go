@@ -4,11 +4,21 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"sort"
 
 	badger "github.com/dgraph-io/badger"
-	"github.com/gogo/protobuf/proto"
+	proto "github.com/gogo/protobuf/proto"
+
 	types "github.com/underlay/styx/types"
 )
+
+// A Generator generates, that's what it does
+type Generator interface {
+	String() string
+	Close()
+	Next() []byte
+	Seek(v []byte) []byte
+}
 
 // A Constraint to an occurrence of a variable in a dataset
 type Constraint struct {
@@ -179,6 +189,15 @@ func (c *Constraint) getCount(txn *badger.Txn) (count uint64, err error) {
 // A ConstraintSet is just a slice of Constraints.
 type ConstraintSet []*Constraint
 
+// GeneratorSet is fjksdlfjksfjksdl
+type GeneratorSet interface {
+	sort.Interface
+	String() string
+	Close()
+	Seek(v []byte) ([]byte, int)
+	Next() []byte
+}
+
 // Close just calls Close on its child constraints
 func (cs ConstraintSet) Close() {
 	for _, c := range cs {
@@ -203,14 +222,14 @@ func (cs ConstraintSet) Swap(a, b int)      { cs[a], cs[b] = cs[b], cs[a] }
 func (cs ConstraintSet) Less(a, b int) bool { return cs[a].Count < cs[b].Count }
 
 // Seek to the next intersection
-func (cs ConstraintSet) Seek(v []byte) []byte {
+func (cs ConstraintSet) Seek(v []byte) ([]byte, int) {
 	var count int
 	l := len(cs)
 	for i := 0; count < l; i = (i + 1) % l {
 		c := cs[i]
 		next := c.Seek(v)
 		if next == nil {
-			return nil
+			return nil, 0
 		} else if bytes.Equal(next, v) {
 			count++
 		} else {
@@ -218,7 +237,7 @@ func (cs ConstraintSet) Seek(v []byte) []byte {
 			v = next
 		}
 	}
-	return v
+	return v, count
 }
 
 // Next value (could be improved to not double-check cursor[0])
@@ -226,7 +245,7 @@ func (cs ConstraintSet) Next() (next []byte) {
 	c := cs[0]
 	c.Iterator.Next()
 	if next = c.value(); next != nil {
-		next = cs.Seek(next)
+		next, _ = cs.Seek(next)
 	}
 	return
 }
@@ -243,6 +262,7 @@ type ConstraintGraph struct {
 	Map   map[string]int
 	In    map[string][]int
 	Out   map[string][]int
+	Rules []*types.Rule
 }
 
 func (g *ConstraintGraph) String() string {

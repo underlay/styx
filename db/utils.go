@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"regexp"
 	"strings"
 
@@ -194,6 +195,8 @@ var regexEOLN = regexp.MustCompile("(?:\\r\\n)|(?:\\n)|(?:\\r)")
 
 var regexEmpty = regexp.MustCompile("^" + wso + "$")
 
+var comment = regexp.MustCompile("^#")
+
 // define quad part regexes
 
 var regexSubject = regexp.MustCompile("(?:" + iri + "|" + bnode + ")" + ws)
@@ -225,12 +228,19 @@ func ParseMessage(input io.Reader) ([]*ld.Quad, map[string][]int, error) {
 			continue
 		}
 
+		// skip comments
+		if comment.Match(line) {
+			continue
+		}
+
 		// parse quad
 		if !regexQuad.Match(line) {
 			return nil, nil, fmt.Errorf("Error while parsing N-Quads; invalid quad. line: %d", lineNumber)
 		}
 
 		match := regexQuad.FindStringSubmatch(string(line))
+
+		log.Println("match:", match[1:])
 
 		// get subject
 		var subject ld.Node

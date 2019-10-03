@@ -131,7 +131,7 @@ func (db *DB) Query(
 		}()
 
 		var g *query.ConstraintGraph
-		g, err = query.MakeConstraintGraph(quads, label, graph, nil, nil, txn)
+		g, err = query.NewConstraintGraph(quads, label, graph, nil, nil, nil, txn)
 		defer g.Close()
 		if err != nil {
 			return
@@ -203,7 +203,7 @@ func (db *DB) Enumerate(
 		}()
 
 		var g *query.ConstraintGraph
-		g, err = query.MakeConstraintGraph(quads, label, graph, domain, index, txn)
+		g, err = query.NewConstraintGraph(quads, label, graph, domain, index, nil, txn)
 		defer g.Close()
 		if err != nil {
 			return
