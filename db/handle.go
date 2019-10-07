@@ -70,8 +70,9 @@ func (db *DB) HandleMessage(
 	// the default graph will *not* have *any* of its graphs ingested.
 	if len(queries) == 0 {
 		for label, graph := range graphs {
+			l, g := label, graph
 			go func() {
-				if err := db.Ingest(cid, quads, label, graph); err != nil {
+				if err := db.Ingest(cid, quads, l, g); err != nil {
 					log.Println(err.Error())
 				}
 			}()
@@ -89,8 +90,9 @@ func (db *DB) HandleMessage(
 			variables := make(chan []string)
 			data := make(chan map[string]*types.Value)
 			prov := make(chan map[int]*types.SourceList)
+			l, g := label, graphs[target]
 			go func() {
-				if err := db.Query(quads, label, graphs[target], variables, data, prov); err != nil {
+				if err := db.Query(quads, l, g, variables, data, prov); err != nil {
 					log.Println(err.Error())
 				}
 			}()
@@ -104,8 +106,9 @@ func (db *DB) HandleMessage(
 				variables := make(chan []string)
 				data := make(chan map[string]*types.Value)
 				prov := make(chan map[int]*types.SourceList)
+				l, g := label, graphs[target]
 				go func() {
-					if err := db.Enumerate(quads, label, graphs[target], extent, domain, index, variables, data, prov); err != nil {
+					if err := db.Enumerate(quads, l, g, extent, domain, index, variables, data, prov); err != nil {
 						log.Println(err.Error())
 					}
 				}()
@@ -137,8 +140,9 @@ func (db *DB) HandleMessage(
 			variables := make(chan []string)
 			data := make(chan map[string]*types.Value)
 			prov := make(chan map[int]*types.SourceList)
+			l, g := label, graphs[label]
 			go func() {
-				if err := db.Query(quads, label, graphs[label], variables, data, prov); err != nil {
+				if err := db.Query(quads, l, g, variables, data, prov); err != nil {
 					log.Println(err.Error())
 				}
 			}()
