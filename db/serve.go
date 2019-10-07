@@ -19,8 +19,10 @@ import (
 	ld "github.com/piprate/json-gold/ld"
 )
 
-// Replace at your leisure
+// DefaultPath for the Badger database files
 const DefaultPath = "/tmp/styx"
+
+// DefaultPort for the WebUI
 const DefaultPort = "8086"
 
 var port = os.Getenv("STYX_PORT")

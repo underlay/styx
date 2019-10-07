@@ -74,30 +74,6 @@ func (api *HTTPAPI) Ls(ctx context.Context, path corePath.Path, options ...coreO
 // Compile-time type check
 var _ core.UnixfsAPI = (*HTTPAPI)(nil)
 
-// // MakeShellDocumentStore wraps the HTTP API interface
-// func MakeShellDocumentStore(sh *ipfs.Shell) DocumentStore {
-// 	// sh.Add(r io.Reader, options ...func(*ipfs.RequestBuilder) error)
-// 	return func(reader io.Reader) (cid.Cid, error) {
-// 		hash, err := sh.Add(reader)
-// 		if err != nil {
-// 			return cid.Undef, err
-// 		}
-// 		return cid.Parse(hash)
-// 	}
-// }
-
-// // MakeAPIDocumentStore wraps the native CoreAPI interface
-// func MakeAPIDocumentStore(unixfsAPI core.UnixfsAPI) DocumentStore {
-// 	return func(reader io.Reader) (cid.Cid, error) {
-// 		file := files.NewReaderFile(reader)
-// 		path, err := unixfsAPI.Add(context.Background(), file)
-// 		if err != nil {
-// 			return cid.Undef, err
-// 		}
-// 		return path.Cid(), nil
-// 	}
-// }
-
 // GetDatasetOptions returns JsonLdOptions for parsing a document into a dataset
 func GetDatasetOptions(loader ld.DocumentLoader) *ld.JsonLdOptions {
 	options := ld.NewJsonLdOptions("")
@@ -168,11 +144,6 @@ const (
 		"(?:[" + pnCharsU + "0-9])" +
 		"(?:(?:[" + pnChars + ".])*(?:[" + pnChars + "]))?" +
 		")"
-
-		//   '(_:' +
-		//     '(?:[' + PN_CHARS_U + '0-9])' +
-		//     '(?:(?:[' + PN_CHARS + '.])*(?:[' + PN_CHARS + ']))?' +
-		//   ')';
 
 	bnode = blankNodeLabel
 
