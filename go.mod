@@ -1,6 +1,6 @@
 module github.com/underlay/styx
 
-go 1.13.1
+go 1.12
 
 require (
 	github.com/dgraph-io/badger v1.6.0
