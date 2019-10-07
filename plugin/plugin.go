@@ -56,7 +56,7 @@ func (sp *StyxPlugin) Version() string {
 }
 
 // Init initializes plugin, satisfying the plugin.Plugin interface.
-func (sp *StyxPlugin) Init() error {
+func (sp *StyxPlugin) Init(env *plugin.Environment) error {
 	return nil
 }
 
