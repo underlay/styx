@@ -132,12 +132,12 @@ func (g *ConstraintGraph) solve(i int, txn *badger.Txn) (err error) {
 	return
 }
 
-func (g *ConstraintGraph) GetSources() (sources map[int]*types.SourceList, err error) {
+func (g *ConstraintGraph) GetSources(txn *badger.Txn) (sources map[int]*types.SourceList, err error) {
 	sources = map[int]*types.SourceList{}
 	for q, v := range g.Index {
 		// Collect the sources for every first-degree constriant
 		for _, c := range v.D1 {
-			if sources[c.Index], err = c.Sources(); err != nil {
+			if sources[c.Index], err = c.Sources(v.Value, txn); err != nil {
 				return
 			}
 		}
@@ -146,7 +146,7 @@ func (g *ConstraintGraph) GetSources() (sources map[int]*types.SourceList, err e
 		for r, cs := range v.D2 {
 			if g.Map[r] < g.Map[q] {
 				for _, c := range cs {
-					if sources[c.Index], err = c.Sources(); err != nil {
+					if sources[c.Index], err = c.Sources(v.Value, txn); err != nil {
 						return
 					}
 				}
@@ -168,7 +168,7 @@ func (g *ConstraintGraph) Collect(n int, sources []map[int]*types.SourceList, tx
 		results[0][i] = g.Index[p].Value
 	}
 
-	if sources[0], err = g.GetSources(); err != nil {
+	if sources[0], err = g.GetSources(txn); err != nil {
 		return
 	}
 
@@ -239,7 +239,7 @@ func (g *ConstraintGraph) Collect(n int, sources []map[int]*types.SourceList, tx
 				results[x][j] = g.Index[q].Value
 			}
 
-			if sources[x], err = g.GetSources(); err != nil {
+			if sources[x], err = g.GetSources(txn); err != nil {
 				return
 			}
 

@@ -51,14 +51,27 @@ func (c *Constraint) printN() (s string) {
 // Sources can only be called on a first-degree constraint
 // and it returns the unmarshalled SourceList from the value
 // of the badger iterator's current item
-func (c *Constraint) Sources() (*types.SourceList, error) {
-	sources := &types.SourceList{}
-	item := c.Iterator.Item()
-	if val, err := item.ValueCopy(nil); err != nil {
-		return nil, err
+func (c *Constraint) Sources(value []byte, txn *badger.Txn) (sources *types.SourceList, err error) {
+	var item *badger.Item
+	if c.Place == 0 {
+		item = c.Iterator.Item()
 	} else {
-		return sources, proto.Unmarshal(val, sources)
+		var s, p, o []byte
+		if c.Place == 1 {
+			s, p, o = c.n, value, c.m
+		} else if c.Place == 2 {
+			s, p, o = c.m, c.n, value
+		}
+		key := types.AssembleKey(types.TriplePrefixes[0], s, p, o)
+		if item, err = txn.Get(key); err != nil {
+			return
+		}
 	}
+	sources = &types.SourceList{}
+	if val, err := item.ValueCopy(nil); err == nil {
+		err = proto.Unmarshal(val, sources)
+	}
+	return
 }
 
 func (c *Constraint) String() string {

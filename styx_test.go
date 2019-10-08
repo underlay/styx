@@ -178,6 +178,35 @@ func testQuery(query []byte) error {
 	return err
 }
 
+func TestSPO(t *testing.T) {
+	if err := testQuery([]byte(`{
+	"@context": {
+		"@vocab": "http://schema.org/"
+	},
+	"@type": "http://underlay.mit.edu/ns#Query",
+	"@graph": {
+		"@id": "http://people.com/jane",
+		"name": {}
+	}
+}`)); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestOPS(t *testing.T) {
+	if err := testQuery([]byte(`{
+	"@context": {
+		"@vocab": "http://schema.org/"
+	},
+	"@type": "http://underlay.mit.edu/ns#Query",
+	"@graph": {
+		"name": "Jane Doe"
+	}
+}`)); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestSimpleQuery(t *testing.T) {
 	if err := testQuery([]byte(`{
 	"@context": {

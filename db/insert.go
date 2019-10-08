@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
-	"time"
 
 	badger "github.com/dgraph-io/badger"
 	proto "github.com/golang/protobuf/proto"
@@ -15,8 +14,16 @@ import (
 )
 
 func (db *DB) insert(cid cid.Cid, quads []*ld.Quad, label string, graph []int, txn *badger.Txn) (err error) {
-	graphID := fmt.Sprintf("ul:/ipfs/%s#%s", cid.String(), label)
-	graphKey := types.AssembleKey(types.GraphPrefix, []byte(graphID), nil, nil)
+	value, err := proto.Marshal(&types.Blank{
+		Cid: cid.Bytes(),
+		Id:  label,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	graphKey := types.AssembleKey(types.GraphPrefix, value, nil, nil)
 
 	var item *badger.Item
 
@@ -29,8 +36,7 @@ func (db *DB) insert(cid cid.Cid, quads []*ld.Quad, label string, graph []int, t
 	}
 
 	// Write the current date to the graph key
-	date := []byte(time.Now().Format(time.RFC3339))
-	if err = txn.Set(graphKey, date); err != nil {
+	if err = txn.Set(graphKey, nil); err != nil {
 		return
 	}
 
@@ -49,8 +55,8 @@ func (db *DB) insert(cid cid.Cid, quads []*ld.Quad, label string, graph []int, t
 
 		source := &types.Source{
 			Cid:   cid.Bytes(),
+			Index: uint32(index),
 			Graph: g,
-			Index: int32(index),
 		}
 
 		// Get the uint64 ids for the subject, predicate, and object
@@ -91,23 +97,29 @@ func (db *DB) insert(cid cid.Cid, quads []*ld.Quad, label string, graph []int, t
 		for i := uint8(0); i < 3; i++ {
 			a, b, c := permuteMajor(i, s, p, o)
 			key := types.AssembleKey(types.TriplePrefixes[i], a, b, c)
-			sources := &types.SourceList{}
+			// sources := &types.SourceList{}
 			var val []byte
 			if item, err = txn.Get(key); err == badger.ErrKeyNotFound {
-				// Create a new SourceList container with the source
-				sources.Sources = []*types.Source{source}
-				if val, err = proto.Marshal(sources); err != nil {
-					return
-				} else if err = txn.Set(key, val); err != nil {
+				if i == 0 {
+					// Create a new SourceList container with the source
+					sources := &types.SourceList{Sources: []*types.Source{source}}
+					if val, err = proto.Marshal(sources); err != nil {
+						return
+					}
+				}
+
+				if err = txn.Set(key, val); err != nil {
 					return
 				}
 			} else if err != nil {
 				return
-			} else if val, err = item.ValueCopy(nil); err != nil {
-				return
-			} else if err = proto.Unmarshal(val, sources); err != nil {
-				return
-			} else {
+			} else if i == 0 {
+				sources := &types.SourceList{}
+				if val, err = item.ValueCopy(nil); err != nil {
+					return
+				} else if err = proto.Unmarshal(val, sources); err != nil {
+					return
+				}
 				sources.Sources = append(sources.GetSources(), source)
 				if val, err = proto.Marshal(sources); err != nil {
 					return

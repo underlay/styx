@@ -5,7 +5,9 @@ import (
 	"log"
 	"strconv"
 
+	cid "github.com/ipfs/go-cid"
 	ld "github.com/piprate/json-gold/ld"
+	types "github.com/underlay/styx/types"
 )
 
 var graphIri = ld.NewIRI("http://underlay.mit.edu/ns#Graph")
@@ -189,14 +191,13 @@ func handleBundle(
 		q := quads[graph[0]]
 		if b, is := q.Subject.(*ld.BlankNode); is && q.Predicate.Equal(typeIri) && q.Object.Equal(graphIri) {
 			enumerator := fmt.Sprintf("q:%s", b.Attribute)
-			messages := make(chan []byte, extent)
-			dates := make(chan []byte, extent)
+			graphs := make(chan *types.Blank, extent)
 			go func() {
 				var node ld.Node = nil
 				if index != nil && len(index) == 1 {
 					node = index[0]
 				}
-				if err := db.Ls(node, extent, messages, dates); err != nil {
+				if err := db.Ls(node, extent, graphs); err != nil {
 					log.Println(err.Error())
 				}
 			}()
@@ -206,17 +207,15 @@ func handleBundle(
 					"@type":       "Entity",
 					"u:satisfies": t,
 				}
-				if m, d := <-messages, <-dates; m == nil || d == nil {
+				if m := <-graphs; m == nil {
+					entities[x]["value"] = []interface{}{}
+				} else if c, err := cid.Cast(m.Cid); err != nil {
 					entities[x]["value"] = []interface{}{}
 				} else {
 					entities[x]["value"] = []interface{}{
 						map[string]interface{}{
-							"@id":          string(m),
+							"@id":          fmt.Sprintf("ul:/ipfs/%s#%s", c.String(), m.Id),
 							"u:instanceOf": enumerator,
-							// "dateSubmitted": map[string]interface{}{
-							// 	"@value": string(d),
-							// 	"@type":  "xsd:dateTime",
-							// },
 						},
 					}
 				}

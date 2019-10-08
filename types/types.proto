@@ -7,8 +7,8 @@ message SourceList {
 
 message Source {
 	bytes cid = 1;
-	string graph = 2;
-	int32 index = 3;
+	uint32 index = 2;
+	string graph = 3;
 }
 
 message Blank {

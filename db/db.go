@@ -143,7 +143,7 @@ func (db *DB) Query(
 			return
 		}
 
-		if s, err = g.GetSources(); err != nil {
+		if s, err = g.GetSources(txn); err != nil {
 			return
 		}
 
@@ -252,10 +252,10 @@ func (db *DB) Enumerate(
 	})
 }
 
-var regexGraphIri = regexp.MustCompile("^ul:\\/ipfs\\/[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{46}#(_:[a-zA-Z0-9]+)?$")
+var regexGraphIri = regexp.MustCompile("^ul:\\/ipfs\\/([123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{46})#(_:[a-zA-Z0-9]+)?$")
 
 // Ls lists the graphs in the database
-func (db *DB) Ls(index ld.Node, extent int, messages chan []byte, dates chan []byte) error {
+func (db *DB) Ls(index ld.Node, extent int, graphs chan *types.Blank) error {
 	var prefix = make([]byte, 1)
 	prefix[0] = types.GraphPrefix
 
@@ -278,9 +278,19 @@ func (db *DB) Ls(index ld.Node, extent int, messages chan []byte, dates chan []b
 
 		var seek []byte
 		if iri, is := index.(*ld.IRI); is && index != nil && regexGraphIri.MatchString(iri.Value) {
-			seek = make([]byte, 1+len(iri.Value))
-			copy(seek[1:], []byte(iri.Value))
-		} else {
+			match := regexGraphIri.FindStringSubmatch(iri.Value)
+			if c, err := cid.Decode(match[0]); err == nil {
+				value, err := proto.Marshal(&types.Blank{
+					Cid: c.Bytes(),
+					Id:  match[2],
+				})
+				if err == nil {
+					seek = make([]byte, 1+len(value))
+					copy(seek[1:], value)
+				}
+			}
+		}
+		if seek == nil {
 			seek = make([]byte, 1)
 		}
 		seek[0] = types.GraphPrefix
@@ -290,26 +300,18 @@ func (db *DB) Ls(index ld.Node, extent int, messages chan []byte, dates chan []b
 			item := iter.Item()
 
 			// Get the key
-			size := item.KeySize() - 1
-			key := make([]byte, size)
-			copy(key, item.Key()[1:])
-
-			// Key the value
-			size = item.ValueSize()
-			value := make([]byte, size)
-			if value, err = item.ValueCopy(value); err != nil {
+			blank := &types.Blank{}
+			if err = proto.Unmarshal(item.Key()[1:], blank); err != nil {
 				return
 			}
 
-			messages <- key
-			dates <- value
+			graphs <- blank
 
 			i++
 		}
 
 		for ; i < extent; i++ {
-			messages <- nil
-			dates <- nil
+			graphs <- nil
 		}
 
 		return
@@ -376,6 +378,15 @@ func (db *DB) Log() error {
 					binary.BigEndian.Uint64(key[9:17]),
 					binary.BigEndian.Uint64(val),
 				)
+			} else if prefix == types.GraphPrefix {
+				blank := &types.Blank{}
+				if err := proto.Unmarshal(key[1:], blank); err != nil {
+					return err
+				} else if c, err := cid.Cast(blank.Cid); err != nil {
+					return err
+				} else {
+					log.Printf("Graph entry: <ul:/ipfs/%s#%s>\n", c.String(), blank.Id)
+				}
 			}
 			i++
 		}
