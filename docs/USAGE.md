@@ -4,7 +4,7 @@
 
 - [Installing](#installing)
 - [Data Model](#data-model)
-- [Writing Data](#writing-ata)
+- [Writing Data](#writing-data)
 - [Reading Data](#reading-data)
 
 ## Installing
@@ -124,7 +124,7 @@ In JSON-LD, named graphs are represented with a special `@graph` syntax:
 }
 ```
 
-This interpretation of the "meaning" of the graph label - where the graph label is used as a means of reification - is not official. The RDF working group couldn't come to concensus on the semantics of RDF Datasets even though they standardized the syntax. More background is available in the working group note [On Semantics of RDF Datasets](https://www.w3.org/TR/rdf11-datasets/), but the emerging concensus in ensuing years is that this approach (using the graph label to refer to the graph) is the most sane interpretation.
+This interpretation of the "meaning" of the graph label - where the graph label is used as a means of reification - is not official. The RDF working group couldn't come to concensus on the semantics of RDF Datasets, even though they standardized the syntax. More background is available in the working group note [On Semantics of RDF Datasets](https://www.w3.org/TR/rdf11-datasets/), but the emerging concensus in ensuing years is that this approach (using the graph label to refer to the graph) is the most sane interpretation.
 
 As a result, Styx restricts RDF Datasets to named graphs with blank graph names. This means you can't insert datasets with URI graph labels - Styx won't allow it. This was a deliberate decision to strengthen these chosen semantics: the graph label referent is always the named graph itself, and only as represented in the dataset. This is less clear if graph labels can be URIs, which suggest global scope or universality.
 
