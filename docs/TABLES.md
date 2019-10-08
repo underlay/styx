@@ -36,7 +36,7 @@ message Index {
 }
 ```
 
-Ihe `id` identifers are issued for new terms monotonically by a [Badger Sequence](https://godoc.org/github.com/dgraph-io/badger#Sequence). The `subject`, `predicate`, and `object` fields count the number of distinct quads in which the term appears in the respective position, which are use as hueristics during query resolution.
+The `id` identifers are issued for new terms monotonically by a [Badger Sequence](https://godoc.org/github.com/dgraph-io/badger#Sequence). The `subject`, `predicate`, and `object` fields count the number of distinct quads in which the term appears in the respective position, which are use as hueristics during query resolution.
 
 | key (as string)                                                        | value                                                 |
 | ---------------------------------------------------------------------- | ----------------------------------------------------- |
@@ -50,9 +50,9 @@ The Index table is the first table accessed during both insertion and querying. 
 type IndexMap map[string]*Index
 ```
 
-### Quering
+### Querying
 
-The first step in query processing is retrieve the Index struct for every term in the query graph and store them in the index map. If any term is not found in the Index table, the query is rejected with no results, since the term does not exist in the database.
+The first step in query processing is to retrieve the Index struct for every term in the query graph and store them in the index map. If any term is not found in the Index table, the query is rejected with no results, since the term does not exist in the database.
 
 ### Insertion
 
@@ -64,7 +64,7 @@ During insertion, for every term in every quad, either the existing Index struct
 const ValuePrefix = byte('p')
 ```
 
-The Value table inverts the Index table, mapping `unint64` keys to explicit RDF terms.
+The Value table inverts the Index table, mapping `uint64` keys to explicit RDF terms.
 
 ```protobuf
 message Value {
@@ -87,7 +87,7 @@ message Literal {
 }
 ```
 
-Blank nodes _are_ given a separate Value type, even though they're semantically treated as content-address IRIs. This is only to leverage more compact encoding by storing the CID as bytes directly in Protobuf instead of sacrificing a linear space loss to base58 encoding.
+Blank nodes _are_ given a separate Value type, even though they're semantically treated as content-addressed IRIs. This is only to get more compact CIDs by representing them directly as bytes in Protobuf instead of sacrificing a linear loss to base58 encoding.
 
 | key (as bytes)             | value                                                                                                            |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
@@ -105,7 +105,7 @@ During insertion, only newly issued identifers for previously-unseen terms need 
 type ValueMap map[uint64]*Value
 ```
 
-The variable assignments that the querying process returns are all uint64 identifiers, so they need to be converted into explicit RDF terms to return to the user. The in-memory index map can be inverted to create an initial value map, which is used to memoize the Value table lookups for every term in the solution graph.
+The variable assignments that the querying process returns are all uint64 identifiers, so they need to be converted into explicit RDF terms that can be returned to the user. The in-memory index map gets inverted to create an initial value map, which is used to memoize the Value table lookups for every term in the solution graph.
 
 ## Triple tables
 
@@ -115,7 +115,7 @@ var TriplePrefixes = [3]byte{'a', 'b', 'c'}
 
 The most important tables that Styx maintains are the Triple tables. The three prefixes `{a b c}` correspond to the three rotations `{subject-predicate-object, predicate-object-subject, object-subject-predicate}` (respectively). The keys in each Triple table are exactly 25 bytes long: one for the appropriate prefix byte, and then three eight-byte big-endian uint64 ids that encode a triple in the appropriate order.
 
-The first Triple table (`a: spo`) is further distinguished as the Source table. The `b` and `c` tables have empty values, but the keys in the `a` table carry protobuf-serialized lists of `Source` structs that hold the CID of the parent dataset, the graph label of the quad (or an empty string for the default graph), and an integer index of the quad in the canonicalized dataset (as sorted by the [URDNA2015](https://json-ld.github.io/normalization/spec/) algorithm).
+The first Triple table (`a: spo`) is further distinguished as the Source table. The `b` and `c` tables have empty values, but the keys in the `a` table carry protobuf-serialized lists of `Source` structs that hold the CID of the parent dataset, the graph label of the quad (or an empty string for the default graph), and the integer index of the quad in the canonicalized dataset (as sorted by the [URDNA2015](https://json-ld.github.io/normalization/spec/) algorithm).
 
 ```protobuf
 message SourceList {
@@ -129,11 +129,11 @@ message Source {
 }
 ```
 
-| key (as bytes)                                         | value                                             |
-| ------------------------------------------------------ | ------------------------------------------------- |
-| `[97 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0 3]` | `[{cid: Qmfoo..., index: 13, graph: "_:c14n0" }]` |
-| `[98 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 1]` |                                                   |
-| `[99 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 2]` |                                                   |
+| key (as bytes)                                         | value                          |
+| ------------------------------------------------------ | ------------------------------ |
+| `[97 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0 3]` | `[{Qmfoo..., 13, "_:c14n0" }]` |
+| `[98 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 1]` |                                |
+| `[99 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 2]` |                                |
 
 ## Major and Minor tables
 
@@ -144,7 +144,7 @@ var MinorPrefixes = [3]byte{'x', 'y', 'z'}
 
 Styx keeps six more tables similar to the Triple tables, but with keys of just two terms: exactly 17 bytes each. The major table keys encode the three rotations of two terms (`{i: sp, j: po, k: os}`), and the minor table keys encode the three _reverse rotations_ of two terms (`{x: so, y: ps, z: op}`).
 
-The values for all of these keys are (big-endian) uint64s that count the number of distinct entries in corresponding Triple table that begin with the same two terms. The value for the key `[105 0 0 0 0 0 0 0 4 0 0 0 0 0 0 0 2]` is the _number of keys_ beginning with `[97 0 0 0 0 0 0 0 4 0 0 0 0 0 0 0 2]` (or, in other words, the number of distinct solutions for `[97 0 0 0 0 0 0 0 4 0 0 0 0 0 0 0 2 ? ? ? ? ? ? ? ?]`).
+The values for all of these keys are (big-endian) uint64s that count the number of distinct entries in the corresponding Triple table that begin with the same two terms. The value for the key `[105 0 0 0 0 0 0 0 4 0 0 0 0 0 0 0 2]` is the _number of keys_ beginning with `[97 0 0 0 0 0 0 0 4 0 0 0 0 0 0 0 2]` (or, in other words, the number of distinct solutions for `[97 0 0 0 0 0 0 0 4 0 0 0 0 0 0 0 2 ? ? ? ? ? ? ? ?]`).
 
 Every major key has a "dual" minor key that encodes the same two terms in reverse order. The prefixes of duals are offset by one: `i` keys are dual with `y` keys, `j` keys are dual with `z` keys, and `k` keys are dual with `x` keys. Every key has the same value as its dual.
 
