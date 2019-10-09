@@ -7,37 +7,56 @@
 - [Writing Data](#writing-data)
 - [Reading Data](#reading-data)
 
-## Installing
+## Building and Installing
 
-Styx is written in Go, so you need to [have Go installed](https://golang.org/doc/install). Then you should be able to install it with
+Styx is written in Go, so you need to [have Go installed](https://golang.org/doc/install).
+
+Styx is a [go-ipfs daemon plugin](https://github.com/ipfs/go-ipfs/blob/master/docs/plugins.md), which means it gets built with [`-buildmode=plugin`](https://golang.org/pkg/plugin/) into a `styx.so` binary that gets copied to `${IPFS_PATH}/plugins/`. The IPFS daemon dynamically loads plugins in that directory when it starts, and passes them a native [CoreAPI](https://github.com/ipfs/interface-go-ipfs-core) instance that they can use to store and retrieve files directly (without going through the HTTP API).
+
+Wait! Why do we need to store and retrieve files? Isn't Styx itself supposed to do that?
+
+Yes and no. Styx handles inserts and deletes at the granularity of N-Quads files, which it adds to and removes from the IPFS node in addition to indexing them on its own. This isn't _strictly_ necessary: the indices in Styx end up storing (quite redundantly!) all the data in every file, and could _very inefficiently_ reconstruct any given file given its hash. But since we already have to get CIDs for each file, it feels like a sensible default to store them in the repo as well. At the very least it's a convenient backup.
+
+As a Go plugin, Styx needs to be build against the exact version of IPFS that it'll be loaded by: this means that instead of installing IPFS from a binary, you need to [build it from source](https://github.com/ipfs/go-ipfs#build-from-source), and then tell Styx where to find it as well. Typically this means something like:
+
+```sh
+cd ~
+git clone https://github.com/ipfs/go-ipfs
+git clone https://github.com/underlay/styx
+cd go-ipfs
+make install
+cd ~/styx
+go mod edit -droprequire=github.com/ipfs/go-ipfs
+go mod edit -replace=github.com/ipfs/go-ipfs=${HOME}/go-ipfs
+go mod tidy
+make install
+```
+
+Make sure your `IPFS_PATH` environment variable is pointing to a local repo, or run something like `ipfs init --profile server,badgerds --empty-repo` to initialize a new one (`IPFS_PATH` defaults to `$HOME/.ipfs`).
+
+Then if you are able to run `ipfs daemon` and see this kind of output:
 
 ```
-go get github.com/underlay/styx
+...
+2019/10/09 10:15:47 Opening badger database at /tmp/styx
+badger 2019/10/09 10:15:47 INFO: All 1 tables opened in 0s
+badger 2019/10/09 10:15:47 INFO: Replaying file id: 0 at offset: 8036
+badger 2019/10/09 10:15:47 INFO: Replay took: 103.39µs
+2019/10/09 10:15:47 Serving /tmp/styx/www at http://localhost:8086
 ```
 
-Styx is just a really fancy index for graph data that is ultimately stored in an IPFS repo. This IPFS repo doesn't have to be online or anything (although that's the responsible thing to do if you're storing data other people might want!), it just has to follow the [IPFS HTTP API spec](https://docs.ipfs.io/reference/api/http/) for file storage and retrieval.
-
-You can do this [installing a prebuilt IPFS binary](https://docs.ipfs.io/guides/guides/install/), but you can also [build it from source](https://github.com/ipfs/go-ipfs#build-from-source) or even run [js-ipfs with Node](https://github.com/ipfs/go-ipfs#build-from-source). You'll need to initialize a repo somewhere and start the daemon in the background.
+Then it worked! Styx is running in the background and you can browse the WebUI at http://localhost:8086/.
 
 ### Environment Variables
 
-- `IPFS_HOST` (`localhost:5001`): the HTTP API endpoint of your IPFS daemon (just the hostname, port, and pathname - not the protocol)
 - `STYX_PATH` (`/tmp/styx`): the absolute path of a directory that Styx will store data in (and look for existing data in)
 - `STYX_PORT` (`8086`): the localhost port that Styx will serve its WebUI from
 
-If you have an IPFS daemon running, then you shouldn't have to set any of these - just running `styx` will open a new database at `/tmp/styx` and start serving the WebUI at [`http://localhost:8086/`](http://localhost:8086/)
-
-```
-~ $ styx
-2019/09/27 12:14:21 Opening badger database at /tmp/styx
-badger 2019/09/27 12:14:21 INFO: All 1 tables opened in 0s
-badger 2019/09/27 12:14:21 INFO: Replaying file id: 0 at offset: 7431
-badger 2019/09/27 12:14:21 INFO: Replay took: 1.645545ms
-badger 2019/09/27 12:14:21 DEBUG: Value log discard stats empty
-2019/09/27 12:14:21 Listening on port 8086
-```
-
 Styx is build on the [Badger](https://github.com/dgraph-io/badger) key/value store, so everything that it writes to `STYX_PATH` will be Badger database files.
+
+### WebUI
+
+The web interface for browsing data and composing queries is built with Webpack in [webui/](webui/), and produces a static directory [webui/www/](webui/www/) that gets copied to `$STYX_PATH/www` during `make install`. When Styx starts, it just attaches a `http.FileServer` over `$STYX_PATH/www` to the value of `$STYX_PORT` If you change your `$STYX_PATH`, or update the WebUI, you need to (at least) run `make www` to re-copy the files over.
 
 ## Data Model
 

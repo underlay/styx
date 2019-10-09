@@ -37,12 +37,12 @@ const NQuadsListenerPort = "4045"
 
 // StyxPlugin is an IPFS deamon plugin
 type StyxPlugin struct {
-	host string
-	lns  []net.Listener
-	db   *styx.DB
+	host      string
+	listeners []net.Listener
+	db        *styx.DB
 }
 
-// Compile-time type check (bleh)
+// Compile-time type check
 var _ plugin.PluginDaemon = (*StyxPlugin)(nil)
 
 // Name returns the plugin's name, satisfying the plugin.Plugin interface.
@@ -149,8 +149,6 @@ func (sp *StyxPlugin) handleCborLdConnection(conn net.Conn) {
 			continue
 		}
 
-		log.Println("Received message", resolved.String())
-
 		quads, graphs, err := styx.ParseMessage(strings.NewReader(normalized))
 		if err != nil {
 			log.Println(err)
@@ -164,31 +162,33 @@ func (sp *StyxPlugin) handleCborLdConnection(conn net.Conn) {
 }
 
 func (sp *StyxPlugin) attach(port string, protocol string, handler func(conn net.Conn)) error {
-	ln, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
 		return err
 	}
 
-	sp.lns = append(sp.lns, ln)
+	sp.listeners = append(sp.listeners, listener)
 
 	address := "/ip4/127.0.0.1/tcp/" + port
 	go func() error {
 		url := fmt.Sprintf("%s/api/v0/p2p/listen?arg=%s&arg=%s&allow-custom-protocol=true", sp.host, protocol, address)
 		res, err := http.Get(url)
 		if err != nil {
+			log.Printf("Error attaching protocol %s: %s\n", protocol, err.Error())
 			return err
 		}
 
-		log.Printf("Registering %s protocol handler: %s\n", protocol, res.Status)
+		fmt.Printf("Registering %s protocol handler: %s\n", protocol, res.Status)
 
 		if res.StatusCode != http.StatusOK {
 			return nil
 		}
 
 		for {
-			if conn, err := ln.Accept(); err == nil {
+			if conn, err := listener.Accept(); err == nil {
 				go handler(conn)
 			} else {
+				log.Printf("Error handling protocol %s: %s\n", protocol, err.Error())
 				return err
 			}
 		}
@@ -200,6 +200,7 @@ func (sp *StyxPlugin) attach(port string, protocol string, handler func(conn net
 // Start gets passed a CoreAPI instance, satisfying the plugin.PluginDaemon interface.
 func (sp *StyxPlugin) Start(api core.CoreAPI) error {
 	path := os.Getenv("STYX_PATH")
+	port := os.Getenv("STYX_PORT")
 
 	key, err := api.Key().Self(context.Background())
 	if err != nil {
@@ -223,7 +224,9 @@ func (sp *StyxPlugin) Start(api core.CoreAPI) error {
 		return err
 	}
 
-	go log.Fatal(sp.db.Serve(styx.DefaultPort))
+	go func() {
+		log.Fatal(sp.db.Serve(port))
+	}()
 
 	return nil
 }
@@ -236,7 +239,7 @@ func (sp *StyxPlugin) Close() error {
 		}
 	}
 
-	for _, ln := range sp.lns {
+	for _, ln := range sp.listeners {
 		if err := ln.Close(); err != nil {
 			return err
 		}

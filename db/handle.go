@@ -37,13 +37,13 @@ var wasAttributedToIri = ld.NewIRI("http://www.w3.org/ns/prov#wasAttributedTo")
 
 // HandleMessage is where all the magic happens.
 func (db *DB) HandleMessage(
-	cid cid.Cid,
+	c cid.Cid,
 	quads []*ld.Quad,
 	graphs map[string][]int,
 ) map[string]interface{} {
 
 	if logging != "PROD" {
-		log.Printf("Message: %s\n", cid.String())
+		log.Printf("Message: %s\n", c.String())
 	}
 
 	queries := map[string]bool{}
@@ -72,7 +72,7 @@ func (db *DB) HandleMessage(
 		for label, graph := range graphs {
 			l, g := label, graph
 			go func() {
-				if err := db.Ingest(cid, quads, l, g); err != nil {
+				if err := db.Ingest(c, quads, l, g); err != nil {
 					log.Println(err.Error())
 				}
 			}()
@@ -163,7 +163,7 @@ func (db *DB) HandleMessage(
 		log.Println("Error unmarshalling context", err)
 	}
 
-	context["q"] = fmt.Sprintf("ul:/ipfs/%s#", cid.String())
+	context["q"] = fmt.Sprintf("ul:/ipfs/%s#", c.String())
 
 	return map[string]interface{}{
 		"@context": context,

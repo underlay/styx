@@ -84,7 +84,7 @@ func (db *DB) IngestJSONLd(doc interface{}) error {
 		return err
 	}
 
-	cid := resolved.Cid()
+	c := resolved.Cid()
 
 	quads, graphs, err := ParseMessage(strings.NewReader(normalized))
 	if err != nil {
@@ -95,7 +95,7 @@ func (db *DB) IngestJSONLd(doc interface{}) error {
 		for label, graph := range graphs {
 			if len(graph) == 0 {
 				continue
-			} else if err = db.insert(cid, quads, label, graph, txn); err != nil {
+			} else if err = db.insert(c, quads, label, graph, txn); err != nil {
 				return
 			}
 		}

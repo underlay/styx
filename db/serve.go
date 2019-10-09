@@ -9,7 +9,6 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -24,8 +23,6 @@ const DefaultPath = "/tmp/styx"
 
 // DefaultPort for the WebUI
 const DefaultPort = "8086"
-
-var port = os.Getenv("STYX_PORT")
 
 func walkValues(values []interface{}, files map[string]string) {
 	for _, value := range values {
@@ -83,7 +80,7 @@ func (db *DB) Serve(port string) error {
 				return
 			}
 
-			var cid cid.Cid
+			var c cid.Cid
 			var reader io.Reader
 			if m == "application/ld+json" {
 				decoder := json.NewDecoder(req.Body)
@@ -106,7 +103,7 @@ func (db *DB) Serve(port string) error {
 					res.Write([]byte(err.Error() + "\n"))
 					return
 				} else {
-					cid = resolved.Cid()
+					c = resolved.Cid()
 					reader = strings.NewReader(s)
 				}
 			} else if m == "application/n-quads" {
@@ -120,7 +117,7 @@ func (db *DB) Serve(port string) error {
 					return
 				} else if file, is := node.(files.File); is {
 					reader = file
-					cid = resolved.Cid()
+					c = resolved.Cid()
 				} else {
 					res.WriteHeader(400)
 					return
@@ -186,7 +183,7 @@ func (db *DB) Serve(port string) error {
 					res.Write([]byte(err.Error() + "\n"))
 					return
 				} else {
-					cid = resolved.Cid()
+					c = resolved.Cid()
 					reader = strings.NewReader(s)
 				}
 			} else {
@@ -201,15 +198,19 @@ func (db *DB) Serve(port string) error {
 			} else {
 				var r map[string]interface{}
 				if logging == "PROD" {
-					r = db.HandleMessage(cid, quads, graphs)
+					r = db.HandleMessage(c, quads, graphs)
 				} else {
 					start := time.Now()
-					r = db.HandleMessage(cid, quads, graphs)
+					r = db.HandleMessage(c, quads, graphs)
 					log.Printf("Handled message in %s\n", time.Since(start))
 				}
 
 				if res == nil {
-					res.WriteHeader(204)
+					cs := c.String()
+					res.Header().Add("Content-Type", "text/plain")
+					res.Header().Add("Location", fmt.Sprintf("/directory/?%s", cs))
+					res.WriteHeader(201)
+					res.Write([]byte(cs))
 				} else {
 					res.Header().Add("Content-Type", "application/ld+json")
 					res.WriteHeader(200)

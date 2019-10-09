@@ -13,9 +13,9 @@ import (
 	types "github.com/underlay/styx/types"
 )
 
-func (db *DB) insert(cid cid.Cid, quads []*ld.Quad, label string, graph []int, txn *badger.Txn) (err error) {
+func (db *DB) insert(c cid.Cid, quads []*ld.Quad, label string, graph []int, txn *badger.Txn) (err error) {
 	value, err := proto.Marshal(&types.Blank{
-		Cid: cid.Bytes(),
+		Cid: c.Bytes(),
 		Id:  label,
 	})
 
@@ -54,18 +54,18 @@ func (db *DB) insert(cid cid.Cid, quads []*ld.Quad, label string, graph []int, t
 		}
 
 		source := &types.Source{
-			Cid:   cid.Bytes(),
+			Cid:   c.Bytes(),
 			Index: uint32(index),
 			Graph: g,
 		}
 
 		// Get the uint64 ids for the subject, predicate, and object
 		var s, p, o []byte
-		if s, err = db.getID(cid, quad.Subject, 0, indexMap, valueMap, txn); err != nil {
+		if s, err = db.getID(c, quad.Subject, 0, indexMap, valueMap, txn); err != nil {
 			return
-		} else if p, err = db.getID(cid, quad.Predicate, 1, indexMap, valueMap, txn); err != nil {
+		} else if p, err = db.getID(c, quad.Predicate, 1, indexMap, valueMap, txn); err != nil {
 			return
-		} else if o, err = db.getID(cid, quad.Object, 2, indexMap, valueMap, txn); err != nil {
+		} else if o, err = db.getID(c, quad.Object, 2, indexMap, valueMap, txn); err != nil {
 			return
 		}
 

@@ -15,10 +15,10 @@ import (
 
 // GetValue serializes the source to a string.
 func (source *Source) GetValue() string {
-	if cid, err := cid.Cast(source.Cid); err != nil {
+	if c, err := cid.Cast(source.Cid); err != nil {
 		return ""
 	} else {
-		return fmt.Sprintf("ul:/ipfs/%s#/%d", cid.String(), source.Index)
+		return fmt.Sprintf("ul:/ipfs/%s#/%d", c.String(), source.Index)
 	}
 }
 

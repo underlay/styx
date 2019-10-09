@@ -48,12 +48,12 @@ type HTTPAPI struct {
 func (api *HTTPAPI) Add(ctx context.Context, node files.Node, options ...coreOptions.UnixfsAddOption) (corePath.Resolved, error) {
 	if file, is := node.(files.File); !is {
 		return nil, nil
-	} else if c, err := api.Shell.Add(file); err != nil {
+	} else if cs, err := api.Shell.Add(file); err != nil {
 		return nil, err
-	} else if d, err := cid.Decode(c); err != nil {
+	} else if c, err := cid.Decode(cs); err != nil {
 		return nil, err
 	} else {
-		return corePath.IpfsPath(d), nil
+		return corePath.IpfsPath(c), nil
 	}
 }
 
