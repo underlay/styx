@@ -2,7 +2,7 @@
 
 Styx handles six types of keys in twelve logical tables. The underlying key/value store [Badger](https://github.com/dgraph-io/badger) doesn't have a concept of a table, so instead we start every key with a single prefix byte to make virtual ones.
 
-In this table, `l`, `m`, and `n` are all big-endian unsigned 64-bit integer identifiers.
+In this table, `l`, `m`, and `n` are all big-endian unsigned 64-bit integer identifiers, and `|` indicates concatenation.
 
 | name    | #   | key format    | value type         | prefixes  |
 | ------- | --- | ------------- | ------------------ | --------- |
