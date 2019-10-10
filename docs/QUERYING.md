@@ -1,6 +1,6 @@
 # Querying
 
-When Styx first receives a subgraph query, it's in the form of a directed labeled multigraph, where some of the labels (of nodes _or_ edges) are variables.
+When Styx first receives a subgraph query, it's in the form of a directed labeled multigraph, where some of the labels (of nodes _or_ edges) are variables (denoted throughout with a `_:` prefix).
 
 ![](query.svg)
 
