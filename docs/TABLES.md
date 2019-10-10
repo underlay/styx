@@ -1,5 +1,18 @@
 # Tables and Data Layout
 
+## Table of Contents
+
+"Table" of contents, very funny.
+
+- [Overview](#overview)
+- [Index table](#index-table)
+- [Value table](#value-table)
+- [Triple tables](#triple-tables)
+- [Major and Minor tables](#major-and-minor-tables)
+- [Graph table](#graph-table)
+
+## Overview
+
 Styx handles six types of keys in twelve logical tables. The underlying key/value store [Badger](https://github.com/dgraph-io/badger) doesn't have a concept of a table, so instead we start every key with a single prefix byte to make virtual ones.
 
 In this table, the 'p' that each key starts with is a single byte "prefix"
