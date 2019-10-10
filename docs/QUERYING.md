@@ -1,6 +1,6 @@
 # Querying
 
-When Styx first receives a subgraph query, it's in the form of a directed labelled multigraph, where some of the labels (of nodes or edges) are variables.
+When Styx first receives a subgraph query, it's in the form of a directed labeled multigraph, where some of the labels (of nodes _or_ edges) are variables.
 
 ![](query.svg)
 
@@ -8,11 +8,11 @@ This "star" shape is a common pattern: many real-world queries resemble a cluste
 
 ## Constraint Degree
 
-Styx imposes two requirements on query graphs: every triple must have at least one blank node, and no triple can be all blank nodes. This _does_ mean that blank nodes can appear as predicates, which places the domain of "valid graphs" in-between regular RDF and [Generalized RDF](https://www.w3.org/TR/rdf11-concepts/#section-generalized-rdf). Both of these constraints may be relaxed in the future, but for now it just means making sure you "ground" at least one term in every triple.
+Styx imposes two requirements on query graphs: every triple must have at least one blank node, and no triple can be all blank nodes. This _does_ mean that blank nodes can appear as predicates, which places the domain of "valid graphs" in-between regular RDF Graphs and [Generalized RDF Graphs](https://www.w3.org/TR/rdf11-concepts/#section-generalized-rdf). Both of these constraints may be relaxed in the future, but for now it just means making sure you "ground" at least one term in every triple.
 
 This leaves exactly two cases for each triples: either they reference one blank node, or they reference two - although it's worth subdividing this into a third case: triples that reference the same blank node twice. These cases are called "degrees":
 
-- 1st Degree triples reference exacly one blank node, like `_:a <rdf:type> <schema:Person> .`
+- 1st Degree triples reference exactly one blank node, like `_:a <rdf:type> <schema:Person> .`
 - 2nd Degree triples reference two distinct blank nodes, like `_:a <schema:knows> _:b .`
 - Z-Degree triples reference the same blank node twice, like `_:a <schema:funder> _:a .`
 

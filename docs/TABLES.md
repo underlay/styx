@@ -29,10 +29,10 @@ Values in the Index table are serialized [Protobuf](https://developers.google.co
 
 ```protobuf
 message Index {
-	uint64 id = 1;
-	uint64 subject = 2;
-	uint64 predicate = 3;
-	uint64 object = 4;
+  uint64 id = 1;
+  uint64 subject = 2;
+  uint64 predicate = 3;
+  uint64 object = 4;
 }
 ```
 
@@ -68,22 +68,22 @@ The Value table inverts the Index table, mapping `uint64` keys to explicit RDF t
 
 ```protobuf
 message Value {
-	oneof node {
-		string iri = 1;
-		Blank blank = 2;
-		Literal literal = 3;
-	}
+  oneof node {
+    string iri = 1;
+    Blank blank = 2;
+    Literal literal = 3;
+  }
 }
 
 message Blank {
-	bytes cid = 1;
-	string id = 2;
+  bytes cid = 1;
+  string id = 2;
 }
 
 message Literal {
-	string value = 1;
-	string language = 2;
-	string datatype = 3;
+  string value = 1;
+  string language = 2;
+  string datatype = 3;
 }
 ```
 
@@ -119,13 +119,13 @@ The first Triple table (`a: spo`) is further distinguished as the Source table. 
 
 ```protobuf
 message SourceList {
-	repeated Source sources = 1;
+  repeated Source sources = 1;
 }
 
 message Source {
-	bytes cid = 1;
-	uint32 index = 2;
-	string graph = 3;
+  bytes cid = 1;
+  uint32 index = 2;
+  string graph = 3;
 }
 ```
 
