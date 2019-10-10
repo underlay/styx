@@ -1,7 +1,5 @@
 # User Manual
 
-## Table of Contents
-
 - [Installing](#installing)
 - [Data Model](#data-model)
 - [Writing Data](#writing-data)
