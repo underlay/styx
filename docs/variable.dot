@@ -1,0 +1,18 @@
+graph G {
+  "_:a" [label="_:a              \n      type   Person  +1     \nname   (_:an)  -1\nactor  (_:m)   +1\nspouse (_:b)   -1\ngender (_:g)   -1" shape=rect fontname=monospace];
+  "_:b" [label="_:b              \n      type   Person  +1     \nname   (_:bn)  -1\nactor  (_:m)   +1\nspouse (_:a)   +1\ngender (_:g)   -1" shape=rect fontname=monospace];
+  "_:m" [label="  _:m              \n     type  Movie   +1    \nname  (_:mn)  -1\n actor (_:a)   -1\nactor (_:b)   -1" shape=rect fontname=monospace];
+  "_:an" [label="_:an          \n    name (_:a)  +1   " shape=rect fontname=monospace];
+  "_:bn" [label="_:bn          \n    name (_:b)  +1   " shape=rect fontname=monospace];
+  "_:mn" [label="_:mn          \n    name (_:m)  +1   " shape=rect fontname=monospace];
+  "_:g" [label="_:g             \n      gender (_:a)  +1     \n      gender (_:b)  +1     " shape=rect fontname=monospace];
+
+  "_:a" -- "_:b";
+  "_:m" -- "_:a";
+  "_:m" -- "_:b";
+  "_:a" -- "_:an";
+  "_:b" -- "_:bn";
+  "_:b" -- "_:g";
+  "_:a" -- "_:g";
+  "_:m" -- "_:mn";
+}

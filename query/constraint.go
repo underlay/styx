@@ -12,16 +12,16 @@ import (
 
 // A Constraint to an occurrence of a variable in a dataset
 type Constraint struct {
-	Index    int
-	Place    uint8  // The term (subject/predicate/object) within the triple
-	M        HasID  // The next (clockwise) element in the triple
-	m        []byte // a convience slot for the []byte of M, if it exists
-	N        HasID  // The previous element in the triple
-	n        []byte // a convience slot for the []byte of N, if it exists
-	Count    uint64
-	Prefix   []byte
+	Index    int    // The index of the triple within the dataset
+	Place    uint8  // The term (subject = 0, predicate = 1, object = 2) within the triple
+	M        HasID  // The next ((Place + 1) % 3) element in the triple
+	m        []byte // a convience slot for the []byte of M, if it is known at the time
+	N        HasID  // The previous ((Place + 2) % 3) element in the triple
+	n        []byte // a convience slot for the []byte of N, if it is known at the time
+	Count    uint64 // The number of triples that satisfy the Constraint
+	Prefix   []byte // This is m and n (if it exists) appended to the appropriate prefix
 	Iterator *badger.Iterator
-	Dual     *Constraint // If (M or N) is a blank node, this is a pointer to the mirror struct
+	Dual     *Constraint // If (M or N) is a blank node, this is a pointer to their dual struct
 }
 
 func (c *Constraint) printM() (s string) {

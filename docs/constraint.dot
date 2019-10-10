@@ -1,0 +1,18 @@
+graph G {
+  "_:a" [label="     _:a                \n     _:a type Person    " shape=rect fontname=monospace];
+  "_:b" [label="     _:b                \n     _:b type Person    " shape=rect fontname=monospace];
+  "_:m" [label="    _:m              \n    _:m type Movie   " shape=rect fontname=monospace];
+  "_:an" [shape=rect fontname=monospace];
+  "_:bn" [shape=rect fontname=monospace];
+  "_:mn" [shape=rect fontname=monospace];
+  "_:g" [shape=rect fontname=monospace];
+
+  "_:a" -- "_:b" [label="spouse" fontname=monospace];
+  "_:m" -- "_:a" [label="actor" fontname=monospace];
+  "_:m" -- "_:b" [label="actor" fontname=monospace];
+  "_:a" -- "_:an" [label="name" fontname=monospace];
+  "_:b" -- "_:bn" [label="name" fontname=monospace];
+  "_:b" -- "_:g" [label="gender" fontname=monospace];
+  "_:a" -- "_:g" [label="gender" fontname=monospace];
+  "_:m" -- "_:mn" [label="name" fontname=monospace];
+}
