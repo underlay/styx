@@ -10,7 +10,7 @@ This "star" shape is a common pattern: many real-world queries resemble a cluste
 
 Styx imposes two requirements on query graphs: every triple must have at least one blank node, and no triple can be all blank nodes. This _does_ mean that blank nodes can appear as predicates, which places the domain of "valid graphs" in-between regular RDF Graphs and [Generalized RDF Graphs](https://www.w3.org/TR/rdf11-concepts/#section-generalized-rdf). Both of these constraints may be relaxed in the future, but for now it just means making sure you "ground" at least one term in every triple.
 
-This leaves exactly two cases for each triples: either they reference one blank node, or they reference two - although it's worth subdividing this into a third case: triples that reference the same blank node twice. These cases are called "degrees":
+This leaves exactly two cases for each triple: either it references one blank node, or it references two - although it's worth subdividing this into a third case: triples that reference the same blank node twice. These cases are called "degrees":
 
 - 1st Degree triples reference exactly one blank node, like `_:a <rdf:type> <schema:Person> .`
 - 2nd Degree triples reference two distinct blank nodes, like `_:a <schema:knows> _:b .`
@@ -28,7 +28,7 @@ Given this categorization, notice that every degree (and therefore every triple)
   - For 2nd-degree triples, this means selecting the Major or Minor table that places the position of the ground term first and the target variable second, and seeking to the first key that begins with the id of the ground value.
   - For Z-degree triples, since a variable is repeated, the selection of a Major or Minor table is arbitrary: there is exactly one of each that would work equally well. The process is otherwise the same as the 2nd degree.
 
-At the beginning of query processing, every triple in a query graph is converted into a `Constraint` struct that captures all of the state so far described. In the case of 2nd-degree triples, _two_ Constraint structs are assembled: one from each "persective", each also holding a pointer to the other. The constraints for each _variable_ get collected into a `map[string]*Variable`, where each Variable contains a set of first-degree constraints `[]*Constraint`, and a map of second-degree constraints `map[string][]*Constraint` indexed by the label of the other variable.
+At the beginning of query processing, every triple in a query graph is converted into a `Constraint` struct that captures all of the state so far described. In the case of 2nd-degree triples, _two_ Constraint structs are assembled: one from each "persective", each also holding a pointer to the other. The constraints for each _variable_ get collected into a `map[string]*Variable`, where each Variable contains a set of first-degree constraints `[]*Constraint`, a set of z-degree constraints `[]*Constraint`, and a map of second-degree constraints `map[string][]*Constraint` indexed by the label of the other variable.
 
 ```golang
 // Variable is a collection of constraints on a particular blank node.
