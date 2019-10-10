@@ -20,7 +20,7 @@ Note that even though two variables might be distinct in a query, they may resol
 
 Given this categorization, notice that every degree (and therefore every triple) avails the following operations:
 
-- Computing a ceiling of the number of distint assignments to its variables that are possible in the database
+- Computing a ceiling of the number of distinct assignments to its variables that are possible in the database
   - For 1st-degree triples, this means rotating the variable into the last position, and looking up the concatenation of the first two positions in the Major table. For example, for the triple `_:a <rdf:type> <schema:Person> .`, the value of the key `'j' | id(rdf:type) | id(schema:Person)` is a uint64 counting how many distinct entries in the Triple table begin with `'b' | id(rdf:type) | id(schema:Person)`.
   - For 2nd- and Z-degree triples, this means taking the single ground (non-blank) term in the triple, retrieving its Index struct from the Index map, and looking up the appropriate position's count (total counts for each position are stored with each term's ID in the Index table).
 - Generating a stream of deterministicly-ordered values for a given "target" variable
@@ -72,6 +72,6 @@ Conceptually, this is all a rearrangment from a directed pattern graph to an _un
 
 ![](variable.svg)
 
-Here, all constraints have been grouped together under their respective variables, which now form the nodes of the graph (previously the nodes were RDF _terms_, including ground IRIs and literals). The edges between the variables now represent _mutual constraint_ - the presence of at least one triple referencing both variables. The undirectness of this constraint graph is important: all of the tables Styx keeps lets it index triples in any direction, which means that this constraint graph can be _solved in any order_. Either value of a 2nd-degree constraint can be "propagated" to the other just as easily.
+Here, all constraints have been grouped together under their respective variables, which now form the nodes of the graph (previously the nodes were RDF _terms_, including ground IRIs and literals, but now they are conceptual sets of _independent constraints_). The edges between the variables now represent _mutual constraint_ - the presence of at least one triple referencing both variables. The undirectness of this constraint graph is important: all of the tables Styx keeps lets it index triples in any direction, which means that this constraint graph can be _solved in any order_. Either value of a 2nd-degree constraint can be "propagated" to the other just as easily.
 
 The high-level strategy from this point is to sort the variables into "solve order", and then incrementally seek to the first universally-satisfying set of assignments, backtracking when necessarily.
