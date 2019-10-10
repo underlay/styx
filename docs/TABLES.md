@@ -43,7 +43,7 @@ message Index {
 
 The `id` identifers are issued for new terms monotonically by a [Badger Sequence](https://godoc.org/github.com/dgraph-io/badger#Sequence). The `subject`, `predicate`, and `object` fields count the number of distinct quads in which the term appears in the respective position, which are use as hueristics during query resolution.
 
-| key (as string)                                                        | value                                                 |
+| key (as string, including prefix)                                      | value                                                 |
 | ---------------------------------------------------------------------- | ----------------------------------------------------- |
 | `q<http://xmlns.com/foaf/0.1/name>`                                    | `{ Id: 8234, Subject: 1, Predicate: 142, Object: 2 }` |
 | `q"2011-04-09T20:00:00Z"^^<http://www.w3.org/2001/XMLSchema#dateTime>` | `{ Id: 1129, Subject: 0, Predicate: 0, Object: 1 }`   |
@@ -94,11 +94,11 @@ message Literal {
 
 Blank nodes _are_ given a separate Value type, even though they're semantically treated as content-addressed IRIs. This is only to get more compact CIDs by representing them directly as bytes in Protobuf instead of sacrificing a linear loss to base58 encoding.
 
-| key (as bytes)             | value                                                                                                            |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `[112 0 0 0 0 0 0 32 42]`  | `iri "http://xmlns.com/foaf/0.1/name"`                                                                           |
-| `[112 0 0 0 0 0 0 4 105]`  | `literal { value: "2011-04-09T20:00:00Z", datatype: "http://www.w3.org/2001/XMLSchema#dateTime", language: "" }` |
-| `[112 0 0 0 0 0 0 70 203]` | `literal { value: "N-Triples", datatype: "http://www.w3.org/2000/01/rdf-schema#langString", language: "en-US" }` |
+| key (as bytes, including prefix) | value                                                                                                            |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `[112 0 0 0 0 0 0 32 42]`        | `iri "http://xmlns.com/foaf/0.1/name"`                                                                           |
+| `[112 0 0 0 0 0 0 4 105]`        | `literal { value: "2011-04-09T20:00:00Z", datatype: "http://www.w3.org/2001/XMLSchema#dateTime", language: "" }` |
+| `[112 0 0 0 0 0 0 70 203]`       | `literal { value: "N-Triples", datatype: "http://www.w3.org/2000/01/rdf-schema#langString", language: "en-US" }` |
 
 ### Insertion
 
@@ -134,11 +134,11 @@ message Source {
 }
 ```
 
-| key (as bytes)                                         | value                          |
-| ------------------------------------------------------ | ------------------------------ |
-| `[97 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0 3]` | `[{Qmfoo..., 13, "_:c14n0" }]` |
-| `[98 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 1]` |                                |
-| `[99 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 2]` |                                |
+| key (as bytes, including prefix)                       | value                                     |
+| ------------------------------------------------------ | ----------------------------------------- |
+| `[97 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0 3]` | `[{cid: ..., index: 13, id: "_:c14n0" }]` |
+| `[98 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 1]` |                                           |
+| `[99 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 2]` |                                           |
 
 ## Major and Minor tables
 
@@ -153,7 +153,7 @@ The values for all of these keys are (big-endian) uint64s that count the number 
 
 Every major key has a "dual" minor key that encodes the same two terms in reverse order. The prefixes of duals are offset by one: `i` keys are dual with `y` keys, `j` keys are dual with `z` keys, and `k` keys are dual with `x` keys. Every key has the same value as its dual.
 
-| key (as bytes)                          | value |
+| key (as bytes, including prefix)        | value |
 | --------------------------------------- | ----- |
 | `[105 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 2]` | `5`   |
 | `[121 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0 1]` | `5`   |
