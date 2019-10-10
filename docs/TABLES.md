@@ -4,15 +4,15 @@ Styx handles six types of keys in twelve logical tables. The underlying key/valu
 
 In this table, `l`, `m`, and `n` are all big-endian unsigned 64-bit integer identifiers, and `|` indicates concatenation.
 
-| name    | #   | key format    | value type         | prefixes  |
-| ------- | --- | ------------- | ------------------ | --------- |
-| triple  | 3   | `l \| m \| n` | `types.SourceList` | `{a b c}` |
-| major   | 3   | `l \| m`      | `uint64`           | `{i j k}` |
-| minor   | 3   | `l \| n`      | `uint64`           | `{x y z}` |
-| value   | 1   | `l`           | `types.Value`      | `{p}`     |
-| index   | 1   | `<term>`      | `types.Index`      | `{q}`     |
-| graph   | 1   | `types.Blank` |                    | `{g}`     |
-| counter | 1   |               | `uint64`           | `{>}`     |
+| name    | #   | key format    | value type         | prefixes      |
+| ------- | --- | ------------- | ------------------ | ------------- |
+| triple  | 3   | `l \| m \| n` | `types.SourceList` | `a`, `b`, `c` |
+| major   | 3   | `l \| m`      | `uint64`           | `i`, `j`, `k` |
+| minor   | 3   | `l \| n`      | `uint64`           | `x`, `y`, `z` |
+| value   | 1   | `l`           | `types.Value`      | `p`           |
+| index   | 1   | `<term>`      | `types.Index`      | `q`           |
+| graph   | 1   | `types.Blank` |                    | `g`           |
+| counter | 1   |               | `uint64`           | `>`           |
 
 - [Index table](#index-table)
 - [Value table](#value-table)
