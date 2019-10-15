@@ -28,7 +28,7 @@ This might have been all from a single dataset, or might be the union of the dat
 
 Now suppose we want to retrieve some data - like Bob's birthdate. In traditional relational database this would mean looking up Bob's row in the Person table by his primary key, and then getting the value in the birthDate column. Even in a traditional graph database, this usually means selecting the Bob node and then either traversing the edge labeled "birthDate" or getting the property birthDate of the node, depending on the database. But in Styx there aren't operations like select, traverse, or get. There's just one operation and it one takes argument - an RDF graph - and returns another RDF graph that looks just like it:
 
-![](images/query1.svg) ⇒ ![](images/result1.svg)
+![](images/query1.svg) ![](images/result1.svg)
 
 This operation is _subgraph matching_. Even though it feels similar to the other methods of data retrieval, it's different in a couple key ways:
 
