@@ -47,7 +47,7 @@ The `id` identifers are issued for new terms monotonically by a [Badger Sequence
 | ---------------------------------------------------------------------- | ----------------------------------------------------- |
 | `q<http://xmlns.com/foaf/0.1/name>`                                    | `{ Id: 8234, Subject: 1, Predicate: 142, Object: 2 }` |
 | `q"2011-04-09T20:00:00Z"^^<http://www.w3.org/2001/XMLSchema#dateTime>` | `{ Id: 1129, Subject: 0, Predicate: 0, Object: 1 }`   |
-| `q"N-Triples"@en-US`                                                  | `{ Id: 18123, Subject: 0, Predicate: 0, Object: 2 }`  |
+| `q"N-Triples"@en-US`                                                   | `{ Id: 18123, Subject: 0, Predicate: 0, Object: 2 }`  |
 
 The Index table is the first table accessed during both insertion and querying. Both memoize deserialized structs (which include term identifiers) in an index map to deduplicate lookups.
 
@@ -94,9 +94,9 @@ message Literal {
 
 Blank nodes _are_ given a separate Value type, even though they're semantically treated as content-addressed IRIs. This is only to get more compact CIDs by representing them directly as bytes in Protobuf instead of sacrificing a linear loss to base58 encoding.
 
-| key (as bytes, including prefix) | value                                                                                                            |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `[112 0 0 0 0 0 0 32 42]`        | `iri "http://xmlns.com/foaf/0.1/name"`                                                                           |
+| key (as bytes, including prefix) | value                                                                               |
+| -------------------------------- | ----------------------------------------------------------------------------------- |
+| `[112 0 0 0 0 0 0 32 42]`        | `iri "http://xmlns.com/foaf/0.1/name"`                                              |
 | `[112 0 0 0 0 0 0 4 105]`        | `literal { "2011-04-09T20:00:00Z" "http://www.w3.org/2001/XMLSchema#dateTime" "" }` |
 | `[112 0 0 0 0 0 0 70 203]`       | `literal { "N-Triples" "http://www.w3.org/2000/01/rdf-schema#langString" "en-US" }` |
 
