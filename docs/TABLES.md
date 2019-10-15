@@ -47,7 +47,7 @@ The `id` identifers are issued for new terms monotonically by a [Badger Sequence
 | ---------------------------------------------------------------------- | ----------------------------------------------------- |
 | `q<http://xmlns.com/foaf/0.1/name>`                                    | `{ Id: 8234, Subject: 1, Predicate: 142, Object: 2 }` |
 | `q"2011-04-09T20:00:00Z"^^<http://www.w3.org/2001/XMLSchema#dateTime>` | `{ Id: 1129, Subject: 0, Predicate: 0, Object: 1 }`   |
-| `q"N-Triples"@en-US"`                                                  | `{ Id: 18123, Subject: 0, Predicate: 0, Object: 2 }`  |
+| `q"N-Triples"@en-US`                                                  | `{ Id: 18123, Subject: 0, Predicate: 0, Object: 2 }`  |
 
 The Index table is the first table accessed during both insertion and querying. Both memoize deserialized structs (which include term identifiers) in an index map to deduplicate lookups.
 
