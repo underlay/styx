@@ -32,5 +32,5 @@ Now suppose we want to retrieve some data - like Bob's birthdate. In traditional
 
 This operation is _subgraph matching_. Even though it feels similar to the other methods of data retrieval, it's different in a couple key ways:
 
-- The input and output are both _graphs_, serialized and represent the exact same way that you represent any other RDF graph (JSON-LD, N-Triples, ...)
+- The input and output are both _graphs_, serialized the exact same way that you serialize any other RDF graph (JSON-LD, N-Triples, ...)
 - The subgraph pattern (input) doesn't have explicit order to it, unlike the other graph query languages that imperatively direct the order the variables get solved in. There's no distinguished "root" or "focus" node, there's just a pile of nodes and edges.
