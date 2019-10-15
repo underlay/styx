@@ -97,8 +97,8 @@ Blank nodes _are_ given a separate Value type, even though they're semantically 
 | key (as bytes, including prefix) | value                                                                                                            |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `[112 0 0 0 0 0 0 32 42]`        | `iri "http://xmlns.com/foaf/0.1/name"`                                                                           |
-| `[112 0 0 0 0 0 0 4 105]`        | `literal { value: "2011-04-09T20:00:00Z", datatype: "http://www.w3.org/2001/XMLSchema#dateTime", language: "" }` |
-| `[112 0 0 0 0 0 0 70 203]`       | `literal { value: "N-Triples", datatype: "http://www.w3.org/2000/01/rdf-schema#langString", language: "en-US" }` |
+| `[112 0 0 0 0 0 0 4 105]`        | `literal { "2011-04-09T20:00:00Z" "http://www.w3.org/2001/XMLSchema#dateTime" "" }` |
+| `[112 0 0 0 0 0 0 70 203]`       | `literal { "N-Triples" "http://www.w3.org/2000/01/rdf-schema#langString" "en-US" }` |
 
 ### Insertion
 
