@@ -1,0 +1,18 @@
+graph G {
+  "_:a" [fontname=monospace];
+  "_:b" [fontname=monospace];
+  "_:g" [fontname=monospace];
+  "_:m" [fontname=monospace];
+  "_:an" [fontname=monospace];
+  "_:bn" [fontname=monospace];
+  "_:mn" [fontname=monospace];
+  
+  "_:a" -- "_:b";
+  "_:m" -- "_:a";
+  "_:m" -- "_:b";
+  "_:a" -- "_:an";
+  "_:b" -- "_:bn";
+  "_:b" -- "_:g";
+  "_:a" -- "_:g";
+  "_:m" -- "_:mn";
+}

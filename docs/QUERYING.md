@@ -2,7 +2,7 @@
 
 When Styx first receives a subgraph query, it's in the form of a directed labeled multigraph, where some of the labels (of nodes _or_ edges) are variables (denoted throughout with a `_:` prefix).
 
-![](query.svg)
+![](images/query.svg)
 
 This "star" shape is a common pattern: many real-world queries resemble a cluster of central nodes with several properties relating them all together, surrounded by a fringe of leaf variables that retrieve single properties of the central nodes. In this case, the query represents a same-sex married couple who both acted in the same film.
 
@@ -70,8 +70,14 @@ type HasID interface {
 
 Conceptually, this is all a rearrangment from a directed pattern graph to an _undirected constraint graph_.
 
-![](variable.svg)
+![](images/variable.svg)
 
-Here, all constraints have been grouped together under their respective variables, which now form the nodes of the graph (previously the nodes were RDF _terms_, including ground IRIs and literals, but now they are conceptual sets of _independent constraints_). The edges between the variables now represent _mutual constraint_ - the presence of at least one triple referencing both variables. The undirectness of this constraint graph is important: all of the tables Styx keeps lets it index triples in any direction, which means that this constraint graph can be _solved in any order_. Either value of a 2nd-degree constraint can be "propagated" to the other just as easily.
+Here, all constraints have been grouped together under their respective variables, which now form the nodes of the graph. Previously the nodes were RDF _terms_, including ground IRIs and literals, but now they are conceptual sets of _independent constraints_. The edges between the variables now represent _mutual constraint_ - the presence of at least one triple referencing both variables. The undirectness of this constraint graph is important: all of the tables Styx keeps lets it index triples in any direction, which means that this constraint graph can be _solved in any order_. Either value of a 2nd-degree constraint can be "propagated" to the other just as easily, "upgrading" the dual 2nd-degree constraint to a virutal 1st-degree constraint in the process.
+
+A key concept here is that the value generators of each constraint compose to make a value generator for the variable.
 
 The high-level strategy from this point is to sort the variables into "solve order", and then incrementally seek to the first universally-satisfying set of assignments, backtracking when necessarily.
+
+### Sort heuristic
+
+Sorting the constraint graph into linear order means selecting

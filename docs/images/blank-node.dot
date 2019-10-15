@@ -1,0 +1,5 @@
+digraph G {
+  _ [label="" pos="0,0!"];
+  "\"John Doe\"" [pos="3,0!" shape=rect]
+  _ -> "\"John Doe\"" [label="http://schema.org/name"];
+}

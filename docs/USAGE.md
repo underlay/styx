@@ -90,7 +90,7 @@ This syntax is called [N-Triples](https://en.wikipedia.org/wiki/N-Triples) (`app
 
 Both the JSON-LD and N-Triples here encode the same graph:
 
-![graph](Screenshot_2019-09-27%20Styx%20Directory.png)
+![graph](images/Screenshot_2019-09-27%20Styx%20Directory.png)
 
 ### URIs, Blank Nodes, and Literals
 
@@ -169,9 +169,9 @@ null
 
 Then if we look at http://localhost:8086/directory/, we'll see that file listed (by content-address!) and we can view its contents:
 
-![directory](Screen%20Shot%202019-09-27%20at%204.40.48%20PM.png)
-![download](Screen%20Shot%202019-09-27%20at%204.40.54%20PM.png)
-![view](Screen%20Shot%202019-09-27%20at%204.33.23%20PM.png)
+![directory](images/Screen%20Shot%202019-09-27%20at%204.40.48%20PM.png)
+![download](images/Screen%20Shot%202019-09-27%20at%204.40.54%20PM.png)
+![view](images/Screen%20Shot%202019-09-27%20at%204.33.23%20PM.png)
 
 ## Reading Data
 

@@ -1,0 +1,5 @@
+digraph G {
+  b0 [label="\"1990-07-04\"^^xsd:date" shape=rect pos="4.5,0!"];
+  bob [label="http://example.org/bob#me" shape=rect pos="0,0!"];
+  bob -> b0 [label="schema:birthDate     "];
+}

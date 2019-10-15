@@ -164,4 +164,4 @@ Every major key has a "dual" minor key that encodes the same two terms in revers
 const GraphPrefix = byte('g')
 ```
 
-The Graph table lists every _graph_ in the database, with keys serialized directly as `Blank` structs re-used from the Value table. The values are empty, but may be used to store graph-level metadata in the future.
+The Graph table lists every _graph_ in the database, with keys serialized directly as `Blank` structs re-used from the Value table. The values are empty for now, but may be used to store graph-level metadata in the future.

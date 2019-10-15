@@ -1,0 +1,22 @@
+digraph G {
+  "_:b0" [pos="0,1.5!"];
+  "_:b1" [pos="1.5,1.5!"];
+  "_:b2" [pos="3,1.5!"];
+  "_:b3" [pos="4.5,1.5!"];
+  "nil" [shape=rect pos="6,1.5!"];
+
+  fee [shape=rect pos="0,0!"];
+  fi [shape=rect pos="1.5,0!"];
+  fo [shape=rect pos="3,0!"];
+  fum [shape=rect pos="4.5,0!"];
+
+  "_:b0" -> fee [label="first "];
+  "_:b1" -> fi  [label="first "];
+  "_:b2" -> fo  [label="first "];
+  "_:b3" -> fum [label="first "];
+
+  "_:b0" -> "_:b1" [label="rest    "];
+  "_:b1" -> "_:b2" [label="rest    "];
+  "_:b2" -> "_:b3" [label="rest    "];
+  "_:b3" -> "nil" [label="rest    "];
+}
