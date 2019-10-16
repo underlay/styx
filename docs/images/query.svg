@@ -15,8 +15,21 @@
 <ellipse fill="none" stroke="#000000" cx="167.7829" cy="-112.7859" rx="27" ry="18"/>
 <text text-anchor="middle" x="167.7829" y="-108.5859" font-family="monospace" font-size="14.00" fill="#000000">_:a</text>
 </g>
-<!-- _:b -->
+<!-- Person -->
 <g id="node2" class="node">
+<title>Person</title>
+<ellipse fill="none" stroke="#000000" cx="37.3188" cy="-155.1763" rx="37.1386" ry="18"/>
+<text text-anchor="middle" x="37.3188" y="-150.9763" font-family="monospace" font-size="14.00" fill="#000000">Person</text>
+</g>
+<!-- _:a&#45;&gt;Person -->
+<g id="edge1" class="edge">
+<title>_:a&#45;&gt;Person</title>
+<path fill="none" stroke="#000000" d="M143.2436,-120.7592C125.0193,-126.6807 99.7397,-134.8945 78.4471,-141.8129"/>
+<polygon fill="#000000" stroke="#000000" points="77.1035,-138.5692 68.6746,-144.9882 79.2667,-145.2266 77.1035,-138.5692"/>
+<text text-anchor="middle" x="98.7927" y="-135.4861" font-family="monospace" font-size="14.00" fill="#000000">type</text>
+</g>
+<!-- _:b -->
+<g id="node3" class="node">
 <title>_:b</title>
 <ellipse fill="none" stroke="#000000" cx="167.7829" cy="-334.7446" rx="27" ry="18"/>
 <text text-anchor="middle" x="167.7829" y="-330.5446" font-family="monospace" font-size="14.00" fill="#000000">_:b</text>
@@ -29,7 +42,7 @@
 <text text-anchor="middle" x="148.731" y="-222.8806" font-family="monospace" font-size="14.00" fill="#000000">spouse</text>
 </g>
 <!-- _:an -->
-<g id="node3" class="node">
+<g id="node6" class="node">
 <title>_:an</title>
 <ellipse fill="none" stroke="#000000" cx="198.5807" cy="-18" rx="27.8286" ry="18"/>
 <text text-anchor="middle" x="198.5807" y="-13.8" font-family="monospace" font-size="14.00" fill="#000000">_:an</text>
@@ -42,33 +55,27 @@
 <text text-anchor="middle" x="166.4364" y="-74.4726" font-family="monospace" font-size="14.00" fill="#000000">name</text>
 </g>
 <!-- _:g -->
-<g id="node5" class="node">
+<g id="node8" class="node">
 <title>_:g</title>
-<ellipse fill="none" stroke="#000000" cx="37.3188" cy="-155.1763" rx="27" ry="18"/>
-<text text-anchor="middle" x="37.3188" y="-150.9763" font-family="monospace" font-size="14.00" fill="#000000">_:g</text>
+<ellipse fill="none" stroke="#000000" cx="37.3188" cy="-292.3543" rx="27" ry="18"/>
+<text text-anchor="middle" x="37.3188" y="-288.1543" font-family="monospace" font-size="14.00" fill="#000000">_:g</text>
 </g>
 <!-- _:a&#45;&gt;_:g -->
 <g id="edge10" class="edge">
 <title>_:a&#45;&gt;_:g</title>
-<path fill="none" stroke="#000000" d="M143.2436,-120.7592C122.9254,-127.361 93.8376,-136.8122 71.2825,-144.1408"/>
-<polygon fill="#000000" stroke="#000000" points="70.1771,-140.8198 61.7481,-147.2387 72.3403,-147.4772 70.1771,-140.8198"/>
-<text text-anchor="middle" x="88.2182" y="-136.65" font-family="monospace" font-size="14.00" fill="#000000">gender</text>
+<path fill="none" stroke="#000000" d="M155.975,-129.0381C133.0377,-160.6086 82.3365,-230.3928 55.2316,-267.6995"/>
+<polygon fill="#000000" stroke="#000000" points="52.2404,-265.862 49.1941,-276.0094 57.9035,-269.9765 52.2404,-265.862"/>
+<text text-anchor="middle" x="86.5584" y="-202.5688" font-family="monospace" font-size="14.00" fill="#000000">gender</text>
 </g>
-<!-- Person -->
-<g id="node8" class="node">
-<title>Person</title>
-<ellipse fill="none" stroke="#000000" cx="37.3188" cy="-292.3543" rx="37.1386" ry="18"/>
-<text text-anchor="middle" x="37.3188" y="-288.1543" font-family="monospace" font-size="14.00" fill="#000000">Person</text>
-</g>
-<!-- _:a&#45;&gt;Person -->
-<g id="edge1" class="edge">
-<title>_:a&#45;&gt;Person</title>
-<path fill="none" stroke="#000000" d="M155.975,-129.0381C133.2119,-160.3688 83.1051,-229.335 55.8532,-266.8439"/>
-<polygon fill="#000000" stroke="#000000" points="52.8118,-265.0755 49.7655,-275.2229 58.475,-269.19 52.8118,-265.0755"/>
-<text text-anchor="middle" x="93.8615" y="-202.141" font-family="monospace" font-size="14.00" fill="#000000">type</text>
+<!-- _:b&#45;&gt;Person -->
+<g id="edge2" class="edge">
+<title>_:b&#45;&gt;Person</title>
+<path fill="none" stroke="#000000" d="M155.975,-318.4924C133.2119,-287.1617 83.1051,-218.1956 55.8532,-180.6866"/>
+<polygon fill="#000000" stroke="#000000" points="58.475,-178.3405 49.7655,-172.3076 52.8118,-182.4551 58.475,-178.3405"/>
+<text text-anchor="middle" x="93.8615" y="-253.7895" font-family="monospace" font-size="14.00" fill="#000000">type</text>
 </g>
 <!-- _:bn -->
-<g id="node4" class="node">
+<g id="node7" class="node">
 <title>_:bn</title>
 <ellipse fill="none" stroke="#000000" cx="198.7481" cy="-430.0458" rx="28.4127" ry="18"/>
 <text text-anchor="middle" x="198.7481" y="-425.8458" font-family="monospace" font-size="14.00" fill="#000000">_:bn</text>
@@ -83,19 +90,12 @@
 <!-- _:b&#45;&gt;_:g -->
 <g id="edge9" class="edge">
 <title>_:b&#45;&gt;_:g</title>
-<path fill="none" stroke="#000000" d="M155.975,-318.4924C133.0377,-286.9219 82.3365,-217.1378 55.2316,-179.831"/>
-<polygon fill="#000000" stroke="#000000" points="57.9035,-177.554 49.1941,-171.5211 52.2404,-181.6686 57.9035,-177.554"/>
-<text text-anchor="middle" x="86.5584" y="-253.3617" font-family="monospace" font-size="14.00" fill="#000000">gender</text>
-</g>
-<!-- _:b&#45;&gt;Person -->
-<g id="edge2" class="edge">
-<title>_:b&#45;&gt;Person</title>
-<path fill="none" stroke="#000000" d="M143.2436,-326.7713C125.0193,-320.8499 99.7397,-312.636 78.4471,-305.7176"/>
-<polygon fill="#000000" stroke="#000000" points="79.2667,-302.3039 68.6746,-302.5424 77.1035,-308.9613 79.2667,-302.3039"/>
-<text text-anchor="middle" x="98.7927" y="-320.4445" font-family="monospace" font-size="14.00" fill="#000000">type</text>
+<path fill="none" stroke="#000000" d="M143.2436,-326.7713C122.9254,-320.1695 93.8376,-310.7183 71.2825,-303.3897"/>
+<polygon fill="#000000" stroke="#000000" points="72.3403,-300.0533 61.7481,-300.2918 70.1771,-306.7107 72.3403,-300.0533"/>
+<text text-anchor="middle" x="88.2182" y="-319.2805" font-family="monospace" font-size="14.00" fill="#000000">gender</text>
 </g>
 <!-- _:m -->
-<g id="node6" class="node">
+<g id="node4" class="node">
 <title>_:m</title>
 <ellipse fill="none" stroke="#000000" cx="248.4141" cy="-223.7653" rx="27" ry="18"/>
 <text text-anchor="middle" x="248.4141" y="-219.5653" font-family="monospace" font-size="14.00" fill="#000000">_:m</text>
@@ -114,31 +114,31 @@
 <polygon fill="#000000" stroke="#000000" points="182.7754,-308.1546 179.7291,-318.302 188.4386,-312.2691 182.7754,-308.1546"/>
 <text text-anchor="middle" x="197.1285" y="-279.2979" font-family="monospace" font-size="14.00" fill="#000000">actor</text>
 </g>
-<!-- _:mn -->
-<g id="node7" class="node">
-<title>_:mn</title>
-<ellipse fill="none" stroke="#000000" cx="345.1587" cy="-152.7532" rx="30.7789" ry="18"/>
-<text text-anchor="middle" x="345.1587" y="-148.5532" font-family="monospace" font-size="14.00" fill="#000000">_:mn</text>
-</g>
-<!-- _:m&#45;&gt;_:mn -->
-<g id="edge11" class="edge">
-<title>_:m&#45;&gt;_:mn</title>
-<path fill="none" stroke="#000000" d="M266.611,-210.4084C280.9671,-199.8708 301.2272,-184.9996 317.5752,-172.9999"/>
-<polygon fill="#000000" stroke="#000000" points="319.7251,-175.7636 325.7156,-167.0248 315.5831,-170.1205 319.7251,-175.7636"/>
-<text text-anchor="middle" x="276.9332" y="-179.1042" font-family="monospace" font-size="14.00" fill="#000000">name</text>
-</g>
 <!-- Movie -->
-<g id="node9" class="node">
+<g id="node5" class="node">
 <title>Movie</title>
-<ellipse fill="none" stroke="#000000" cx="346.7897" cy="-289.6731" rx="36.4975" ry="18"/>
-<text text-anchor="middle" x="346.7897" y="-285.4731" font-family="monospace" font-size="14.00" fill="#000000">Movie</text>
+<ellipse fill="none" stroke="#000000" cx="346.7897" cy="-157.8575" rx="36.4975" ry="18"/>
+<text text-anchor="middle" x="346.7897" y="-153.6575" font-family="monospace" font-size="14.00" fill="#000000">Movie</text>
 </g>
 <!-- _:m&#45;&gt;Movie -->
 <g id="edge4" class="edge">
 <title>_:m&#45;&gt;Movie</title>
-<path fill="none" stroke="#000000" d="M267.8499,-236.7865C281.7403,-246.0925 300.7011,-258.7955 316.5585,-269.4194"/>
-<polygon fill="#000000" stroke="#000000" points="314.7411,-272.4146 324.997,-275.0728 318.6373,-266.5991 314.7411,-272.4146"/>
-<text text-anchor="middle" x="280.1516" y="-257.3029" font-family="monospace" font-size="14.00" fill="#000000">type</text>
+<path fill="none" stroke="#000000" d="M267.8499,-210.744C281.7403,-201.438 300.7011,-188.735 316.5585,-178.1112"/>
+<polygon fill="#000000" stroke="#000000" points="318.6373,-180.9314 324.997,-172.4577 314.7411,-175.1159 318.6373,-180.9314"/>
+<text text-anchor="middle" x="280.1516" y="-181.8276" font-family="monospace" font-size="14.00" fill="#000000">type</text>
+</g>
+<!-- _:mn -->
+<g id="node9" class="node">
+<title>_:mn</title>
+<ellipse fill="none" stroke="#000000" cx="345.1587" cy="-294.7773" rx="30.7789" ry="18"/>
+<text text-anchor="middle" x="345.1587" y="-290.5773" font-family="monospace" font-size="14.00" fill="#000000">_:mn</text>
+</g>
+<!-- _:m&#45;&gt;_:mn -->
+<g id="edge11" class="edge">
+<title>_:m&#45;&gt;_:mn</title>
+<path fill="none" stroke="#000000" d="M266.611,-237.1221C280.9671,-247.6597 301.2272,-262.5309 317.5752,-274.5306"/>
+<polygon fill="#000000" stroke="#000000" points="315.5831,-277.41 325.7156,-280.5057 319.7251,-271.767 315.5831,-277.41"/>
+<text text-anchor="middle" x="276.9332" y="-260.0264" font-family="monospace" font-size="14.00" fill="#000000">name</text>
 </g>
 </g>
 </svg>

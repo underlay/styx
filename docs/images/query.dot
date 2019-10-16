@@ -1,22 +1,15 @@
 digraph G {
-  "_:a" [ fontname=monospace ];
-  "_:b" [ fontname=monospace ];
-  "_:an" [ fontname=monospace ];
-  "_:bn" [ fontname=monospace ];
-  "_:g" [ fontname=monospace ];
-  "_:m" [ fontname=monospace ];
-  "_:mn" [ fontname=monospace ];
-  "Person" [ fontname=monospace ];
-  "Movie" [ fontname=monospace ];
-  "_:a" -> "Person" [label="type" fontname=monospace];
-  "_:b" -> "Person" [label="type" fontname=monospace];
-  "_:a" -> "_:b" [label="spouse" fontname=monospace];
-  "_:m" -> "Movie" [label="type" fontname=monospace];
-  "_:m" -> "_:a" [label="actor" fontname=monospace];
-  "_:m" -> "_:b" [label="actor" fontname=monospace];
-  "_:a" -> "_:an" [label="name" fontname=monospace];
-  "_:b" -> "_:bn" [label="name" fontname=monospace];
-  "_:b" -> "_:g" [label="gender" fontname=monospace];
-  "_:a" -> "_:g" [label="gender" fontname=monospace];
-  "_:m" -> "_:mn" [label="name" fontname=monospace];
+  node [fontname=monospace];
+  edge [fontname=monospace];
+  "_:a" -> "Person" [label="type" ];
+  "_:b" -> "Person" [label="type" ];
+  "_:a" -> "_:b" [label="spouse" ];
+  "_:m" -> "Movie" [label="type" ];
+  "_:m" -> "_:a" [label="actor" ];
+  "_:m" -> "_:b" [label="actor" ];
+  "_:a" -> "_:an" [label="name" ];
+  "_:b" -> "_:bn" [label="name" ];
+  "_:b" -> "_:g" [label="gender" ];
+  "_:a" -> "_:g" [label="gender" ];
+  "_:m" -> "_:mn" [label="name" ];
 }

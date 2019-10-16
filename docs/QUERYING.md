@@ -72,7 +72,7 @@ Conceptually, this is all a rearrangment from a directed pattern graph to an _un
 
 ![](images/variable.svg)
 
-Here, all constraints have been grouped together under their respective variables, which now form the nodes of the graph. Previously the nodes were RDF _terms_, including ground IRIs and literals, but now they are conceptual sets of _independent constraints_. The edges between the variables now represent _mutual constraint_ - the presence of at least one triple referencing both variables. The undirectness of this constraint graph is important: all of the tables Styx keeps lets it index triples in any direction, which means that this constraint graph can be _solved in any order_. Either value of a 2nd-degree constraint can be "propagated" to the other just as easily, "upgrading" the dual 2nd-degree constraint to a virutal 1st-degree constraint in the process.
+Here, all constraints have been grouped together under their respective variables, which now form the nodes of the graph. Previously the nodes were RDF _terms_, including ground IRIs and literals, but now they are conceptual sets of _independent constraints_. The edges between the variables now represent _mutual constraint_ - the presence of at least one triple referencing both variables. The undirectness of this constraint graph is important: all of the tables Styx keeps lets it index triples in any direction, which means that this constraint graph can be solved in any order. Either value of a 2nd-degree constraint can be "propagated" to the other, "upgrading" the dual 2nd-degree constraint to a virutal 1st-degree constraint in the process.
 
 A key concept here is that the value generators of each constraint compose to make a value generator for the variable.
 
