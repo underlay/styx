@@ -252,6 +252,11 @@ func (db *DB) Enumerate(
 	})
 }
 
+// Delete a dataset from the database
+func (db *DB) Delete(c *cid.Cid) (err error) {
+	return
+}
+
 var regexGraphIri = regexp.MustCompile("^ul:\\/ipfs\\/([123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{46})#(_:[a-zA-Z0-9]+)?$")
 
 // Ls lists the graphs in the database
@@ -321,6 +326,7 @@ func (db *DB) Ls(index ld.Node, extent int, graphs chan *types.Blank) error {
 // Log will print the *entire database contents* to log
 func (db *DB) Log() error {
 	return db.Badger.View(func(txn *badger.Txn) error {
+		valueMap := types.ValueMap{}
 		iter := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer iter.Close()
 		var i int
@@ -350,7 +356,7 @@ func (db *DB) Log() error {
 					return err
 				}
 				id := binary.BigEndian.Uint64(key[1:])
-				log.Printf("Value: %02d %s\n", id, value.GetValue())
+				log.Printf("Value: %02d %s\n", id, value.GetValue(valueMap, txn))
 			} else if _, has := types.TriplePrefixMap[prefix]; has {
 				// Value key
 				sourceList := &types.SourceList{}
@@ -360,7 +366,7 @@ func (db *DB) Log() error {
 					binary.BigEndian.Uint64(key[1:9]),
 					binary.BigEndian.Uint64(key[9:17]),
 					binary.BigEndian.Uint64(key[17:25]),
-					types.PrintSources(sourceList.Sources),
+					types.PrintSources(sourceList.GetSources(), valueMap, txn),
 				)
 			} else if _, has := types.MinorPrefixMap[prefix]; has {
 				// Minor key
@@ -378,7 +384,7 @@ func (db *DB) Log() error {
 					binary.BigEndian.Uint64(key[9:17]),
 					binary.BigEndian.Uint64(val),
 				)
-			} else if prefix == types.GraphPrefix {
+			} else if prefix == types.DatasetPrefix {
 				blank := &types.Blank{}
 				if err := proto.Unmarshal(key[1:], blank); err != nil {
 					return err

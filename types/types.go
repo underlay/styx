@@ -10,16 +10,38 @@ import (
 	badger "github.com/dgraph-io/badger"
 	proto "github.com/golang/protobuf/proto"
 	cid "github.com/ipfs/go-cid"
+	multihash "github.com/multiformats/go-multihash"
 	ld "github.com/piprate/json-gold/ld"
 )
 
+const tail = "zkiKpvWP3HqVQEfLDhexQzHj4sN413x"
+
+func makeHashlinkURI(mh multihash.Multihash) string {
+	return fmt.Sprintf("hl:%s:%s", mh.B58String(), tail)
+}
+
+func makeDWEBURI(mh multihash.Multihash) string {
+	c := cid.NewCidV1(cid.Raw, mh)
+	return fmt.Sprintf("dweb:/ipfs/%s", c.String())
+}
+
+func makeULURI(mh multihash.Multihash) string {
+	c := cid.NewCidV1(cid.Raw, mh)
+	return fmt.Sprintf("ul:/ipfs/%s", c.String())
+}
+
+// var makeURI = makeDWEBURI
+var makeURI = makeHashlinkURI
+
 // GetValue serializes the source to a string.
-func (source *Source) GetValue() string {
-	if c, err := cid.Cast(source.Cid); err != nil {
-		return ""
-	} else {
-		return fmt.Sprintf("ul:/ipfs/%s#/%d", c.String(), source.Index)
+func (source *SourceList_Source) GetValue(valueMap ValueMap, txn *badger.Txn) string {
+	if value, err := valueMap.Get(source.Id, txn); err == nil {
+		hash := value.GetDataset().GetMultihash()
+		if mh, err := multihash.Cast(hash); err == nil {
+			return makeURI(mh)
+		}
 	}
+	return ""
 }
 
 // Value needs to satisfy the ld.Node interface, which means implementing
@@ -29,11 +51,15 @@ var patternInteger = regexp.MustCompile("^[\\-+]?[0-9]+$")
 var patternDouble = regexp.MustCompile("^(\\+|-)?([0-9]+(\\.[0-9]*)?|\\.[0-9]+)([Ee](\\+|-)?[0-9]+)?$")
 
 // ToJSON casts the value into the appropriate JSON-LD interface
-func (value *Value) ToJSON() (r interface{}) {
-	if t, is := value.Node.(*Value_Blank); is {
-		if c, err := cid.Cast(t.Blank.Cid); err == nil {
-			uri := fmt.Sprintf("ul:/ipfs/%s#%s", c.String(), t.Blank.Id)
-			r = map[string]interface{}{"@id": uri}
+func (value *Value) ToJSON(valueMap ValueMap, txn *badger.Txn) (r interface{}) {
+	if blank := value.GetBlank(); blank != nil {
+		if v, err := valueMap.Get(blank.Origin, txn); err == nil {
+			if ds := v.GetDataset(); ds != nil {
+				if mh, err := multihash.Cast(ds.Multihash); err == nil {
+					uri := fmt.Sprintf("%s#%s", makeURI(mh), blank.Id)
+					r = map[string]interface{}{"@id": uri}
+				}
+			}
 		}
 	} else if t, is := value.Node.(*Value_Iri); is {
 		r = map[string]interface{}{"@id": t.Iri}
@@ -63,10 +89,15 @@ func (value *Value) ToJSON() (r interface{}) {
 }
 
 // GetValue serializes the value to a string.
-func (value *Value) GetValue() string {
-	if b, isBlank := value.Node.(*Value_Blank); isBlank {
-		c, _ := cid.Cast(b.Blank.Cid)
-		return fmt.Sprintf("<ul:/ipfs/%s#%s>", c.String(), b.Blank.Id)
+func (value *Value) GetValue(valueMap ValueMap, txn *badger.Txn) string {
+	if blank := value.GetBlank(); blank != nil {
+		if v, err := valueMap.Get(blank.Origin, txn); err != nil {
+			if ds := v.GetDataset(); ds != nil {
+				if mh, err := multihash.Cast(ds.Multihash); err != nil {
+					return fmt.Sprintf("<%s#%s>", makeURI(mh), blank.Id)
+				}
+			}
+		}
 	} else if i, isIri := value.Node.(*Value_Iri); isIri {
 		return fmt.Sprintf("<%s>", i.Iri)
 	} else if l, isLiteral := value.Node.(*Value_Literal); isLiteral {
@@ -79,9 +110,8 @@ func (value *Value) GetValue() string {
 		} else {
 			return fmt.Sprintf("\"%s\"", escaped)
 		}
-	} else {
-		return ""
 	}
+	return ""
 }
 
 func escape(str string) string {
@@ -149,7 +179,7 @@ func (indexMap IndexMap) Commit(txn *badger.Txn) (err error) {
 
 // Get memoizes database lookup for RDF nodes.
 func (indexMap IndexMap) Get(node ld.Node, txn *badger.Txn) (*Index, error) {
-	value := NodeToValue(cid.Undef, node).GetValue()
+	value := NodeToValue(0, node).GetValue(nil, txn)
 	if index, has := indexMap[value]; has {
 		return index, nil
 	}
@@ -168,8 +198,8 @@ func (indexMap IndexMap) Get(node ld.Node, txn *badger.Txn) (*Index, error) {
 	}
 }
 
-// NodeToValue parses a cid.Cid and an ld.Node into a Value struct.
-func NodeToValue(origin cid.Cid, node ld.Node) *Value {
+// NodeToValue parses a uint64 and an ld.Node into a Value struct.
+func NodeToValue(origin uint64, node ld.Node) *Value {
 	value := &Value{}
 	if iri, isIri := node.(*ld.IRI); isIri {
 		value.Node = &Value_Iri{Iri: iri.Value}
@@ -183,7 +213,7 @@ func NodeToValue(origin cid.Cid, node ld.Node) *Value {
 		}
 		value.Node = &Value_Literal{l}
 	} else if blank, isBlank := node.(*ld.BlankNode); isBlank {
-		b := &Blank{Cid: origin.Bytes(), Id: blank.Attribute}
+		b := &Blank{Origin: origin, Id: blank.Attribute}
 		value.Node = &Value_Blank{Blank: b}
 	}
 	return value
@@ -212,6 +242,23 @@ func (values ValueMap) Commit(txn *badger.Txn) (err error) {
 	return
 }
 
+func (values ValueMap) Get(id uint64, txn *badger.Txn) (*Value, error) {
+	if value, has := values[id]; has {
+		return value, nil
+	}
+	key := make([]byte, 9)
+	key[0] = ValuePrefix
+	binary.BigEndian.PutUint64(key[1:], id)
+	value := &Value{}
+	if item, err := txn.Get(key); err != nil {
+		return nil, err
+	} else if val, err := item.ValueCopy(nil); err != nil {
+		return nil, err
+	} else {
+		return value, proto.Unmarshal(val, value)
+	}
+}
+
 // AssembleKey will look at the prefix byte to determine
 // how many of the elements {abc} to pack into the key.
 func AssembleKey(prefix byte, a, b, c []byte) []byte {
@@ -231,14 +278,19 @@ func AssembleKey(prefix byte, a, b, c []byte) []byte {
 }
 
 // PrintSources pretty-prints a slice of sources on a single line.
-func PrintSources(sources []*Source) string {
+func PrintSources(sources []*SourceList_Source, valueMap ValueMap, txn *badger.Txn) string {
 	s := "[ "
 	for i, source := range sources {
-		c, _ := cid.Parse(source.Cid)
 		if i > 0 {
 			s += " | "
 		}
-		s += fmt.Sprintf("%s#%s/%d", c.String(), source.Graph, source.Index)
+		if value, err := valueMap.Get(source.GetId(), txn); err == nil {
+			if ds := value.GetDataset(); ds != nil {
+				if mh, err := multihash.Cast(ds.Multihash); err == nil {
+					s += fmt.Sprintf("%s#/%d (%s)", makeURI(mh), source.GetIndex(), source.GetGraph())
+				}
+			}
+		}
 	}
 	return s + " ]"
 }

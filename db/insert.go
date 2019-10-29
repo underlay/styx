@@ -140,7 +140,7 @@ func (db *DB) insert(c cid.Cid, quads []*ld.Quad, label string, graph []int, txn
 }
 
 func (db *DB) getID(
-	origin cid.Cid,
+	origin uint64,
 	node ld.Node,
 	place uint8,
 	indexMap types.IndexMap,
