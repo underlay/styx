@@ -22,3 +22,6 @@ www:
 install: www styx.so
 	mkdir -p "$(IPFS_PATH)/plugins/"
 	cp -f styx.so "$(IPFS_PATH)/plugins/styx.so"
+
+proto:
+	protoc --go_out=. types/types.proto
