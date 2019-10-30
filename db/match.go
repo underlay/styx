@@ -5,9 +5,7 @@ import (
 	"log"
 	"strconv"
 
-	cid "github.com/ipfs/go-cid"
 	ld "github.com/piprate/json-gold/ld"
-	types "github.com/underlay/styx/types"
 )
 
 var graphIri = ld.NewIRI("http://underlay.mit.edu/ns#Graph")
@@ -191,7 +189,7 @@ func handleBundle(
 		q := quads[graph[0]]
 		if b, is := q.Subject.(*ld.BlankNode); is && q.Predicate.Equal(typeIri) && q.Object.Equal(graphIri) {
 			enumerator := fmt.Sprintf("q:%s", b.Attribute)
-			graphs := make(chan *types.Blank, extent)
+			graphs := make(chan string, extent)
 			go func() {
 				var node ld.Node = nil
 				if index != nil && len(index) == 1 {
@@ -207,14 +205,12 @@ func handleBundle(
 					"@type":       "Entity",
 					"u:satisfies": t,
 				}
-				if m := <-graphs; m == nil {
-					entities[x]["value"] = []interface{}{}
-				} else if c, err := cid.Cast(m.Cid); err != nil {
+				if m := <-graphs; m == "" {
 					entities[x]["value"] = []interface{}{}
 				} else {
 					entities[x]["value"] = []interface{}{
 						map[string]interface{}{
-							"@id":          fmt.Sprintf("ul:/ipfs/%s#%s", c.String(), m.Id),
+							"@id":          m,
 							"u:instanceOf": enumerator,
 						},
 					}

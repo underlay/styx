@@ -3,42 +3,15 @@ package db
 import (
 	"encoding/binary"
 	"fmt"
-	"log"
 
 	badger "github.com/dgraph-io/badger"
 	proto "github.com/golang/protobuf/proto"
-	cid "github.com/ipfs/go-cid"
 	ld "github.com/piprate/json-gold/ld"
 
 	types "github.com/underlay/styx/types"
 )
 
-func (db *DB) insert(c cid.Cid, quads []*ld.Quad, label string, graph []int, txn *badger.Txn) (err error) {
-	value, err := proto.Marshal(&types.Blank{
-		Cid: c.Bytes(),
-		Id:  label,
-	})
-
-	if err != nil {
-		return err
-	}
-
-	graphKey := types.AssembleKey(types.GraphPrefix, value, nil, nil)
-
-	var item *badger.Item
-
-	// Check to see if this document is already in the database
-	if item, err = txn.Get(graphKey); err != badger.ErrKeyNotFound {
-		return item.Value(func(val []byte) (err error) {
-			log.Printf("Duplicate document inserted previously on %s\n", string(val))
-			return
-		})
-	}
-
-	// Write the current date to the graph key
-	if err = txn.Set(graphKey, nil); err != nil {
-		return
-	}
+func (db *DB) insertGraph(origin uint64, quads []*ld.Quad, label string, graph []int, txn *badger.Txn) (err error) {
 
 	valueMap := types.ValueMap{}
 	indexMap := types.IndexMap{}
@@ -53,19 +26,19 @@ func (db *DB) insert(c cid.Cid, quads []*ld.Quad, label string, graph []int, txn
 			continue
 		}
 
-		source := &types.Source{
-			Cid:   c.Bytes(),
-			Index: uint32(index),
-			Graph: g,
+		source := &types.Statement{
+			Origin: origin,
+			Index:  uint32(index),
+			Graph:  g,
 		}
 
 		// Get the uint64 ids for the subject, predicate, and object
 		var s, p, o []byte
-		if s, err = db.getID(c, quad.Subject, 0, indexMap, valueMap, txn); err != nil {
+		if s, err = db.getID(origin, quad.Subject, 0, indexMap, valueMap, txn); err != nil {
 			return
-		} else if p, err = db.getID(c, quad.Predicate, 1, indexMap, valueMap, txn); err != nil {
+		} else if p, err = db.getID(origin, quad.Predicate, 1, indexMap, valueMap, txn); err != nil {
 			return
-		} else if o, err = db.getID(c, quad.Object, 2, indexMap, valueMap, txn); err != nil {
+		} else if o, err = db.getID(origin, quad.Object, 2, indexMap, valueMap, txn); err != nil {
 			return
 		}
 
@@ -102,7 +75,7 @@ func (db *DB) insert(c cid.Cid, quads []*ld.Quad, label string, graph []int, txn
 			if item, err = txn.Get(key); err == badger.ErrKeyNotFound {
 				if i == 0 {
 					// Create a new SourceList container with the source
-					sources := &types.SourceList{Sources: []*types.Source{source}}
+					sources := &types.SourceList{Sources: []*types.Statement{source}}
 					if val, err = proto.Marshal(sources); err != nil {
 						return
 					}
@@ -149,7 +122,7 @@ func (db *DB) getID(
 ) ([]byte, error) {
 	ID := make([]byte, 8)
 	value := types.NodeToValue(origin, node)
-	v := value.GetValue()
+	v := value.GetValue(valueMap, txn)
 
 	if index, has := indexMap[v]; has {
 		index.Increment(place)

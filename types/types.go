@@ -16,29 +16,59 @@ import (
 
 const tail = "zkiKpvWP3HqVQEfLDhexQzHj4sN413x"
 
-func makeHashlinkURI(mh multihash.Multihash) string {
-	return fmt.Sprintf("hl:%s:%s", mh.B58String(), tail)
+func makeHashlinkURI(mh multihash.Multihash, fragment string) string {
+	return fmt.Sprintf("hl:%s:%s%s", mh.B58String(), tail, fragment)
 }
 
-func makeDWEBURI(mh multihash.Multihash) string {
+func makeDwebURI(mh multihash.Multihash, fragment string) string {
 	c := cid.NewCidV1(cid.Raw, mh)
-	return fmt.Sprintf("dweb:/ipfs/%s", c.String())
+	return fmt.Sprintf("dweb:/ipfs/%s%s", c.String(), fragment)
 }
 
-func makeULURI(mh multihash.Multihash) string {
+func makeUlURI(mh multihash.Multihash, fragment string) string {
 	c := cid.NewCidV1(cid.Raw, mh)
-	return fmt.Sprintf("ul:/ipfs/%s", c.String())
+	return fmt.Sprintf("ul:/ipfs/%s%s", c.String(), fragment)
 }
 
-// var makeURI = makeDWEBURI
-var makeURI = makeHashlinkURI
+// var MakeURI = makeDWEBURI
 
-// GetValue serializes the source to a string.
-func (source *SourceList_Source) GetValue(valueMap ValueMap, txn *badger.Txn) string {
-	if value, err := valueMap.Get(source.Id, txn); err == nil {
-		hash := value.GetDataset().GetMultihash()
-		if mh, err := multihash.Cast(hash); err == nil {
-			return makeURI(mh)
+// MakeURI turns a multihash instance into a URI
+var MakeURI = makeHashlinkURI
+
+var fragment = "(#(?:_:[a-zA-Z0-9]+)?)?"
+var testUlURI = regexp.MustCompile(fmt.Sprintf("^ul:\\/ipfs\\/([a-zA-Z0-9]+)%s$", fragment))
+var testDwebURI = regexp.MustCompile(fmt.Sprintf("^dweb:\\/ipfs\\/([a-zA-Z0-9]+)%s$", fragment))
+var testHashlinkURI = regexp.MustCompile(fmt.Sprintf("^hl:([a-zA-Z0-9]+):%s%s$", tail, fragment))
+
+// TestURI tests URIs
+var TestURI = testHashlinkURI
+
+func parseUlURI(uri string) (multihash.Multihash, string) {
+	match := testUlURI.FindStringSubmatch(uri)
+	c, _ := cid.Decode(match[1])
+	return c.Hash(), match[2]
+}
+
+func parseDwebURI(uri string) (multihash.Multihash, string) {
+	match := testDwebURI.FindStringSubmatch(uri)
+	c, _ := cid.Decode(match[1])
+	return c.Hash(), match[2]
+}
+
+func parseHashlinkURI(uri string) (multihash.Multihash, string) {
+	match := testHashlinkURI.FindStringSubmatch(uri)
+	mh, _ := multihash.FromB58String(match[1])
+	return mh, match[2]
+}
+
+// ParseURI parses URIs
+var ParseURI = parseHashlinkURI
+
+// GetValue serializes the statement to a string.
+func (statement *Statement) GetValue(valueMap ValueMap, txn *badger.Txn) string {
+	if value, err := valueMap.Get(statement.Origin, txn); err == nil {
+		if mh, err := multihash.Cast(value.GetDataset()); err == nil {
+			return MakeURI(mh, fmt.Sprintf("#/%d", statement.GetIndex()))
 		}
 	}
 	return ""
@@ -54,17 +84,15 @@ var patternDouble = regexp.MustCompile("^(\\+|-)?([0-9]+(\\.[0-9]*)?|\\.[0-9]+)(
 func (value *Value) ToJSON(valueMap ValueMap, txn *badger.Txn) (r interface{}) {
 	if blank := value.GetBlank(); blank != nil {
 		if v, err := valueMap.Get(blank.Origin, txn); err == nil {
-			if ds := v.GetDataset(); ds != nil {
-				if mh, err := multihash.Cast(ds.Multihash); err == nil {
-					uri := fmt.Sprintf("%s#%s", makeURI(mh), blank.Id)
-					r = map[string]interface{}{"@id": uri}
-				}
+			if mh, err := multihash.Cast(v.GetDataset()); err == nil {
+				uri := MakeURI(mh, fmt.Sprintf("#%s", blank.Id))
+				r = map[string]interface{}{"@id": uri}
 			}
 		}
 	} else if t, is := value.Node.(*Value_Iri); is {
 		r = map[string]interface{}{"@id": t.Iri}
-	} else if t, is := value.Node.(*Value_Literal); is {
-		v, d, l := t.Literal.Value, t.Literal.Datatype, t.Literal.Language
+	} else if t := value.GetLiteral(); t != nil {
+		v, d, l := t.Value, t.Datatype, t.Language
 		if d == ld.RDFLangString {
 			r = map[string]interface{}{"@value": v, "@language": l}
 		} else if d == "" || d == ld.XSDString {
@@ -92,21 +120,18 @@ func (value *Value) ToJSON(valueMap ValueMap, txn *badger.Txn) (r interface{}) {
 func (value *Value) GetValue(valueMap ValueMap, txn *badger.Txn) string {
 	if blank := value.GetBlank(); blank != nil {
 		if v, err := valueMap.Get(blank.Origin, txn); err != nil {
-			if ds := v.GetDataset(); ds != nil {
-				if mh, err := multihash.Cast(ds.Multihash); err != nil {
-					return fmt.Sprintf("<%s#%s>", makeURI(mh), blank.Id)
-				}
+			if mh, err := multihash.Cast(v.GetDataset()); err != nil {
+				return fmt.Sprintf("<%s>", MakeURI(mh, fmt.Sprintf("#%s", blank.Id)))
 			}
 		}
 	} else if i, isIri := value.Node.(*Value_Iri); isIri {
 		return fmt.Sprintf("<%s>", i.Iri)
-	} else if l, isLiteral := value.Node.(*Value_Literal); isLiteral {
-		v, d, l := l.Literal.Value, l.Literal.Datatype, l.Literal.Language
-		escaped := escape(v)
-		if d == ld.RDFLangString {
-			return fmt.Sprintf("\"%s\"@%s", escaped, l)
-		} else if d != "" && d != ld.XSDString {
-			return fmt.Sprintf("\"%s\"^^<%s>", escaped, d)
+	} else if l := value.GetLiteral(); l != nil {
+		escaped := escape(l.Value)
+		if l.Datatype == ld.RDFLangString {
+			return fmt.Sprintf("\"%s\"@%s", escaped, l.Language)
+		} else if l.Datatype != "" && l.Datatype != ld.XSDString {
+			return fmt.Sprintf("\"%s\"^^<%s>", escaped, l.Datatype)
 		} else {
 			return fmt.Sprintf("\"%s\"", escaped)
 		}
@@ -204,17 +229,17 @@ func NodeToValue(origin uint64, node ld.Node) *Value {
 	if iri, isIri := node.(*ld.IRI); isIri {
 		value.Node = &Value_Iri{Iri: iri.Value}
 	} else if literal, isLiteral := node.(*ld.Literal); isLiteral {
-		l := &Literal{Value: literal.Value}
+		l := &Value_Literal{Value: literal.Value}
 		if literal.Datatype == ld.RDFLangString {
 			l.Datatype = ld.RDFLangString
 			l.Language = literal.Language
 		} else if literal.Datatype != "" && literal.Datatype != ld.XSDString {
 			l.Datatype = literal.Datatype
 		}
-		value.Node = &Value_Literal{l}
+		value.Node = &Value_Literal_{Literal: l}
 	} else if blank, isBlank := node.(*ld.BlankNode); isBlank {
-		b := &Blank{Origin: origin, Id: blank.Attribute}
-		value.Node = &Value_Blank{Blank: b}
+		b := &Value_Blank{Origin: origin, Id: blank.Attribute}
+		value.Node = &Value_Blank_{Blank: b}
 	}
 	return value
 }
@@ -278,17 +303,16 @@ func AssembleKey(prefix byte, a, b, c []byte) []byte {
 }
 
 // PrintSources pretty-prints a slice of sources on a single line.
-func PrintSources(sources []*SourceList_Source, valueMap ValueMap, txn *badger.Txn) string {
+func PrintSources(statements []*Statement, valueMap ValueMap, txn *badger.Txn) string {
 	s := "[ "
-	for i, source := range sources {
+	for i, statement := range statements {
 		if i > 0 {
 			s += " | "
 		}
-		if value, err := valueMap.Get(source.GetId(), txn); err == nil {
-			if ds := value.GetDataset(); ds != nil {
-				if mh, err := multihash.Cast(ds.Multihash); err == nil {
-					s += fmt.Sprintf("%s#/%d (%s)", makeURI(mh), source.GetIndex(), source.GetGraph())
-				}
+		if value, err := valueMap.Get(statement.GetOrigin(), txn); err == nil {
+			if mh, err := multihash.Cast(value.GetDataset()); err == nil {
+				uri := MakeURI(mh, fmt.Sprintf("#/%d", statement.GetIndex()))
+				s += fmt.Sprintf("%s (%s)", uri, statement.GetGraph())
 			}
 		}
 	}

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	badger "github.com/dgraph-io/badger"
 	cid "github.com/ipfs/go-cid"
 	ld "github.com/piprate/json-gold/ld"
 
@@ -38,6 +39,7 @@ var wasAttributedToIri = ld.NewIRI("http://www.w3.org/ns/prov#wasAttributedTo")
 // HandleMessage is where all the magic happens.
 func (db *DB) HandleMessage(
 	c cid.Cid,
+	size uint32,
 	quads []*ld.Quad,
 	graphs map[string][]int,
 ) map[string]interface{} {
@@ -69,13 +71,29 @@ func (db *DB) HandleMessage(
 	// Any message that has a named graph typed to be a query in
 	// the default graph will *not* have *any* of its graphs ingested.
 	if len(queries) == 0 {
-		for label, graph := range graphs {
-			l, g := label, graph
-			go func() {
-				if err := db.Ingest(c, quads, l, g); err != nil {
-					log.Println(err.Error())
+		err := db.Badger.Update(func(txn *badger.Txn) (err error) {
+			graphList := make([]string, len(graphs))
+			var i int
+			for label := range graphs {
+				graphList[i] = label
+				i++
+			}
+
+			var origin uint64
+			origin, err = db.insertDataset(c, uint32(len(quads)), size, graphList, txn)
+			if err != nil {
+				return
+			}
+
+			for label, graph := range graphs {
+				if err = db.insertGraph(origin, quads, label, graph, txn); err != nil {
+					return
 				}
-			}()
+			}
+			return
+		})
+		if err != nil {
+			log.Println("Error inserting dataset", err)
 		}
 		return nil
 	}

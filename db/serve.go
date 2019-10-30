@@ -82,6 +82,7 @@ func (db *DB) Serve(port string) error {
 
 			var c cid.Cid
 			var reader io.Reader
+			var size int64
 			if m == "application/ld+json" {
 				decoder := json.NewDecoder(req.Body)
 
@@ -105,6 +106,7 @@ func (db *DB) Serve(port string) error {
 				} else {
 					c = resolved.Cid()
 					reader = strings.NewReader(s)
+					size = int64(len(s))
 				}
 			} else if m == "application/n-quads" {
 				if resolved, err := db.API.Add(context.Background(), files.NewReaderFile(req.Body)); err != nil {
@@ -117,6 +119,7 @@ func (db *DB) Serve(port string) error {
 					return
 				} else if file, is := node.(files.File); is {
 					reader = file
+					size, _ = file.Size()
 					c = resolved.Cid()
 				} else {
 					res.WriteHeader(400)
@@ -185,6 +188,7 @@ func (db *DB) Serve(port string) error {
 				} else {
 					c = resolved.Cid()
 					reader = strings.NewReader(s)
+					size = int64(len(s))
 				}
 			} else {
 				res.WriteHeader(415)
@@ -198,10 +202,10 @@ func (db *DB) Serve(port string) error {
 			} else {
 				var r map[string]interface{}
 				if logging == "PROD" {
-					r = db.HandleMessage(c, quads, graphs)
+					r = db.HandleMessage(c, uint32(size), quads, graphs)
 				} else {
 					start := time.Now()
-					r = db.HandleMessage(c, quads, graphs)
+					r = db.HandleMessage(c, uint32(size), quads, graphs)
 					log.Printf("Handled message in %s\n", time.Since(start))
 				}
 
