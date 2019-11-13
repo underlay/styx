@@ -13,9 +13,11 @@ import (
 	"os"
 	"strings"
 
-	files "github.com/ipfs/go-ipfs-files"
+	"github.com/ipfs/go-cid"
 	plugin "github.com/ipfs/go-ipfs/plugin"
 	core "github.com/ipfs/interface-go-ipfs-core"
+	path "github.com/ipfs/interface-go-ipfs-core/path"
+	multihash "github.com/multiformats/go-multihash"
 	ld "github.com/piprate/json-gold/ld"
 	cbor "github.com/polydawn/refmt/cbor"
 
@@ -34,6 +36,28 @@ const CborLdListenerPort = "4044"
 
 // NQuadsListenerPort is the n-quads listener port
 const NQuadsListenerPort = "4045"
+
+// APIDocumentStore is a DocumentStore made from a core.BlockAPI
+type APIDocumentStore struct {
+	api core.BlockAPI
+}
+
+// Put a block
+func (block *APIDocumentStore) Put(reader io.Reader) (multihash.Multihash, error) {
+	if b, err := block.api.Put(context.Background(), reader); err != nil {
+		return nil, err
+	} else {
+		return b.Path().Cid().Hash(), nil
+	}
+}
+
+// Get a block
+func (block *APIDocumentStore) Get(mh multihash.Multihash) (io.Reader, error) {
+	c := cid.NewCidV1(cid.Raw, mh)
+	return block.api.Get(context.Background(), path.IpldPath(c))
+}
+
+var _ styx.DocumentStore = (*APIDocumentStore)(nil)
 
 // StyxPlugin is an IPFS deamon plugin
 type StyxPlugin struct {
@@ -88,15 +112,12 @@ func (sp *StyxPlugin) handleNQuadsConnection(conn net.Conn) {
 			return
 		}
 
-		resolved, err := sp.db.API.Add(context.Background(), files.NewReaderFile(bytes.NewReader(b)))
-		if err != nil {
+		reader := bytes.NewReader(b)
+		size := uint32(m)
+		if mh, err := sp.db.Store.Put(reader); err != nil {
 			log.Println(err)
 			continue
-		}
-
-		quads, graphs, err := styx.ParseMessage(bytes.NewReader(b))
-
-		if response := sp.db.HandleMessage(resolved.Cid(), quads, graphs); response == nil {
+		} else if response := sp.db.HandleMessage(mh, size); response == nil {
 			continue
 		} else if res, err := proc.ToRDF(response, stringOptions); err != nil {
 			continue
@@ -142,20 +163,13 @@ func (sp *StyxPlugin) handleCborLdConnection(conn net.Conn) {
 		}
 
 		normalized := n.(string)
-
-		resolved, err := sp.db.API.Add(context.Background(), files.NewReaderFile(strings.NewReader(normalized)))
+		size := uint32(len(normalized))
+		reader := strings.NewReader(normalized)
+		mh, err := sp.db.Store.Put(reader)
 		if err != nil {
 			log.Println(err)
 			continue
-		}
-
-		quads, graphs, err := styx.ParseMessage(strings.NewReader(normalized))
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-
-		if r := sp.db.HandleMessage(resolved.Cid(), quads, graphs); r != nil {
+		} else if r := sp.db.HandleMessage(mh, size); r != nil {
 			marshaller.Marshal(r)
 		}
 	}
@@ -209,7 +223,8 @@ func (sp *StyxPlugin) Start(api core.CoreAPI) error {
 
 	id := fmt.Sprintf("ul:/ipns/%s", key.ID().String())
 	dl := loader.NewCoreDocumentLoader(api)
-	sp.db, err = styx.OpenDB(path, id, dl, api.Unixfs())
+	store := &APIDocumentStore{api: api.Block()}
+	sp.db, err = styx.OpenDB(path, id, dl, store)
 	if err != nil {
 		return err
 	}

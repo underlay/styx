@@ -3,19 +3,52 @@ package db
 import (
 	"encoding/binary"
 	"fmt"
+	"log"
 
 	badger "github.com/dgraph-io/badger"
 	proto "github.com/golang/protobuf/proto"
+	multihash "github.com/multiformats/go-multihash"
 	ld "github.com/piprate/json-gold/ld"
 
 	types "github.com/underlay/styx/types"
 )
 
-func (db *DB) insertGraph(origin uint64, quads []*ld.Quad, label string, graph []int, txn *badger.Txn) (err error) {
+func (db *DB) insertDataset(
+	mh multihash.Multihash, length uint32, size uint32, graphs []string, valueMap types.ValueMap, txn *badger.Txn,
+) (origin uint64, err error) {
+	// mh := c.Hash()
+	datasetKey := types.AssembleKey(types.DatasetPrefix, mh, nil, nil)
 
-	valueMap := types.ValueMap{}
-	indexMap := types.IndexMap{}
+	// Check to see if this document is already in the database
+	if _, err = txn.Get(datasetKey); err != badger.ErrKeyNotFound {
+		if err == nil {
+			log.Println("Dataset already inserted")
+		}
+		return
+	}
 
+	if origin, err = db.Sequence.Next(); err != nil {
+		return
+	}
+
+	valueMap[origin] = &types.Value{Node: &types.Value_Dataset{Dataset: mh}}
+
+	dataset := &types.Dataset{Id: origin, Length: length, Size: size, Graphs: graphs}
+
+	var val []byte
+	if val, err = proto.Marshal(dataset); err != nil {
+		return
+	}
+	err = txn.Set(datasetKey, val)
+	return
+}
+
+func (db *DB) insertGraph(
+	origin uint64, quads []*ld.Quad, label string, graph []int,
+	indexMap types.IndexMap,
+	valueMap types.ValueMap,
+	txn *badger.Txn,
+) (err error) {
 	for index, quad := range quads {
 		var g string
 		if quad.Graph != nil {
@@ -103,12 +136,6 @@ func (db *DB) insertGraph(origin uint64, quads []*ld.Quad, label string, graph [
 		}
 	}
 
-	if err = indexMap.Commit(txn); err != nil {
-		return
-	} else if err = valueMap.Commit(txn); err != nil {
-		return
-	}
-
 	return
 }
 
@@ -121,8 +148,8 @@ func (db *DB) getID(
 	txn *badger.Txn,
 ) ([]byte, error) {
 	ID := make([]byte, 8)
-	value := types.NodeToValue(origin, node)
-	v := value.GetValue(valueMap, txn)
+	value := types.NodeToValue(node, origin, db.uri, txn)
+	v := value.GetValue(valueMap, db.uri, txn)
 
 	if index, has := indexMap[v]; has {
 		index.Increment(place)

@@ -4,26 +4,208 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"time"
 
+	multihash "github.com/multiformats/go-multihash"
 	ld "github.com/piprate/json-gold/ld"
+
+	query "github.com/underlay/styx/query"
 )
 
 var graphIri = ld.NewIRI("http://underlay.mit.edu/ns#Graph")
 var queryIri = ld.NewIRI("http://underlay.mit.edu/ns#Query")
 
+var pinIri = ld.NewIRI("http://underlay.mit.edu/ns#pin")
+
 const valueIri = "http://www.w3.org/1999/02/22-rdf-syntax-ns#value"
 const indexIri = "http://underlay.mit.edu/ns#index"
+const domainIri = "http://underlay.mit.edu/ns#domain"
 const satisfiesIri = "http://underlay.mit.edu/ns#satisfies"
 const enumeratesIri = "http://underlay.mit.edu/ns#enumerates"
 const extentIri = "http://purl.org/dc/terms/extent"
 
 const entityIri = "http://www.w3.org/ns/prov#Entity"
-const bundleIri = "http://www.w3.org/ns/prov#Bundle"
 
-func matchGraph(label string, graphs map[string][]int, quads []*ld.Quad) (
-	entity, bundle bool,
-	target string, extent int, domain []string, index []ld.Node,
-) {
+// const bundleIri = "http://www.w3.org/ns/prov#Bundle"
+
+var provValueIri = ld.NewIRI("http://www.w3.org/ns/prov#value")
+
+var rdfFirstIri = ld.NewIRI(ld.RDFFirst)
+var rdfRestIri = ld.NewIRI(ld.RDFRest)
+var rdfNilIri = ld.NewIRI(ld.RDFNil)
+
+// Query is a type of query that can be executed
+type Query interface {
+	execute(
+		label string, // label is the blank graph label of the top-level query
+		graphs map[string][]int,
+		quads []*ld.Quad,
+		graph *ld.BlankNode,
+		ds multihash.Multihash,
+		db *DB,
+	) []*ld.Quad
+}
+
+// # Instance Queries -----------------------------------------
+type instanceQuery struct{}
+
+func (q instanceQuery) execute(
+	label string,
+	graphs map[string][]int,
+	quads []*ld.Quad,
+	graph *ld.BlankNode,
+	ds multihash.Multihash,
+	db *DB,
+) []*ld.Quad {
+	fmt.Println("Instance query!")
+	variables := make(chan []string)
+	data := make(chan []ld.Node)
+	prov := make(chan query.Prov)
+	go func() {
+		if err := db.Query(quads, graphs[label], nil, nil, 1, variables, data, prov); err != nil {
+			log.Println("hmm", err.Error())
+		}
+	}()
+	v, _ := <-variables
+	d, _ := <-data
+	_, _ = <-prov
+	fmt.Println("got stuff", v, d)
+	if v != nil && d != nil && len(v) > 0 && len(d) == len(v) {
+		variableMap := make(map[string]ld.Node, len(variables))
+		for i, v := range v {
+			variableMap[v] = d[i]
+		}
+		r := make([]*ld.Quad, len(graphs[label]))
+		for i, j := range graphs[label] {
+			q := quads[j]
+			if blank, is := q.Subject.(*ld.BlankNode); is {
+				if node, has := variableMap[blank.Attribute]; has {
+					q.Subject = node
+				} else {
+					break
+				}
+			}
+			if blank, is := q.Predicate.(*ld.BlankNode); is {
+				if node, has := variableMap[blank.Attribute]; has {
+					q.Predicate = node
+				} else {
+					break
+				}
+			}
+			if blank, is := q.Object.(*ld.BlankNode); is {
+				if node, has := variableMap[blank.Attribute]; has {
+					q.Object = node
+				} else {
+					break
+				}
+			}
+			q.Graph = graph
+			r[i] = q
+		}
+		return r
+	}
+	return nil
+}
+
+var _ Query = (*instanceQuery)(nil)
+
+// # Entity Queries -----------------------------------------
+
+type entityQuery struct {
+	target string
+	extent int
+	domain []string
+	index  []ld.Node
+}
+
+func (q entityQuery) execute(
+	label string,
+	graphs map[string][]int,
+	quads []*ld.Quad,
+	graph *ld.BlankNode,
+	ds multihash.Multihash,
+	db *DB,
+) []*ld.Quad {
+
+	g := graph.Attribute
+
+	id := ld.NewIRI(fmt.Sprintf("dweb:/ipns/%s", db.ID))
+	entity := ld.NewBlankNode(fmt.Sprintf("%s-e", g))
+	timeLiteral := ld.NewLiteral(time.Now().Format(time.RFC3339), xsdDateIri, "")
+	uri := db.uri.String(ds, fmt.Sprintf("#%s", q.target))
+	r := []*ld.Quad{
+		ld.NewQuad(entity, typeIri, ld.NewIRI(entityIri), g),
+		ld.NewQuad(entity, ld.NewIRI(satisfiesIri), ld.NewIRI(uri), g),
+		ld.NewQuad(entity, wasAttributedToIri, id, g),
+		ld.NewQuad(entity, generatedAtTimeIri, timeLiteral, g),
+	}
+
+	var value ld.Node = rdfNilIri
+	var variables []string
+	if h, v, t := handleEntity(graphs[q.target], q.domain, q.index, q.extent, quads, g, db); h != nil {
+		r = append(r, t...)
+		value = h
+		variables = v
+	} else {
+		vars := make(chan []string)
+		data := make(chan []ld.Node)
+		prov := make(chan query.Prov)
+
+		go func() {
+			err := db.Query(quads, graphs[q.target], q.domain, q.index, q.extent, vars, data, prov)
+			if err != nil {
+				log.Println(err.Error())
+			}
+		}()
+
+		v, ok := <-vars
+		if !ok || v == nil {
+			return nil
+		}
+		variables = v
+
+		t := make([][]*ld.BlankNode, q.extent)
+		for i := 0; i < q.extent; i++ {
+			d, ok := <-data
+			if !ok || d == nil {
+				break
+			}
+			t[i] = make([]*ld.BlankNode, len(d))
+			var head ld.Node = rdfNilIri
+			for j, node := range d {
+				t[i][j] = ld.NewBlankNode(fmt.Sprintf("%s-t-%d-%d", g, i, j))
+				r = append(r, ld.NewQuad(t[i][j], rdfFirstIri, node, g), ld.NewQuad(t[i][j], rdfRestIri, head, g))
+				head = t[i][j]
+			}
+		}
+
+		for i := len(t); i > 0; i-- {
+			fmt.Println("In reverse order")
+			b := ld.NewBlankNode(fmt.Sprintf("%s-t-%d", g, i-1))
+			r = append(r, ld.NewQuad(b, rdfFirstIri, t[i-1][0], g), ld.NewQuad(b, rdfRestIri, value, g))
+			value = b
+		}
+	}
+
+	var domain ld.Node = rdfNilIri
+	for i, v := range variables {
+		b := ld.NewBlankNode(fmt.Sprintf("%s-d-%d", g, i))
+		o := ld.NewIRI(db.uri.String(ds, fmt.Sprintf("#%s", v)))
+		r = append(r, ld.NewQuad(b, rdfFirstIri, o, g), ld.NewQuad(b, rdfRestIri, domain, g))
+		domain = b
+	}
+
+	fmt.Println("value:", value.GetValue())
+	r = append(
+		r,
+		ld.NewQuad(entity, ld.NewIRI(domainIri), domain, g),
+		ld.NewQuad(entity, provValueIri, value, g),
+	)
+
+	return r
+}
+
+func matchQuery(label string, graphs map[string][]int, quads []*ld.Quad) Query {
 	dataset := ld.NewRDFDataset()
 	dataset.Graphs[label] = make([]*ld.Quad, len(graphs[label]))
 	for i, x := range graphs[label] {
@@ -35,190 +217,192 @@ func matchGraph(label string, graphs map[string][]int, quads []*ld.Quad) (
 	opts.UseNativeTypes = false
 
 	if doc, err := api.FromRDF(dataset, opts); err != nil {
-		return
+		return nil
 	} else if len(doc) < 1 {
-		return
+		return nil
 	} else if first, is := doc[0].(map[string]interface{}); !is {
-		return
+		return nil
 	} else if array, is := first["@graph"].([]interface{}); !is {
-		return
-	} else if target, entity = matchEntity(array); entity {
-		return
-	} else if target, extent, domain, index, bundle = matchBundle(array); bundle {
-		return
+		return nil
+		// } else if entity := matchEntity(label, graphs, array); entity != nil {
+		// 	return entity
+	} else if entity := matchEntity(label, graphs, array); entity != nil {
+		return entity
+	} else {
+		return &instanceQuery{}
 	}
-
-	return
 }
 
-// (I'm an idiot and don't know how to use Go)
-func matchEntity(doc []interface{}) (target string, isEntity bool) {
+// // (I'm an idiot and don't know how to use Go)
+// func matchEntity(label string, graphs map[string][]int, doc []interface{}) (entity *entityQuery) {
+// 	if len(doc) != 1 {
+// 		return
+// 	} else if node, is := doc[0].(map[string]interface{}); !is {
+// 		return
+// 	} else if len(node) != 3 {
+// 		return
+// 	} else if types, is := node["@type"].([]interface{}); !is || len(types) != 1 || types[0] != entityIri {
+// 		return
+// 	} else if target := matchBlankNode(matchValue(node[satisfiesIri])); target == "" {
+// 		return
+// 	} else if _, has := graphs[target]; !has || target == label {
+// 		return
+// 	} else {
+// 		return &entityQuery{target}
+// 	}
+// }
+
+// (I'm really really dumb)
+func matchEntity(label string, graphs map[string][]int, doc []interface{}) (entity *entityQuery) {
 	if len(doc) != 1 {
 		return
 	} else if node, is := doc[0].(map[string]interface{}); !is {
 		return
-	} else if len(node) != 3 {
+	} else if len(node) != 6 {
 		return
-	} else if types, is := node["@type"].([]interface{}); !is || len(types) != 1 {
+	} else if nodeType := matchValue(node["@type"]); nodeType != entityIri {
 		return
-	} else if types[0] != entityIri {
+	} else if target := matchBlankNode(matchValue(node[satisfiesIri])); target == "" {
 		return
-	} else if satisfiesArray, is := node[satisfiesIri].([]interface{}); !is || len(satisfiesArray) != 1 {
+	} else if _, has := graphs[target]; !has || target == label {
 		return
-	} else {
-		return matchBlankNode(satisfiesArray[0])
-	}
-}
-
-func matchBundle(doc []interface{}) (target string, extent int, domain []string, index []ld.Node, isBundle bool) {
-	var isTempBundle bool
-	values := map[string]ld.Node{}
-	for _, node := range doc {
-		if !isTempBundle {
-			target, extent, domain, isTempBundle = matchBundleNode(node)
-			if isTempBundle {
-				continue
-			}
-		}
-
-		if node, is := node.(map[string]interface{}); !is || len(node) != 2 {
-			return
-		} else if id, is := node["@id"].(string); !is || id[:2] != "_:" {
-			return
-		} else if valueArray, is := node[valueIri].([]interface{}); !is || len(valueArray) != 1 {
-			return
-		} else if value, is := valueArray[0].(map[string]interface{}); !is {
-			return
-		} else if iri, is := value["@id"].(string); is && len(value) == 1 {
-			if iri[:2] == "_:" {
-				values[id] = ld.NewBlankNode(iri)
-			} else {
-				values[id] = ld.NewIRI(iri)
-			}
-		} else if literal, is := value["@value"].(string); is {
-			if language, is := value["@language"].(string); is && len(value) == 2 {
-				values[id] = ld.NewLiteral(literal, ld.RDFLangString, language)
-			} else if datatype, is := value["@type"].(string); is && len(value) == 2 {
-				values[id] = ld.NewLiteral(literal, datatype, "")
-			} else if len(value) == 1 {
-				values[id] = ld.NewLiteral(literal, ld.XSDString, "")
-			} else {
-				return
-			}
-		}
-	}
-
-	if isTempBundle && len(values) <= len(domain) {
-		index = make([]ld.Node, len(domain))
-		for i, label := range domain {
-			if value, has := values[label]; has {
-				delete(values, label)
-				index[i] = value
-			}
-		}
-
-		isBundle = len(values) == 0
-	}
-
-	return
-}
-
-// (I'm really really dumb)
-func matchBundleNode(node interface{}) (target string, extent int, domain []string, isBundle bool) {
-	if node, is := node.(map[string]interface{}); !is {
-		return
-	} else if len(node) != 5 {
-		return
-	} else if types, is := node["@type"].([]interface{}); !is || len(types) != 1 {
-		return
-	} else if types[0] != bundleIri {
-		return
-	} else if enumeratesArray, is := node[enumeratesIri].([]interface{}); !is || len(enumeratesArray) != 1 {
-		return
-	} else if id, is := matchBlankNode(enumeratesArray[0]); !is {
-		return
-	} else if extentArray, is := node[extentIri].([]interface{}); !is || len(extentArray) != 1 {
-		return
-	} else if extentNode, is := extentArray[0].(map[string]interface{}); !is || len(extentNode) != 2 {
+	} else if extentNode, is := matchValue(node[extentIri]).(map[string]interface{}); !is || len(extentNode) != 2 {
 		return
 	} else if extentType, is := extentNode["@type"].(string); !is || extentType != ld.XSDInteger {
 		return
 	} else if extentValue, is := extentNode["@value"].(string); !is {
 		return
-	} else if value, err := strconv.Atoi(extentValue); err != nil || value < 1 {
+	} else if extent, err := strconv.Atoi(extentValue); err != nil || extent < 0 {
 		return
-	} else if indexArray, is := node[indexIri].([]interface{}); !is || len(indexArray) != 1 {
+	} else if domainList := matchList(matchValue(node[domainIri])); domainList == nil {
 		return
-	} else if indexNode, is := indexArray[0].(map[string]interface{}); !is || len(indexNode) != 1 {
+	} else if indexList := matchList(matchValue(node[indexIri])); indexList == nil {
 		return
-	} else if indexList, is := indexNode["@list"].([]interface{}); !is {
+	} else if len(indexList) > len(domainList) {
 		return
 	} else {
-		domain = make([]string, len(indexList))
+		domain := make([]string, len(domainList))
+		// Nodes in domainList must be blank nodes
+		for i, node := range domainList {
+			if domain[i] = matchBlankNode(node); domain[i] == "" {
+				return
+			}
+		}
+
+		index := make([]ld.Node, len(indexList))
+		// Nodes in indexList must not be blank nodes
 		for i, node := range indexList {
-			if id, is := matchBlankNode(node); is {
-				domain[i] = id
+			if matchBlankNode(node) != "" {
+				return
+			} else if node, is := node.(map[string]interface{}); !is {
+				return
+			} else if iri, is := node["@id"].(string); is && len(node) == 1 {
+				index[i] = ld.NewIRI(iri)
+			} else if value, is := node["@value"].(string); is {
+				if language, is := node["@language"].(string); is && len(node) == 2 {
+					index[i] = ld.NewLiteral(value, ld.RDFLangString, language)
+				} else if datatype, is := node["@type"].(string); is && len(value) == 2 {
+					index[i] = ld.NewLiteral(value, datatype, "")
+				} else if len(node) == 1 {
+					index[i] = ld.NewLiteral(value, ld.XSDString, "")
+				} else {
+					return
+				}
 			} else {
 				return
 			}
 		}
-		return id, value, domain, true
+
+		return &entityQuery{target, extent, domain, index}
 	}
 }
 
-func matchBlankNode(node interface{}) (string, bool) {
-	if node, is := node.(map[string]interface{}); is && len(node) == 1 {
-		if id, is := node["@id"].(string); is && id[:2] == "_:" {
-			return id, true
+func matchValue(value interface{}) interface{} {
+	if array, is := value.([]interface{}); is && len(array) == 1 {
+		return array[0]
+	}
+	return nil
+}
+
+func matchBlankNode(value interface{}) string {
+	if value != nil {
+		if node, is := value.(map[string]interface{}); is && len(node) == 1 {
+			if id, is := node["@id"].(string); is && id[:2] == "_:" {
+				return id
+			}
 		}
 	}
-	return "", false
+	return ""
 }
 
-func handleBundle(
+func matchList(value interface{}) []interface{} {
+	if value != nil {
+		if node, is := value.(map[string]interface{}); is && len(node) == 1 {
+			if list, is := node["@list"].([]interface{}); is {
+				return list
+			}
+		}
+	}
+	return nil
+}
+
+func handleEntity(
 	graph []int,
-	extent int,
 	domain []string,
 	index []ld.Node,
+	extent int,
 	quads []*ld.Quad,
-	t map[string]interface{},
-	entities []map[string]interface{},
+	g string,
 	db *DB,
-) bool {
-	if len(graph) == 1 {
-		q := quads[graph[0]]
-		if b, is := q.Subject.(*ld.BlankNode); is && q.Predicate.Equal(typeIri) && q.Object.Equal(graphIri) {
-			enumerator := fmt.Sprintf("q:%s", b.Attribute)
-			graphs := make(chan string, extent)
-			go func() {
-				var node ld.Node = nil
-				if index != nil && len(index) == 1 {
-					node = index[0]
-				}
-				if err := db.Ls(node, extent, graphs); err != nil {
-					log.Println(err.Error())
-				}
-			}()
-
-			for x := 0; x < extent; x++ {
-				entities[x] = map[string]interface{}{
-					"@type":       "Entity",
-					"u:satisfies": t,
-				}
-				if m := <-graphs; m == "" {
-					entities[x]["value"] = []interface{}{}
-				} else {
-					entities[x]["value"] = []interface{}{
-						map[string]interface{}{
-							"@id":          m,
-							"u:instanceOf": enumerator,
-						},
-					}
-				}
+) (value ld.Node, variables []string, tail []*ld.Quad) {
+	if len(graph) != 1 {
+		return
+	} else if q := quads[graph[0]]; !q.Predicate.Equal(pinIri) {
+		return
+	} else if iri, is := q.Subject.(*ld.IRI); !is || iri.Value != db.ID {
+		return
+	} else if blank, is := q.Object.(ld.BlankNode); !is {
+		return
+	} else {
+		pins := make(chan string)
+		go func() {
+			var node ld.Node = nil
+			if index != nil && len(index) == 1 {
+				node = index[0]
 			}
-			return true
-		}
-	}
+			if err := db.Ls(node, extent, pins); err != nil {
+				log.Println(err.Error())
+			}
+		}()
 
-	return false
+		results := make([]string, extent)
+
+		i := 0
+		for pin := range pins {
+			results[i] = pin
+			i++
+		}
+
+		tail := []*ld.Quad{}
+		value = rdfNilIri
+		for i := extent; i > 0; i-- {
+			b := ld.NewBlankNode(fmt.Sprintf("%s-v-%d", g, i-1))
+			next := ld.NewQuad(b, rdfRestIri, value, g)
+			if results[i] == "" {
+				tail = append(tail, ld.NewQuad(b, rdfFirstIri, rdfNilIri, g), next)
+			} else {
+				b0 := ld.NewBlankNode(fmt.Sprintf("%s-v-%d-0", g, i-1))
+				tail = append(
+					tail,
+					ld.NewQuad(b, rdfFirstIri, b0, g),
+					ld.NewQuad(b0, rdfFirstIri, ld.NewIRI(results[i]), g),
+					ld.NewQuad(b0, rdfRestIri, rdfNilIri, g),
+					next,
+				)
+			}
+			value = b
+		}
+
+		return value, []string{blank.Attribute}, tail
+	}
 }

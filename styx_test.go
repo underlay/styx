@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	cid "github.com/ipfs/go-cid"
 	ipfs "github.com/ipfs/go-ipfs-api"
 	ld "github.com/piprate/json-gold/ld"
 
@@ -67,9 +66,9 @@ func TestIngest(t *testing.T) {
 
 	dl := loader.NewShellDocumentLoader(sh)
 
-	api := &styx.HTTPAPI{Shell: sh}
+	store := styx.NewHTTPDocumentStore(sh)
 
-	db, err := styx.OpenDB(styx.DefaultPath, peerID.ID, dl, api)
+	db, err := styx.OpenDB(styx.DefaultPath, peerID.ID, dl, store)
 	if err != nil {
 		t.Error(err)
 		return
@@ -110,9 +109,9 @@ func testQuery(query []byte) error {
 
 	dl := loader.NewShellDocumentLoader(sh)
 
-	api := &styx.HTTPAPI{Shell: sh}
+	store := styx.NewHTTPDocumentStore(sh)
 
-	db, err := styx.OpenDB(styx.DefaultPath, peerID.ID, dl, api)
+	db, err := styx.OpenDB(styx.DefaultPath, peerID.ID, dl, store)
 	if err != nil {
 		return err
 	}
@@ -142,19 +141,20 @@ func testQuery(query []byte) error {
 		return err
 	}
 
-	hash, err := sh.Add(strings.NewReader(rdf.(string)))
+	reader := strings.NewReader(rdf.(string))
+	size := uint32(len(rdf.(string)))
+
+	mh, err := store.Put(reader)
 	if err != nil {
 		return err
 	}
 
-	c, err := cid.Decode(hash)
+	fmt.Println("Hash", mh.B58String())
+
+	quads, _, err := styx.ParseMessage(strings.NewReader(rdf.(string)))
 	if err != nil {
 		return err
 	}
-
-	fmt.Println("CID", c)
-
-	quads, graphs, err := styx.ParseMessage(strings.NewReader(rdf.(string)))
 
 	fmt.Println("--- query graph ---")
 	for _, quad := range quads {
@@ -170,11 +170,14 @@ func testQuery(query []byte) error {
 		fmt.Print("\n")
 	}
 
-	result := db.HandleMessage(c, quads, graphs)
-
+	result, err := db.HandleMessage(mh, size)
+	if err != nil {
+		return err
+	}
+	api := ld.NewJsonLdApi()
+	normalized, err := api.Normalize(result, stringOptions)
 	fmt.Println("Result:")
-	b, err := json.MarshalIndent(result, "", "  ")
-	fmt.Println(string(b))
+	fmt.Println(normalized)
 	return err
 }
 
@@ -186,7 +189,7 @@ func TestSPO(t *testing.T) {
 	"@type": "http://underlay.mit.edu/ns#Query",
 	"@graph": {
 		"@id": "http://people.com/jane",
-		"name": {}
+		"name": { }
 	}
 }`)); err != nil {
 		t.Error(err)
@@ -225,30 +228,30 @@ func TestSimpleQuery(t *testing.T) {
 	}
 }
 
-func TestEntityQuery(t *testing.T) {
-	if err := testQuery([]byte(`{
-	"@context": {
-		"@vocab": "http://schema.org/",
-		"prov": "http://www.w3.org/ns/prov#",
-		"u": "http://underlay.mit.edu/ns#"
-	},
-	"@type": "u:Query",
-	"@graph": {
-		"@type": "prov:Entity",
-		"u:satisfies": {
-			"@graph": {
-				"@type": "Person",
-				"birthDate": { },
-				"knows": {
-					"name": "Jane Doe"
-				}
-			}
-		}
-	}
-}`)); err != nil {
-		t.Error(err)
-	}
-}
+// func TestEntityQuery(t *testing.T) {
+// 	if err := testQuery([]byte(`{
+// 	"@context": {
+// 		"@vocab": "http://schema.org/",
+// 		"prov": "http://www.w3.org/ns/prov#",
+// 		"u": "http://underlay.mit.edu/ns#"
+// 	},
+// 	"@type": "u:Query",
+// 	"@graph": {
+// 		"@type": "prov:Entity",
+// 		"u:satisfies": {
+// 			"@graph": {
+// 				"@type": "Person",
+// 				"birthDate": { },
+// 				"knows": {
+// 					"name": "Jane Doe"
+// 				}
+// 			}
+// 		}
+// 	}
+// }`)); err != nil {
+// 		t.Error(err)
+// 	}
+// }
 
 func TestBundleQuery(t *testing.T) {
 	if err := testQuery([]byte(`{
@@ -257,14 +260,16 @@ func TestBundleQuery(t *testing.T) {
 		"dcterms": "http://purl.org/dc/terms/",
 		"prov": "http://www.w3.org/ns/prov#",
 		"u": "http://underlay.mit.edu/ns#",
-		"u:index": { "@container": "@list" }
+		"u:index": { "@container": "@list" },
+		"u:domain": { "@container": "@list" }
 	},
 	"@type": "u:Query",
 	"@graph": {
-		"@type": "prov:Bundle",
-		"dcterms:extent": 3,
+		"@type": "prov:Entity",
+		"dcterms:extent": 1,
+		"u:domain": [],
 		"u:index": [],
-		"u:enumerates": {
+		"u:satisfies": {
 			"@graph": {
 				"@type": "Person",
 				"name": { }
@@ -434,9 +439,9 @@ func TestNT(t *testing.T) {
 	}
 
 	dl := loader.NewShellDocumentLoader(sh)
-	api := &styx.HTTPAPI{Shell: sh}
+	store := styx.NewHTTPDocumentStore(sh)
 
-	db, err := styx.OpenDB(styx.DefaultPath, peerID.ID, dl, api)
+	db, err := styx.OpenDB(styx.DefaultPath, peerID.ID, dl, store)
 	if err != nil {
 		t.Error(err)
 		return
@@ -482,18 +487,9 @@ func TestNT(t *testing.T) {
 		t.Error(err)
 	}
 
-	quads, graphs, err := styx.ParseMessage(strings.NewReader(rdf.(string)))
-
-	hash, err := sh.Add(strings.NewReader(rdf.(string)))
+	quads, _, err := styx.ParseMessage(strings.NewReader(rdf.(string)))
 	if err != nil {
 		t.Error(err)
-		return
-	}
-
-	c, err := cid.Decode(hash)
-	if err != nil {
-		t.Error(err)
-		return
 	}
 
 	fmt.Println("--- query graph ---")
@@ -506,11 +502,18 @@ func TestNT(t *testing.T) {
 		)
 	}
 
-	result := db.HandleMessage(c, quads, graphs)
+	reader := strings.NewReader(rdf.(string))
+	size := uint32(len(rdf.(string)))
+	mh, err := store.Put(reader)
+	if err != nil {
+		t.Error(err)
+	}
 
+	result, err := db.HandleMessage(mh, size)
+	api := ld.NewJsonLdApi()
+	normalized, err := api.Normalize(result, stringOptions)
 	fmt.Println("Result:")
-	b, err := json.MarshalIndent(result, "", "  ")
-	fmt.Println(string(b))
+	fmt.Println(normalized)
 }
 
 func openFile(path string, dl ld.DocumentLoader) (doc map[string]interface{}, err error) {
