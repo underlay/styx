@@ -182,7 +182,8 @@ func (q entityQuery) execute(
 		for i := len(t); i > 0; i-- {
 			fmt.Println("In reverse order")
 			b := ld.NewBlankNode(fmt.Sprintf("%s-t-%d", g, i-1))
-			r = append(r, ld.NewQuad(b, rdfFirstIri, t[i-1][0], g), ld.NewQuad(b, rdfRestIri, value, g))
+			o := t[i-1][len(t[i-1])-1]
+			r = append(r, ld.NewQuad(b, rdfFirstIri, o, g), ld.NewQuad(b, rdfRestIri, value, g))
 			value = b
 		}
 	}

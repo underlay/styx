@@ -9,6 +9,7 @@ import (
 
 	badger "github.com/dgraph-io/badger"
 	proto "github.com/golang/protobuf/proto"
+	"github.com/ipfs/go-cid"
 	multibase "github.com/multiformats/go-multibase"
 	multihash "github.com/multiformats/go-multihash"
 	ld "github.com/piprate/json-gold/ld"
@@ -18,7 +19,7 @@ const tail = "zkiKpvWP3HqVQEfLDhexQzHj4sN413x"
 
 const fragment = "(#(?:_:[a-zA-Z0-9]+)?)?"
 
-var testUlURI = regexp.MustCompile(fmt.Sprintf("^ul:\\/ipfs\\/([a-zA-Z0-9]+)%s$", fragment))
+var testUlURI = regexp.MustCompile(fmt.Sprintf("^ul:\\/ipld\\/([a-zA-Z0-9]+)%s$", fragment))
 var testDwebURI = regexp.MustCompile(fmt.Sprintf("^dweb:\\/ipfs\\/([a-zA-Z0-9]+)%s$", fragment))
 var testHashlinkURI = regexp.MustCompile(fmt.Sprintf("^hl:([a-zA-Z0-9]+):%s%s$", tail, fragment))
 
@@ -29,7 +30,7 @@ type URI interface {
 
 type hlURI struct{}
 
-func (hlURI) Parse(uri string) (mh multihash.Multihash, fragment string) {
+func (*hlURI) Parse(uri string) (mh multihash.Multihash, fragment string) {
 	if match := testHashlinkURI.FindStringSubmatch(uri); match != nil {
 		mh, _ = multihash.FromB58String(match[1])
 		fragment = match[2]
@@ -37,7 +38,7 @@ func (hlURI) Parse(uri string) (mh multihash.Multihash, fragment string) {
 	return
 }
 
-func (hlURI) String(mh multihash.Multihash, fragment string) (uri string) {
+func (*hlURI) String(mh multihash.Multihash, fragment string) (uri string) {
 	s, _ := multibase.Encode(multibase.Base58BTC, mh)
 	return fmt.Sprintf("hl:%s:%s%s", s, tail, fragment)
 }
@@ -46,7 +47,7 @@ var HlURI URI = (*hlURI)(nil)
 
 type ulURI struct{}
 
-func (ulURI) Parse(uri string) (mh multihash.Multihash, fragment string) {
+func (*ulURI) Parse(uri string) (mh multihash.Multihash, fragment string) {
 	if match := testUlURI.FindStringSubmatch(uri); match != nil {
 		mh, _ = multihash.FromB58String(match[1])
 		fragment = match[2]
@@ -54,8 +55,10 @@ func (ulURI) Parse(uri string) (mh multihash.Multihash, fragment string) {
 	return
 }
 
-func (ulURI) String(mh multihash.Multihash, fragment string) (uri string) {
-	return fmt.Sprintf("ul:/ipfs/%s%s", mh.B58String(), fragment)
+func (*ulURI) String(mh multihash.Multihash, fragment string) (uri string) {
+	c := cid.NewCidV1(cid.Raw, mh)
+	s, _ := c.StringOfBase(multibase.Base58BTC)
+	return fmt.Sprintf("ul:/ipld/%s%s", s, fragment)
 }
 
 var UlURI URI = (*ulURI)(nil)

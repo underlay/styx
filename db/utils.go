@@ -4,12 +4,12 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"regexp"
 	"strings"
 
 	cid "github.com/ipfs/go-cid"
 	ipfs "github.com/ipfs/go-ipfs-api"
+	"github.com/multiformats/go-multibase"
 	multihash "github.com/multiformats/go-multihash"
 	ld "github.com/piprate/json-gold/ld"
 
@@ -54,9 +54,7 @@ func NewHTTPDocumentStore(shell *ipfs.Shell) *HTTPDocumentStore {
 
 // Put a stream to a multihash
 func (api *HTTPDocumentStore) Put(reader io.Reader) (multihash.Multihash, error) {
-	if block, err := ioutil.ReadAll(reader); err != nil {
-		return nil, err
-	} else if s, err := api.shell.BlockPut(block, "raw", "sha2-256", -1); err != nil {
+	if s, err := api.shell.Add(reader, ipfs.RawLeaves(true)); err != nil {
 		return nil, err
 	} else if c, err := cid.Decode(s); err != nil {
 		return nil, err
@@ -68,7 +66,11 @@ func (api *HTTPDocumentStore) Put(reader io.Reader) (multihash.Multihash, error)
 // Get a stream by multihash
 func (api *HTTPDocumentStore) Get(mh multihash.Multihash) (io.Reader, error) {
 	c := cid.NewCidV1(cid.Raw, mh)
-	return api.shell.Cat(c.String())
+	s, err := c.StringOfBase(multibase.Base58BTC)
+	if err != nil {
+		return nil, err
+	}
+	return api.shell.Cat(s)
 }
 
 // Compile-time type check

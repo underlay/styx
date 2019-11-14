@@ -134,6 +134,8 @@ func testQuery(query []byte) error {
 		return err
 	}
 
+	fmt.Println("got query data")
+
 	proc := ld.NewJsonLdProcessor()
 	stringOptions := styx.GetStringOptions(dl)
 	rdf, err := proc.ToRDF(queryData, stringOptions)
@@ -141,17 +143,16 @@ func testQuery(query []byte) error {
 		return err
 	}
 
-	reader := strings.NewReader(rdf.(string))
 	size := uint32(len(rdf.(string)))
-
-	mh, err := store.Put(reader)
+	fmt.Println("About to put")
+	mh, err := store.Put(strings.NewReader(rdf.(string)))
 	if err != nil {
 		return err
 	}
 
 	fmt.Println("Hash", mh.B58String())
-
-	quads, _, err := styx.ParseMessage(strings.NewReader(rdf.(string)))
+	reader, err := store.Get(mh)
+	quads, _, err := styx.ParseMessage(reader)
 	if err != nil {
 		return err
 	}
@@ -178,14 +179,14 @@ func testQuery(query []byte) error {
 	normalized, err := api.Normalize(result, stringOptions)
 	fmt.Println("Result:")
 	fmt.Println(normalized)
+	s, err := sh.Add(strings.NewReader(normalized.(string)), ipfs.RawLeaves(true))
+	fmt.Printf("http://localhost:8000?%s\n", s)
 	return err
 }
 
 func TestSPO(t *testing.T) {
 	if err := testQuery([]byte(`{
-	"@context": {
-		"@vocab": "http://schema.org/"
-	},
+	"@context": { "@vocab": "http://schema.org/" },
 	"@type": "http://underlay.mit.edu/ns#Query",
 	"@graph": {
 		"@id": "http://people.com/jane",
@@ -198,9 +199,7 @@ func TestSPO(t *testing.T) {
 
 func TestOPS(t *testing.T) {
 	if err := testQuery([]byte(`{
-	"@context": {
-		"@vocab": "http://schema.org/"
-	},
+	"@context": { "@vocab": "http://schema.org/" },
 	"@type": "http://underlay.mit.edu/ns#Query",
 	"@graph": {
 		"name": "Jane Doe"
@@ -270,9 +269,12 @@ func TestBundleQuery(t *testing.T) {
 		"u:domain": [],
 		"u:index": [],
 		"u:satisfies": {
-			"@graph": {
+			"@graph":  {
 				"@type": "Person",
-				"name": { }
+				"birthDate": { },
+				"knows": {
+					"name": "Jane Doe"
+				}
 			}
 		}
 	}

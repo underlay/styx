@@ -300,6 +300,7 @@ func (g *ConstraintGraph) Close() {
 // Sort interface functions
 func (g *ConstraintGraph) Len() int { return len(g.Domain) }
 func (g *ConstraintGraph) Swap(a, b int) {
+	g.Variables[a], g.Variables[b] = g.Variables[b], g.Variables[a]
 	g.Domain[a], g.Domain[b] = g.Domain[b], g.Domain[a]
 }
 
