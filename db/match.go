@@ -15,7 +15,7 @@ import (
 var graphIri = ld.NewIRI("http://underlay.mit.edu/ns#Graph")
 var queryIri = ld.NewIRI("http://underlay.mit.edu/ns#Query")
 
-var pinIri = ld.NewIRI("http://underlay.mit.edu/ns#pin")
+var memberIri = ld.NewIRI("http://www.w3.org/ns/ldp#member")
 
 const valueIri = "http://www.w3.org/1999/02/22-rdf-syntax-ns#value"
 const indexIri = "http://underlay.mit.edu/ns#index"
@@ -57,7 +57,6 @@ func (q instanceQuery) execute(
 	ds multihash.Multihash,
 	db *DB,
 ) []*ld.Quad {
-	fmt.Println("Instance query!")
 	variables := make(chan []string)
 	data := make(chan []ld.Node)
 	prov := make(chan query.Prov)
@@ -69,7 +68,6 @@ func (q instanceQuery) execute(
 	v, _ := <-variables
 	d, _ := <-data
 	_, _ = <-prov
-	fmt.Println("got stuff", v, d)
 	if v != nil && d != nil && len(v) > 0 && len(d) == len(v) {
 		variableMap := make(map[string]ld.Node, len(variables))
 		for i, v := range v {
@@ -142,7 +140,7 @@ func (q entityQuery) execute(
 
 	var value ld.Node = rdfNilIri
 	var variables []string
-	if h, v, t := handleEntity(graphs[q.target], q.domain, q.index, q.extent, quads, g, db); h != nil {
+	if h, v, t := handleEntity(graphs[q.target], q.domain, q.index, q.extent, quads, g, id, db); h != nil {
 		r = append(r, t...)
 		value = h
 		variables = v
@@ -167,6 +165,7 @@ func (q entityQuery) execute(
 		t := make([][]*ld.BlankNode, q.extent)
 		for i := 0; i < q.extent; i++ {
 			d, ok := <-data
+			_ = <-prov
 			if !ok || d == nil {
 				break
 			}
@@ -180,9 +179,14 @@ func (q entityQuery) execute(
 		}
 
 		for i := len(t); i > 0; i-- {
-			fmt.Println("In reverse order")
 			b := ld.NewBlankNode(fmt.Sprintf("%s-t-%d", g, i-1))
-			o := t[i-1][len(t[i-1])-1]
+			var o ld.Node
+			l := len(t[i-1])
+			if l > 0 {
+				o = t[i-1][l-1]
+			} else {
+				o = rdfNilIri
+			}
 			r = append(r, ld.NewQuad(b, rdfFirstIri, o, g), ld.NewQuad(b, rdfRestIri, value, g))
 			value = b
 		}
@@ -196,7 +200,6 @@ func (q entityQuery) execute(
 		domain = b
 	}
 
-	fmt.Println("value:", value.GetValue())
 	r = append(
 		r,
 		ld.NewQuad(entity, ld.NewIRI(domainIri), domain, g),
@@ -354,25 +357,33 @@ func handleEntity(
 	extent int,
 	quads []*ld.Quad,
 	g string,
+	id *ld.IRI,
 	db *DB,
 ) (value ld.Node, variables []string, tail []*ld.Quad) {
 	if len(graph) != 1 {
 		return
-	} else if q := quads[graph[0]]; !q.Predicate.Equal(pinIri) {
+	} else if q := quads[graph[0]]; !q.Predicate.Equal(memberIri) {
 		return
-	} else if iri, is := q.Subject.(*ld.IRI); !is || iri.Value != db.ID {
+	} else if iri, is := q.Subject.(*ld.IRI); !is || iri.Value != id.Value {
 		return
-	} else if blank, is := q.Object.(ld.BlankNode); !is {
+	} else if blank, is := q.Object.(*ld.BlankNode); !is {
 		return
 	} else {
 		pins := make(chan string)
-		go func() {
-			var node ld.Node = nil
-			if index != nil && len(index) == 1 {
-				node = index[0]
+		var mh multihash.Multihash = nil
+		var fragment string
+		if len(index) == 1 {
+			if iri, is := index[0].(*ld.IRI); is {
+				mh, fragment = db.uri.Parse(iri.Value)
+				if fragment != "" {
+					mh = nil
+				}
 			}
-			if err := db.Ls(node, extent, pins); err != nil {
-				log.Println(err.Error())
+		}
+
+		go func() {
+			if err := db.Ls(mh, extent, pins); err != nil {
+				fmt.Println("db.Ls failed:", err.Error())
 			}
 		}()
 
@@ -389,14 +400,14 @@ func handleEntity(
 		for i := extent; i > 0; i-- {
 			b := ld.NewBlankNode(fmt.Sprintf("%s-v-%d", g, i-1))
 			next := ld.NewQuad(b, rdfRestIri, value, g)
-			if results[i] == "" {
+			if results[i-1] == "" {
 				tail = append(tail, ld.NewQuad(b, rdfFirstIri, rdfNilIri, g), next)
 			} else {
 				b0 := ld.NewBlankNode(fmt.Sprintf("%s-v-%d-0", g, i-1))
 				tail = append(
 					tail,
 					ld.NewQuad(b, rdfFirstIri, b0, g),
-					ld.NewQuad(b0, rdfFirstIri, ld.NewIRI(results[i]), g),
+					ld.NewQuad(b0, rdfFirstIri, ld.NewIRI(results[i-1]), g),
 					ld.NewQuad(b0, rdfRestIri, rdfNilIri, g),
 					next,
 				)

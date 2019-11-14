@@ -19,7 +19,7 @@ const tail = "zkiKpvWP3HqVQEfLDhexQzHj4sN413x"
 
 const fragment = "(#(?:_:[a-zA-Z0-9]+)?)?"
 
-var testUlURI = regexp.MustCompile(fmt.Sprintf("^ul:\\/ipld\\/([a-zA-Z0-9]+)%s$", fragment))
+var testUlURI = regexp.MustCompile(fmt.Sprintf("^ul:\\/ipld\\/([a-zA-Z0-9]{49})%s$", fragment))
 var testDwebURI = regexp.MustCompile(fmt.Sprintf("^dweb:\\/ipfs\\/([a-zA-Z0-9]+)%s$", fragment))
 var testHashlinkURI = regexp.MustCompile(fmt.Sprintf("^hl:([a-zA-Z0-9]+):%s%s$", tail, fragment))
 
@@ -49,8 +49,8 @@ type ulURI struct{}
 
 func (*ulURI) Parse(uri string) (mh multihash.Multihash, fragment string) {
 	if match := testUlURI.FindStringSubmatch(uri); match != nil {
-		mh, _ = multihash.FromB58String(match[1])
-		fragment = match[2]
+		c, _ := cid.Decode(match[1])
+		mh = c.Hash()
 	}
 	return
 }

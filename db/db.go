@@ -3,6 +3,7 @@ package db
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"log"
 	"strings"
 
@@ -153,9 +154,11 @@ func (db *DB) Query(
 		variables <- g.Domain
 
 		valueMap := types.ValueMap{}
-		var i int
-		for ; i < extent; i++ {
+		fmt.Println("Okay we're starting iteration")
+		for i := 0; i < extent; i++ {
+			fmt.Println("i", i)
 			tail, p, err := g.Next(txn)
+			fmt.Println("Got next", tail, p, err)
 			if err != nil {
 				return err
 			} else if tail == nil {
@@ -170,8 +173,10 @@ func (db *DB) Query(
 				}
 				d[j] = types.ValueToNode(value, valueMap, db.uri, txn)
 			}
+			fmt.Println("About to send d and p", d, p)
 			data <- d
 			prov <- p
+			fmt.Println("Sent d and p")
 		}
 		return
 	})
@@ -183,7 +188,7 @@ func (db *DB) Rm(mh multihash.Multihash) (err error) {
 }
 
 // Ls lists the datasets in the database
-func (db *DB) Ls(index ld.Node, extent int, datasets chan string) error {
+func (db *DB) Ls(index multihash.Multihash, extent int, datasets chan string) error {
 	var prefix = make([]byte, 1)
 	prefix[0] = types.DatasetPrefix
 
@@ -206,13 +211,10 @@ func (db *DB) Ls(index ld.Node, extent int, datasets chan string) error {
 		defer close(datasets)
 
 		var seek []byte
-		if iri, is := index.(*ld.IRI); is && index != nil && types.TestURI.MatchString(iri.Value) {
-			if mh, fragment := db.uri.Parse(iri.Value); mh != nil && fragment == "" {
-				seek = make([]byte, len(mh)+1)
-				copy(seek[1:], mh)
-			}
-		}
-		if seek == nil {
+		if index != nil {
+			seek = make([]byte, len(index)+1)
+			copy(seek[1:], index)
+		} else {
 			seek = make([]byte, 1)
 		}
 
@@ -227,8 +229,8 @@ func (db *DB) Ls(index ld.Node, extent int, datasets chan string) error {
 			if err != nil {
 				return err
 			}
-			datasets <- db.uri.String(mh, "")
 
+			datasets <- db.uri.String(mh, "")
 			i++
 		}
 

@@ -42,6 +42,18 @@ var sampleData = []byte(`{
 	}
 }`)
 
+var sampleData2 = []byte(`{
+	"@context": {
+		"@vocab": "http://schema.org/",
+		"xsd": "http://www.w3.org/2001/XMLSchema#",
+		"birthDate": { "@type": "xsd:date" }
+	},
+	"@type": "Person",
+	"name": "Johnanthan Appleseed",
+	"birthDate": "1780-01-10",
+	"knows": { "@id": "http://people.com/jane" }
+}`)
+
 func TestIngest(t *testing.T) {
 	// Replace at your leisure
 	sh := ipfs.NewShell(defaultHost)
@@ -92,7 +104,7 @@ func TestIngest(t *testing.T) {
 	}
 }
 
-func testQuery(query []byte) error {
+func testQuery(double bool, query []byte) error {
 	// Replace at your leisure
 	sh := ipfs.NewShell(defaultHost)
 
@@ -125,6 +137,17 @@ func testQuery(query []byte) error {
 
 	if err := db.IngestJSONLd(data); err != nil {
 		return err
+	}
+
+	if double {
+		var data2 map[string]interface{}
+		if err := json.Unmarshal(sampleData2, &data2); err != nil {
+			return err
+		}
+
+		if err := db.IngestJSONLd(data2); err != nil {
+			return err
+		}
 	}
 
 	db.Log()
@@ -185,7 +208,7 @@ func testQuery(query []byte) error {
 }
 
 func TestSPO(t *testing.T) {
-	if err := testQuery([]byte(`{
+	if err := testQuery(false, []byte(`{
 	"@context": { "@vocab": "http://schema.org/" },
 	"@type": "http://underlay.mit.edu/ns#Query",
 	"@graph": {
@@ -198,7 +221,7 @@ func TestSPO(t *testing.T) {
 }
 
 func TestOPS(t *testing.T) {
-	if err := testQuery([]byte(`{
+	if err := testQuery(false, []byte(`{
 	"@context": { "@vocab": "http://schema.org/" },
 	"@type": "http://underlay.mit.edu/ns#Query",
 	"@graph": {
@@ -210,7 +233,7 @@ func TestOPS(t *testing.T) {
 }
 
 func TestSimpleQuery(t *testing.T) {
-	if err := testQuery([]byte(`{
+	if err := testQuery(false, []byte(`{
 	"@context": {
 		"@vocab": "http://schema.org/"
 	},
@@ -253,7 +276,7 @@ func TestSimpleQuery(t *testing.T) {
 // }
 
 func TestBundleQuery(t *testing.T) {
-	if err := testQuery([]byte(`{
+	if err := testQuery(false, []byte(`{
 	"@context": {
 		"@vocab": "http://schema.org/",
 		"dcterms": "http://purl.org/dc/terms/",
@@ -265,13 +288,12 @@ func TestBundleQuery(t *testing.T) {
 	"@type": "u:Query",
 	"@graph": {
 		"@type": "prov:Entity",
-		"dcterms:extent": 1,
+		"dcterms:extent": 3,
 		"u:domain": [],
 		"u:index": [],
 		"u:satisfies": {
 			"@graph":  {
 				"@type": "Person",
-				"birthDate": { },
 				"knows": {
 					"name": "Jane Doe"
 				}
@@ -284,21 +306,25 @@ func TestBundleQuery(t *testing.T) {
 }
 
 func TestGraphQuery(t *testing.T) {
-	if err := testQuery([]byte(`{
+	if err := testQuery(true, []byte(`{
 	"@context": {
 		"dcterms": "http://purl.org/dc/terms/",
 		"prov": "http://www.w3.org/ns/prov#",
+		"ldp": "http://www.w3.org/ns/ldp#",
 		"u": "http://underlay.mit.edu/ns#",
-		"u:index": { "@container": "@list" }
+		"u:index": { "@container": "@list" },
+		"u:domain": { "@container": "@list" }
 	},
 	"@type": "u:Query",
 	"@graph": {
-		"@type": "prov:Bundle",
+		"@type": "prov:Entity",
 		"dcterms:extent": 3,
+		"u:domain": [],
 		"u:index": [],
-		"u:enumerates": {
+		"u:satisfies": {
 			"@graph": {
-				"@type": "u:Graph"
+				"@id": "dweb:/ipns/QmYxMiLd4GXeW8FTSFGUiaY8imCksY6HH9LBq86gaFiwXG",
+				"ldp:member": { }
 			}
 		}
 	}
@@ -308,26 +334,25 @@ func TestGraphQuery(t *testing.T) {
 }
 
 func TestGraphIndexQuery(t *testing.T) {
-	if err := testQuery([]byte(`{
+	if err := testQuery(true, []byte(`{
 	"@context": {
 		"dcterms": "http://purl.org/dc/terms/",
 		"prov": "http://www.w3.org/ns/prov#",
-		"rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+		"ldp": "http://www.w3.org/ns/ldp#",
 		"u": "http://underlay.mit.edu/ns#",
-		"u:index": { "@container": "@list" }
+		"u:index": { "@container": "@list" },
+		"u:domain": { "@container": "@list" }
 	},
 	"@type": "u:Query",
 	"@graph": {
-		"@type": "prov:Bundle",
+		"@type": "prov:Entity",
 		"dcterms:extent": 3,
-		"u:index": {
-			"@id": "_:b0",
-			"rdf:value": { "@id": "ul:/ipfs/QmRyaXPZpXxXBcdrikHTjnLr2w6rQK9bChsB7V1bUZv1er#_:c14n0" }
-		},
-		"u:enumerates": {
+		"u:domain": [{ "@id": "_:member" }],
+		"u:index": [{ "@id": "ul:/ipld/zb2rhjSUbeWp4RUdC1KSPoyaFhCbCY4xoRG3b2918jZsEWBgo" }],
+		"u:satisfies": {
 			"@graph": {
-				"@id": "_:b0",
-				"@type": "u:Graph"
+				"@id": "dweb:/ipns/QmYxMiLd4GXeW8FTSFGUiaY8imCksY6HH9LBq86gaFiwXG",
+				"ldp:member": { "@id": "_:member" }
 			}
 		}
 	}
@@ -337,20 +362,22 @@ func TestGraphIndexQuery(t *testing.T) {
 }
 
 func TestDomainQuery(t *testing.T) {
-	if err := testQuery([]byte(`{
+	if err := testQuery(true, []byte(`{
 	"@context": {
 		"@vocab": "http://schema.org/",
 		"dcterms": "http://purl.org/dc/terms/",
 		"prov": "http://www.w3.org/ns/prov#",
 		"u": "http://underlay.mit.edu/ns#",
-		"u:index": { "@container": "@list" }
+		"u:index": { "@container": "@list" },
+		"u:domain": { "@container": "@list" }
 	},
 	"@type": "u:Query",
 	"@graph": {
-		"@type": "prov:Bundle",
+		"@type": "prov:Entity",
 		"dcterms:extent": 3,
-		"u:index": { "@id": "_:b0" },
-		"u:enumerates": {
+		"u:domain": [{ "@id": "_:b0" }],
+		"u:index": [],
+		"u:satisfies": {
 			"@graph": {
 				"@id": "_:b0",
 				"@type": "Person",
@@ -364,7 +391,7 @@ func TestDomainQuery(t *testing.T) {
 }
 
 func TestIndexQuery(t *testing.T) {
-	if err := testQuery([]byte(`{
+	if err := testQuery(false, []byte(`{
 	"@context": {
 		"@vocab": "http://schema.org/",
 		"dcterms": "http://purl.org/dc/terms/",
@@ -375,13 +402,13 @@ func TestIndexQuery(t *testing.T) {
 	},
 	"@type": "u:Query",
 	"@graph": {
-		"@type": "prov:Bundle",
+		"@type": "prov:Entity",
 		"dcterms:extent": 2,
 		"u:index": {
 			"@id": "_:b0",
 			"rdf:value": { "@id": "ul:/ipfs/QmRyaXPZpXxXBcdrikHTjnLr2w6rQK9bChsB7V1bUZv1er#_:c14n1" }
 		},
-		"u:enumerates": {
+		"u:satisfies": {
 			"@graph": {
 				"@id": "_:b0",
 				"@type": "Person",
@@ -395,7 +422,7 @@ func TestIndexQuery(t *testing.T) {
 }
 
 func TestIndexQuery2(t *testing.T) {
-	if err := testQuery([]byte(`{
+	if err := testQuery(false, []byte(`{
 	"@context": {
 		"dcterms": "http://purl.org/dc/terms/",
 		"prov": "http://www.w3.org/ns/prov#",
@@ -404,10 +431,10 @@ func TestIndexQuery2(t *testing.T) {
 	},
 	"@type": "u:Query",
 	"@graph": {
-		"@type": "prov:Bundle",
+		"@type": "prov:Entity",
 		"dcterms:extent": 2,
 		"u:index": { "@id": "_:b0" },
-		"u:enumerates": {
+		"u:satisfies": {
 			"@graph": {
 				"@id": "ul:/ipfs/QmRyaXPZpXxXBcdrikHTjnLr2w6rQK9bChsB7V1bUZv1er#_:c14n1",
 				"_:b0": {}
