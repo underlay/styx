@@ -272,9 +272,10 @@ func (cm ConstraintMap) Len() (l int) {
 type ConstraintGraph struct {
 	Variables []*Variable
 	Domain    []string
+	Map       map[string]int
+	Index     map[string]*Variable // jfc
 	Cache     []*V
 	Pivot     int
-	Map       map[string]int
 	In        [][]int
 	Out       [][]int
 }

@@ -165,6 +165,14 @@ func (q entityQuery) execute(
 		t := make([][]*ld.BlankNode, q.extent)
 		for i := 0; i < q.extent; i++ {
 			d, ok := <-data
+			fmt.Println("got value", i, d, len(d))
+			for _, l := range d {
+				if l != nil {
+					fmt.Println(l.GetValue())
+				} else {
+					fmt.Println(l)
+				}
+			}
 			_ = <-prov
 			if !ok || d == nil {
 				break
@@ -172,6 +180,9 @@ func (q entityQuery) execute(
 			t[i] = make([]*ld.BlankNode, len(d))
 			var head ld.Node = rdfNilIri
 			for j, node := range d {
+				if node == nil {
+					break
+				}
 				t[i][j] = ld.NewBlankNode(fmt.Sprintf("%s-t-%d-%d", g, i, j))
 				r = append(r, ld.NewQuad(t[i][j], rdfFirstIri, node, g), ld.NewQuad(t[i][j], rdfRestIri, head, g))
 				head = t[i][j]

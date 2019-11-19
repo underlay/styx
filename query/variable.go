@@ -73,7 +73,7 @@ func (u *Variable) String() (s string) {
 	// s += fmt.Sprintf("D1: %s\n", u.D1.String())
 	s += fmt.Sprintln("D2:")
 	for id, cs := range u.D2 {
-		s += fmt.Sprintf("  %s: %s\n", id, cs.String())
+		s += fmt.Sprintf("  %d: %s\n", id, cs.String())
 	}
 	s += fmt.Sprintf("Norm: %d\n", u.Norm)
 	s += fmt.Sprintf("Size: %d\n", u.Size)
@@ -141,4 +141,13 @@ func (u *Variable) load(v *V) {
 		c.Set(u.Value, d.c)
 		c.Seek(u.Value)
 	}
+}
+
+func (u *Variable) relabel(transformation []int) {
+	d2 := make(ConstraintMap, len(u.D2))
+	for i, cs := range u.D2 {
+		j := transformation[i]
+		d2[j] = cs
+	}
+	u.D2 = d2
 }

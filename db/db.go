@@ -139,6 +139,7 @@ func (db *DB) Query(
 	if extent == 0 {
 		return nil
 	}
+
 	return db.Badger.View(func(txn *badger.Txn) (err error) {
 		defer close(variables)
 		defer close(data)
@@ -154,7 +155,7 @@ func (db *DB) Query(
 		variables <- g.Domain
 
 		valueMap := types.ValueMap{}
-		fmt.Println("Okay we're starting iteration")
+		fmt.Println("Okay we're starting iteration", g.Domain)
 		for i := 0; i < extent; i++ {
 			fmt.Println("i", i)
 			tail, p, err := g.Next(txn)
@@ -166,12 +167,14 @@ func (db *DB) Query(
 			}
 			d := make([]ld.Node, len(tail))
 			for j, t := range tail {
-				id := binary.BigEndian.Uint64(t)
-				value, err := valueMap.Get(id, txn)
-				if err != nil {
-					return err
+				if t != nil {
+					id := binary.BigEndian.Uint64(t)
+					value, err := valueMap.Get(id, txn)
+					if err != nil {
+						return err
+					}
+					d[j] = types.ValueToNode(value, valueMap, db.uri, txn)
 				}
-				d[j] = types.ValueToNode(value, valueMap, db.uri, txn)
 			}
 			fmt.Println("About to send d and p", d, p)
 			data <- d

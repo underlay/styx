@@ -31,7 +31,7 @@ func MakeConstraintGraph(
 ) (g *ConstraintGraph, err error) {
 	indexMap := types.IndexMap{}
 
-	g = &ConstraintGraph{}
+	g = &ConstraintGraph{Index: map[string]*Variable{}}
 
 	for _, i := range graph {
 		quad := quads[i]
@@ -166,12 +166,6 @@ func MakeConstraintGraph(
 		}
 	}
 
-	// Set the variable roots to the index values, if they exist
-	// for
-	if len(domain) < len(index) {
-		err = ErrInvalidDomain
-	}
-
 	// Score the variables
 	for _, u := range g.Variables {
 		if err = u.Score(txn); err != nil {
@@ -185,6 +179,11 @@ func MakeConstraintGraph(
 	}
 
 	// Check that the domian is valid
+	if len(domain) < len(index) {
+		err = ErrInvalidDomain
+		return
+	}
+
 	for _, a := range domain {
 		err = ErrInvalidDomain
 		for _, b := range g.Domain {
@@ -205,38 +204,88 @@ func MakeConstraintGraph(
 
 	if len(domain) == len(g.Domain) {
 		g.Pivot = len(domain)
+
+		nextMap := make(map[string]int, len(domain))
+		for i, p := range domain {
+			nextMap[p] = i
+		}
+
+		transformation := make([]int, len(domain))
+		for i, p := range g.Domain {
+			transformation[i] = nextMap[p]
+		}
+
+		variables := make([]*Variable, len(domain))
+		for i, u := range g.Variables {
+			j := transformation[i]
+			variables[j] = u
+			u.relabel(transformation)
+		}
+
+		g.Map = nextMap
 		g.Domain = domain
+		g.Variables = variables
 	} else if len(domain) == 0 {
 		// If the domain is length 0 (aka not provided),
 		// we intepret it as being the entire implied g.Domain
 		g.Pivot = len(g.Domain)
 		sort.Stable(g)
+
+		transformation := make([]int, len(g.Domain))
+		nextMap := make(map[string]int, len(g.Domain))
+		for i, p := range g.Domain {
+			j := g.Map[p]
+			transformation[j] = i
+			nextMap[p] = i
+		}
+
+		for _, u := range g.Variables {
+			u.relabel(transformation)
+		}
+
+		g.Map = nextMap
 	} else {
 		g.Pivot = len(domain)
+		transformation := make([]int, len(g.Domain))
+		nextMap := make(map[string]int, len(g.Domain))
+		variables := make([]*Variable, len(domain))
+		for i, p := range domain {
+			j := g.Map[p]
+			variables[i] = g.Variables[j]
+			transformation[j] = i
+			nextMap[p] = i
+		}
 
 		// Get the variables outside the domain
-		complement := make([]string, 0, len(g.Domain)-len(domain))
-		for _, b := range g.Domain {
-			found := false
-			for _, a := range domain {
-				if a == b {
-					found = true
-					break
-				}
-			}
-			if !found {
-				complement = append(complement, b)
+		l := len(g.Domain) - len(domain)
+		complement := make([]string, 0, l)
+		complementVars := make([]*Variable, 0, l)
+		for i, p := range g.Domain {
+			if _, has := nextMap[p]; !has {
+				complement = append(complement, p)
+				complementVars = append(complementVars, g.Variables[i])
 			}
 		}
 
 		// Now sort _just those variables_, which is a little hacky.
-		// e.g. this depends on g.Len() using g.Domain and not g.Variables
 		g.Domain = complement
+		g.Variables = complementVars
 		sort.Stable(g)
+
+		for i, p := range complement {
+			j := len(domain) + i
+			transformation[len(domain)+i] = j
+			nextMap[p] = j
+		}
 
 		// Okay, now concatenate the provided domain (most significant)
 		// and the sorted complement (least significant)
-		g.Domain = append(domain, g.Domain...)
+		g.Domain = append(domain, complement...)
+		g.Variables = append(variables, complementVars...)
+
+		for _, u := range g.Variables {
+			u.relabel(transformation)
+		}
 	}
 
 	// Invert the slice index

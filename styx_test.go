@@ -198,11 +198,17 @@ func testQuery(double bool, query []byte) error {
 	if err != nil {
 		return err
 	}
+	for graph, quads := range result.Graphs {
+		fmt.Println(graph)
+		for _, quad := range quads {
+			fmt.Printf("%s %s %s .\n", quad.Subject.GetValue(), quad.Predicate.GetValue(), quad.Object.GetValue())
+		}
+	}
 	api := ld.NewJsonLdApi()
 	normalized, err := api.Normalize(result, stringOptions)
 	fmt.Println("Result:")
 	fmt.Println(normalized)
-	s, err := sh.Add(strings.NewReader(normalized.(string)), ipfs.RawLeaves(true))
+	s, err := sh.Add(strings.NewReader(normalized.(string)), ipfs.RawLeaves(true), ipfs.Pin(false))
 	fmt.Printf("http://localhost:8000?%s\n", s)
 	return err
 }
@@ -249,31 +255,6 @@ func TestSimpleQuery(t *testing.T) {
 		t.Error(err)
 	}
 }
-
-// func TestEntityQuery(t *testing.T) {
-// 	if err := testQuery([]byte(`{
-// 	"@context": {
-// 		"@vocab": "http://schema.org/",
-// 		"prov": "http://www.w3.org/ns/prov#",
-// 		"u": "http://underlay.mit.edu/ns#"
-// 	},
-// 	"@type": "u:Query",
-// 	"@graph": {
-// 		"@type": "prov:Entity",
-// 		"u:satisfies": {
-// 			"@graph": {
-// 				"@type": "Person",
-// 				"birthDate": { },
-// 				"knows": {
-// 					"name": "Jane Doe"
-// 				}
-// 			}
-// 		}
-// 	}
-// }`)); err != nil {
-// 		t.Error(err)
-// 	}
-// }
 
 func TestBundleQuery(t *testing.T) {
 	if err := testQuery(false, []byte(`{
@@ -374,13 +355,12 @@ func TestDomainQuery(t *testing.T) {
 	"@type": "u:Query",
 	"@graph": {
 		"@type": "prov:Entity",
-		"dcterms:extent": 3,
+		"dcterms:extent": 4,
 		"u:domain": [{ "@id": "_:b0" }],
 		"u:index": [],
 		"u:satisfies": {
 			"@graph": {
 				"@id": "_:b0",
-				"@type": "Person",
 				"name": { "@id": "_:b1" }
 			}
 		}

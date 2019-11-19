@@ -128,7 +128,6 @@ func (db *DB) HandleMessage(mh multihash.Multihash, size uint32) (*ld.RDFDataset
 		graph := ld.NewBlankNode(label)
 		if query := matchQuery(label, graphs, quads); query != nil {
 			r.Graphs[label] = query.execute(label, graphs, quads, graph, mh, db)
-			fmt.Println("got query", label, r.Graphs[label])
 		}
 		instance := ld.NewIRI(db.uri.String(mh, fmt.Sprintf("#%s", label)))
 		r.Graphs["@default"] = append(r.Graphs["@default"], ld.NewQuad(graph, instanceOfIri, instance, ""))
