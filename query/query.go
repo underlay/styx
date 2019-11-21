@@ -13,28 +13,34 @@ import (
 // u, v, w... are *Variable pointers
 // x, y... are dependency slice indices, where e.g. g.In[p][x] == i
 
-// Prov is the
+// Prov!
 type Prov = []map[int][]*types.Statement
 
 // Next advances to the next solution in the domain and returns a *tail slice* of assignment ids
 func (g *ConstraintGraph) Next(txn *badger.Txn) (tail []I, prov Prov, err error) {
-	blacklist := make([]bool, g.Len())
+	l := g.Len()
+	blacklist := make([]bool, l)
+
 	var ok bool
 	if g.Cache == nil {
-		g.Cache = make([]*V, g.Len())
+		g.Cache = make([]*V, l)
 		for i, u := range g.Variables {
-			for u.Value == nil {
-				if ok, err = g.tick(i, 0, blacklist, g.Cache); err != nil {
-					return
-				} else if !ok {
-					return
-				} else if u.Value = u.Seek(u.Root); u.Value == nil {
-					for j, saved := range g.Cache {
-						if saved != nil {
-							g.pushTo(g.Variables[j], j, g.Len())
-						}
+			if u.Value == nil {
+				for u.Value = u.Seek(u.Root); u.Value == nil; u.Value = u.Seek(u.Root) {
+					if ok, err = g.tick(i, 0, blacklist, g.Cache); err != nil {
+						return
+					} else if !ok {
+						return
 					}
-					clear(g.Cache)
+				}
+			}
+
+			// We've got a non-nil value for u!
+			g.pushTo(u, i, l)
+			for j, saved := range g.Cache[:i] {
+				if saved != nil {
+					g.pushTo(g.Variables[j], i, l)
+					g.Cache[j] = nil
 				}
 			}
 		}
@@ -49,9 +55,9 @@ func (g *ConstraintGraph) Next(txn *badger.Txn) (tail []I, prov Prov, err error)
 	fmt.Println(g.Pivot)
 	i := g.Pivot - 1
 	for i >= 0 {
-		fmt.Println("pivot", i)
 		u := g.Variables[i]
 		self := u.Value
+		fmt.Println("pivot", i, self)
 		if u.Value = u.Next(); u.Value == nil {
 			u.Value = u.Seek(self)
 			i--
@@ -176,7 +182,7 @@ func (g *ConstraintGraph) tick(i, min int, blacklist []bool, delta []*V) (ok boo
 			cursor := j
 			blacklist[j] = true
 			for _, k := range g.Out[j] {
-				if k > i {
+				if k >= i {
 					break
 				}
 

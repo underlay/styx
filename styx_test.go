@@ -371,27 +371,24 @@ func TestDomainQuery(t *testing.T) {
 }
 
 func TestIndexQuery(t *testing.T) {
-	if err := testQuery(false, []byte(`{
+	if err := testQuery(true, []byte(`{
 	"@context": {
 		"@vocab": "http://schema.org/",
 		"dcterms": "http://purl.org/dc/terms/",
 		"prov": "http://www.w3.org/ns/prov#",
-		"rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
 		"u": "http://underlay.mit.edu/ns#",
-		"u:index": { "@container": "@list" }
+		"u:index": { "@container": "@list" },
+		"u:domain": { "@container": "@list" }
 	},
 	"@type": "u:Query",
 	"@graph": {
 		"@type": "prov:Entity",
-		"dcterms:extent": 2,
-		"u:index": {
-			"@id": "_:b0",
-			"rdf:value": { "@id": "ul:/ipfs/QmRyaXPZpXxXBcdrikHTjnLr2w6rQK9bChsB7V1bUZv1er#_:c14n1" }
-		},
+		"dcterms:extent": 4,
+		"u:domain": [{ "@id": "_:b0" }],
+		"u:index": [{ "@id": "ul:/ipld/zb2rhbRcxjXByQCLHoh3U2SWdBkEHBpGtx69f9yaSfZ2AsZz7#_:c14n1" }],
 		"u:satisfies": {
 			"@graph": {
 				"@id": "_:b0",
-				"@type": "Person",
 				"name": { "@id": "_:b1" }
 			}
 		}

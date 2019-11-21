@@ -130,7 +130,7 @@ func (db *DB) Query(
 	quads []*ld.Quad,
 	graph []int,
 	domain []string,
-	index []ld.Node,
+	cursor []ld.Node,
 	extent int,
 	variables chan []string,
 	data chan []ld.Node,
@@ -146,7 +146,7 @@ func (db *DB) Query(
 		defer close(prov)
 
 		var g *query.ConstraintGraph
-		g, err = query.MakeConstraintGraph(quads, graph, domain, index, db.uri, txn)
+		g, err = query.MakeConstraintGraph(quads, graph, domain, cursor, db.uri, txn)
 		defer g.Close()
 		if err != nil {
 			return

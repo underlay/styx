@@ -25,13 +25,14 @@ func MakeConstraintGraph(
 	quads []*ld.Quad,
 	graph []int,
 	domain []string,
-	index []ld.Node,
+	cursor []ld.Node,
 	uri types.URI,
 	txn *badger.Txn,
 ) (g *ConstraintGraph, err error) {
+
 	indexMap := types.IndexMap{}
 
-	g = &ConstraintGraph{Index: map[string]*Variable{}}
+	g = &ConstraintGraph{}
 
 	for _, i := range graph {
 		quad := quads[i]
@@ -166,20 +167,8 @@ func MakeConstraintGraph(
 		}
 	}
 
-	// Score the variables
-	for _, u := range g.Variables {
-		if err = u.Score(txn); err != nil {
-			return
-		}
-
-		// Set the initial value of each variable.
-		// This will get overwritten to be nil if/when
-		// previous dependencies propagate their assignments.
-		u.Value = u.Root
-	}
-
 	// Check that the domian is valid
-	if len(domain) < len(index) {
+	if len(domain) < len(cursor) {
 		err = ErrInvalidDomain
 		return
 	}
@@ -195,6 +184,28 @@ func MakeConstraintGraph(
 		if err != nil {
 			return
 		}
+	}
+
+	delta := len(domain) - len(cursor)
+	for i, node := range cursor {
+		p := domain[i+delta]
+		j := g.Map[p]
+		v := g.Variables[j]
+		if _, v.Root, err = getID(node, indexMap, uri, txn); err != nil {
+			return
+		}
+	}
+
+	// Score the variables
+	for _, u := range g.Variables {
+		if err = u.Score(txn); err != nil {
+			return
+		}
+
+		// Set the initial value of each variable.
+		// This will get overwritten to be nil if/when
+		// previous dependencies propagate their assignments.
+		u.Value = u.Root
 	}
 
 	// Reverse the domain (for REASONS)
