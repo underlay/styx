@@ -7,17 +7,17 @@ import (
 
 	badger "github.com/dgraph-io/badger"
 	proto "github.com/golang/protobuf/proto"
-	multihash "github.com/multiformats/go-multihash"
+	cid "github.com/ipfs/go-cid"
 	ld "github.com/piprate/json-gold/ld"
 
 	types "github.com/underlay/styx/types"
 )
 
 func (db *DB) insertDataset(
-	mh multihash.Multihash, length uint32, size uint32, graphs []string, valueMap types.ValueMap, txn *badger.Txn,
+	c cid.Cid, length uint32, size uint32, graphs []string, valueMap types.ValueMap, txn *badger.Txn,
 ) (origin uint64, err error) {
-	// mh := c.Hash()
-	datasetKey := types.AssembleKey(types.DatasetPrefix, mh, nil, nil)
+	b := c.Bytes()
+	datasetKey := types.AssembleKey(types.DatasetPrefix, b, nil, nil)
 
 	// Check to see if this document is already in the database
 	if _, err = txn.Get(datasetKey); err != badger.ErrKeyNotFound {
@@ -31,7 +31,7 @@ func (db *DB) insertDataset(
 		return
 	}
 
-	valueMap[origin] = &types.Value{Node: &types.Value_Dataset{Dataset: mh}}
+	valueMap[origin] = &types.Value{Node: &types.Value_Dataset{Dataset: b}}
 
 	dataset := &types.Dataset{Id: origin, Length: length, Size: size, Graphs: graphs}
 

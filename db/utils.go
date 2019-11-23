@@ -10,7 +10,6 @@ import (
 	cid "github.com/ipfs/go-cid"
 	ipfs "github.com/ipfs/go-ipfs-api"
 	"github.com/multiformats/go-multibase"
-	multihash "github.com/multiformats/go-multihash"
 	ld "github.com/piprate/json-gold/ld"
 
 	types "github.com/underlay/styx/types"
@@ -38,8 +37,8 @@ func permuteMinor(permutation uint8, s, p, o []byte) ([]byte, []byte, []byte) {
 
 // DocumentStore is an interface for either an HTTP API or Core API instance
 type DocumentStore interface {
-	Put(io.Reader) (multihash.Multihash, error)
-	Get(multihash.Multihash) (io.Reader, error)
+	Put(io.Reader) (cid.Cid, error)
+	Get(cid.Cid) (io.Reader, error)
 }
 
 // HTTPDocumentStore is satisfies core.UnixfsAPI with an HTTP IPFS Shell
@@ -53,19 +52,18 @@ func NewHTTPDocumentStore(shell *ipfs.Shell) *HTTPDocumentStore {
 }
 
 // Put a stream to a multihash
-func (api *HTTPDocumentStore) Put(reader io.Reader) (multihash.Multihash, error) {
-	if s, err := api.shell.Add(reader, ipfs.RawLeaves(true)); err != nil {
-		return nil, err
+func (api *HTTPDocumentStore) Put(reader io.Reader) (cid.Cid, error) {
+	if s, err := api.shell.Add(reader, ipfs.RawLeaves(false)); err != nil {
+		return cid.Undef, err
 	} else if c, err := cid.Decode(s); err != nil {
-		return nil, err
+		return cid.Undef, err
 	} else {
-		return c.Hash(), nil
+		return c, nil
 	}
 }
 
 // Get a stream by multihash
-func (api *HTTPDocumentStore) Get(mh multihash.Multihash) (io.Reader, error) {
-	c := cid.NewCidV1(cid.Raw, mh)
+func (api *HTTPDocumentStore) Get(c cid.Cid) (io.Reader, error) {
 	s, err := c.StringOfBase(multibase.Base58BTC)
 	if err != nil {
 		return nil, err

@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	multihash "github.com/multiformats/go-multihash"
+	cid "github.com/ipfs/go-cid"
 	ld "github.com/piprate/json-gold/ld"
 
 	query "github.com/underlay/styx/query"
@@ -41,7 +41,7 @@ type Query interface {
 		graphs map[string][]int,
 		quads []*ld.Quad,
 		graph *ld.BlankNode,
-		ds multihash.Multihash,
+		c cid.Cid,
 		db *DB,
 	) []*ld.Quad
 }
@@ -54,7 +54,7 @@ func (q instanceQuery) execute(
 	graphs map[string][]int,
 	quads []*ld.Quad,
 	graph *ld.BlankNode,
-	ds multihash.Multihash,
+	c cid.Cid,
 	db *DB,
 ) []*ld.Quad {
 	variables := make(chan []string)
@@ -121,7 +121,7 @@ func (q entityQuery) execute(
 	graphs map[string][]int,
 	quads []*ld.Quad,
 	graph *ld.BlankNode,
-	ds multihash.Multihash,
+	c cid.Cid,
 	db *DB,
 ) []*ld.Quad {
 
@@ -130,7 +130,7 @@ func (q entityQuery) execute(
 	id := ld.NewIRI(fmt.Sprintf("dweb:/ipns/%s", db.ID))
 	entity := ld.NewBlankNode(fmt.Sprintf("%s-e", g))
 	timeLiteral := ld.NewLiteral(time.Now().Format(time.RFC3339), xsdDateIri, "")
-	uri := db.uri.String(ds, fmt.Sprintf("#%s", q.target))
+	uri := db.uri.String(c, fmt.Sprintf("#%s", q.target))
 	r := []*ld.Quad{
 		ld.NewQuad(entity, typeIri, ld.NewIRI(entityIri), g),
 		ld.NewQuad(entity, ld.NewIRI(satisfiesIri), ld.NewIRI(uri), g),
@@ -165,14 +165,6 @@ func (q entityQuery) execute(
 		t := make([][]*ld.BlankNode, q.extent)
 		for i := 0; i < q.extent; i++ {
 			d, ok := <-data
-			fmt.Println("got value", i, d, len(d))
-			for _, l := range d {
-				if l != nil {
-					fmt.Println(l.GetValue())
-				} else {
-					fmt.Println(l)
-				}
-			}
 			_ = <-prov
 			if !ok || d == nil {
 				break
@@ -206,7 +198,7 @@ func (q entityQuery) execute(
 	var domain ld.Node = rdfNilIri
 	for i, v := range variables {
 		b := ld.NewBlankNode(fmt.Sprintf("%s-d-%d", g, i))
-		o := ld.NewIRI(db.uri.String(ds, fmt.Sprintf("#%s", v)))
+		o := ld.NewIRI(db.uri.String(c, fmt.Sprintf("#%s", v)))
 		r = append(r, ld.NewQuad(b, rdfFirstIri, o, g), ld.NewQuad(b, rdfRestIri, domain, g))
 		domain = b
 	}
@@ -381,19 +373,19 @@ func handleEntity(
 		return
 	} else {
 		pins := make(chan string)
-		var mh multihash.Multihash = nil
+		var c cid.Cid = cid.Undef
 		var fragment string
 		if len(index) == 1 {
 			if iri, is := index[0].(*ld.IRI); is {
-				mh, fragment = db.uri.Parse(iri.Value)
+				c, fragment = db.uri.Parse(iri.Value)
 				if fragment != "" {
-					mh = nil
+					c = cid.Undef
 				}
 			}
 		}
 
 		go func() {
-			if err := db.Ls(mh, extent, pins); err != nil {
+			if err := db.Ls(c, extent, pins); err != nil {
 				fmt.Println("db.Ls failed:", err.Error())
 			}
 		}()

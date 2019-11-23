@@ -3,12 +3,12 @@ package db
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"log"
 	"strings"
 
 	badger "github.com/dgraph-io/badger"
 	proto "github.com/golang/protobuf/proto"
+	cid "github.com/ipfs/go-cid"
 	multihash "github.com/multiformats/go-multihash"
 	ld "github.com/piprate/json-gold/ld"
 
@@ -81,7 +81,7 @@ func (db *DB) IngestJSONLd(doc interface{}) error {
 	size := len(normalized)
 
 	reader := strings.NewReader(normalized)
-	mh, err := db.Store.Put(reader)
+	c, err := db.Store.Put(reader)
 	if err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func (db *DB) IngestJSONLd(doc interface{}) error {
 	return db.Badger.Update(func(txn *badger.Txn) error {
 		indexMap := types.IndexMap{}
 		valueMap := types.ValueMap{}
-		origin, err := db.insertDataset(mh, uint32(len(quads)), uint32(size), graphList, valueMap, txn)
+		origin, err := db.insertDataset(c, uint32(len(quads)), uint32(size), graphList, valueMap, txn)
 		if err != nil {
 			return err
 		}
@@ -155,11 +155,8 @@ func (db *DB) Query(
 		variables <- g.Domain
 
 		valueMap := types.ValueMap{}
-		fmt.Println("Okay we're starting iteration", g.Domain)
 		for i := 0; i < extent; i++ {
-			fmt.Println("i", i)
 			tail, p, err := g.Next(txn)
-			fmt.Println("Got next", tail, p, err)
 			if err != nil {
 				return err
 			} else if tail == nil {
@@ -176,10 +173,8 @@ func (db *DB) Query(
 					d[j] = types.ValueToNode(value, valueMap, db.uri, txn)
 				}
 			}
-			fmt.Println("About to send d and p", d, p)
 			data <- d
 			prov <- p
-			fmt.Println("Sent d and p")
 		}
 		return
 	})
@@ -191,7 +186,7 @@ func (db *DB) Rm(mh multihash.Multihash) (err error) {
 }
 
 // Ls lists the datasets in the database
-func (db *DB) Ls(index multihash.Multihash, extent int, datasets chan string) error {
+func (db *DB) Ls(index cid.Cid, extent int, datasets chan string) error {
 	var prefix = make([]byte, 1)
 	prefix[0] = types.DatasetPrefix
 
@@ -214,9 +209,10 @@ func (db *DB) Ls(index multihash.Multihash, extent int, datasets chan string) er
 		defer close(datasets)
 
 		var seek []byte
-		if index != nil {
-			seek = make([]byte, len(index)+1)
-			copy(seek[1:], index)
+		if index != cid.Undef {
+			b := index.Bytes()
+			seek = make([]byte, len(b)+1)
+			copy(seek[1:], b)
 		} else {
 			seek = make([]byte, 1)
 		}
@@ -228,12 +224,12 @@ func (db *DB) Ls(index multihash.Multihash, extent int, datasets chan string) er
 			item := iter.Item()
 
 			// Get the key
-			mh, err := multihash.Cast(item.KeyCopy(nil)[1:])
+			c, err := cid.Cast(item.KeyCopy(nil)[1:])
 			if err != nil {
 				return err
 			}
 
-			datasets <- db.uri.String(mh, "")
+			datasets <- db.uri.String(c, "")
 			i++
 		}
 
@@ -303,11 +299,11 @@ func (db *DB) Log() error {
 					binary.BigEndian.Uint64(val),
 				)
 			} else if prefix == types.DatasetPrefix {
-				mh, err := multihash.Cast(key[1:])
+				c, err := cid.Cast(key[1:])
 				if err != nil {
 					return err
 				}
-				log.Printf("Dataset entry: <%s>\n", db.uri.String(mh, ""))
+				log.Printf("Dataset entry: <%s>\n", db.uri.String(c, ""))
 			}
 			i++
 		}

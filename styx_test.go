@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	ipfs "github.com/ipfs/go-ipfs-api"
+	multibase "github.com/multiformats/go-multibase"
 	ld "github.com/piprate/json-gold/ld"
 
 	styx "github.com/underlay/styx/db"
@@ -168,13 +169,14 @@ func testQuery(double bool, query []byte) error {
 
 	size := uint32(len(rdf.(string)))
 	fmt.Println("About to put")
-	mh, err := store.Put(strings.NewReader(rdf.(string)))
+	c, err := store.Put(strings.NewReader(rdf.(string)))
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("Hash", mh.B58String())
-	reader, err := store.Get(mh)
+	s, _ := c.StringOfBase(multibase.Base32)
+	fmt.Println("Hash", s)
+	reader, err := store.Get(c)
 	quads, _, err := styx.ParseMessage(reader)
 	if err != nil {
 		return err
@@ -194,7 +196,7 @@ func testQuery(double bool, query []byte) error {
 		fmt.Print("\n")
 	}
 
-	result, err := db.HandleMessage(mh, size)
+	result, err := db.HandleMessage(c, size)
 	if err != nil {
 		return err
 	}
@@ -208,7 +210,7 @@ func testQuery(double bool, query []byte) error {
 	normalized, err := api.Normalize(result, stringOptions)
 	fmt.Println("Result:")
 	fmt.Println(normalized)
-	s, err := sh.Add(strings.NewReader(normalized.(string)), ipfs.RawLeaves(true), ipfs.Pin(false))
+	s, err = sh.Add(strings.NewReader(normalized.(string)), ipfs.RawLeaves(true), ipfs.Pin(false))
 	fmt.Printf("http://localhost:8000?%s\n", s)
 	return err
 }
@@ -398,30 +400,30 @@ func TestIndexQuery(t *testing.T) {
 	}
 }
 
-func TestIndexQuery2(t *testing.T) {
-	if err := testQuery(false, []byte(`{
-	"@context": {
-		"dcterms": "http://purl.org/dc/terms/",
-		"prov": "http://www.w3.org/ns/prov#",
-		"u": "http://underlay.mit.edu/ns#",
-		"u:index": { "@container": "@list" }
-	},
-	"@type": "u:Query",
-	"@graph": {
-		"@type": "prov:Entity",
-		"dcterms:extent": 2,
-		"u:index": { "@id": "_:b0" },
-		"u:satisfies": {
-			"@graph": {
-				"@id": "ul:/ipfs/QmRyaXPZpXxXBcdrikHTjnLr2w6rQK9bChsB7V1bUZv1er#_:c14n1",
-				"_:b0": {}
-			}
-		}
-	}
-}`)); err != nil {
-		t.Error(err)
-	}
-}
+// func TestIndexQuery2(t *testing.T) {
+// 	if err := testQuery(false, []byte(`{
+// 	"@context": {
+// 		"dcterms": "http://purl.org/dc/terms/",
+// 		"prov": "http://www.w3.org/ns/prov#",
+// 		"u": "http://underlay.mit.edu/ns#",
+// 		"u:index": { "@container": "@list" }
+// 	},
+// 	"@type": "u:Query",
+// 	"@graph": {
+// 		"@type": "prov:Entity",
+// 		"dcterms:extent": 2,
+// 		"u:index": { "@id": "_:b0" },
+// 		"u:satisfies": {
+// 			"@graph": {
+// 				"@id": "ul:/ipfs/QmRyaXPZpXxXBcdrikHTjnLr2w6rQK9bChsB7V1bUZv1er#_:c14n1",
+// 				"_:b0": { }
+// 			}
+// 		}
+// 	}
+// }`)); err != nil {
+// 		t.Error(err)
+// 	}
+// }
 
 func TestNT(t *testing.T) {
 	// Replace at your leisure

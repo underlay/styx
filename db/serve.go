@@ -12,7 +12,7 @@ import (
 	"time"
 
 	uuid "github.com/google/uuid"
-	multihash "github.com/multiformats/go-multihash"
+	cid "github.com/ipfs/go-cid"
 	ld "github.com/piprate/json-gold/ld"
 	types "github.com/underlay/styx/types"
 )
@@ -80,7 +80,7 @@ func (db *DB) Serve(port string) error {
 				return
 			}
 
-			var mh multihash.Multihash
+			var c cid.Cid
 			var size uint32
 			if m == "application/ld+json" {
 				decoder := json.NewDecoder(req.Body)
@@ -98,10 +98,10 @@ func (db *DB) Serve(port string) error {
 					return
 				}
 				reader := strings.NewReader(rdf.(string))
-				mh, err = db.Store.Put(reader)
+				c, err = db.Store.Put(reader)
 				size = uint32(len(rdf.(string)))
 			} else if m == "application/n-quads" {
-				mh, err = db.Store.Put(req.Body)
+				c, err = db.Store.Put(req.Body)
 			} else if boundary, has := params["boundary"]; m == "multipart/form-data" && has {
 				r := multipart.NewReader(req.Body, boundary)
 				filesMap := map[string]string{}
@@ -139,12 +139,12 @@ func (db *DB) Serve(port string) error {
 						} else {
 							graph = flattened.([]interface{})
 						}
-					} else if mh, err := db.Store.Put(p); err != nil {
+					} else if file, err := db.Store.Put(p); err != nil {
 						res.WriteHeader(400)
 						res.Write([]byte(err.Error() + "\n"))
 						return
 					} else {
-						filesMap[base+name] = types.MakeFileURI(mh)
+						filesMap[base+name] = types.MakeFileURI(file)
 					}
 				}
 
@@ -158,7 +158,7 @@ func (db *DB) Serve(port string) error {
 				}
 				reader := strings.NewReader(rdf.(string))
 				size = uint32(len(rdf.(string)))
-				mh, err = db.Store.Put(reader)
+				c, err = db.Store.Put(reader)
 			} else {
 				res.WriteHeader(415)
 				res.Write([]byte(err.Error() + "\n"))
@@ -173,10 +173,10 @@ func (db *DB) Serve(port string) error {
 
 			var r *ld.RDFDataset
 			if logging == "PROD" {
-				r, err = db.HandleMessage(mh, size)
+				r, err = db.HandleMessage(c, size)
 			} else {
 				start := time.Now()
-				r, err = db.HandleMessage(mh, size)
+				r, err = db.HandleMessage(c, size)
 				log.Printf("Handled message in %s\n", time.Since(start))
 			}
 
@@ -189,7 +189,7 @@ func (db *DB) Serve(port string) error {
 				// res.Header().Add("Location", fmt.Sprintf("/directory/?%s", cs))
 				res.WriteHeader(201)
 				// res.Write([]byte(cs))
-			} else if normalized, err := api.Normalize(r, ld.NewJsonLdOptions("")); err != nil {
+			} else if normalized, err := api.Normalize(r, GetStringOptions(db.Loader)); err != nil {
 				res.WriteHeader(500)
 				res.Write([]byte(err.Error() + "\n"))
 			} else {

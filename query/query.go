@@ -2,7 +2,6 @@ package query
 
 import (
 	"encoding/binary"
-	"fmt"
 
 	badger "github.com/dgraph-io/badger"
 	types "github.com/underlay/styx/types"
@@ -52,18 +51,15 @@ func (g *ConstraintGraph) Next(txn *badger.Txn) (tail []I, prov Prov, err error)
 		return
 	}
 
-	fmt.Println(g.Pivot)
 	i := g.Pivot - 1
 	for i >= 0 {
 		u := g.Variables[i]
 		self := u.Value
-		fmt.Println("pivot", i, self)
 		if u.Value = u.Next(); u.Value == nil {
 			u.Value = u.Seek(self)
 			i--
 			continue
 		}
-		fmt.Println("Got next value at i", u.Value)
 
 		if err = g.pushTo(u, i, g.Len()); err != nil {
 			return
@@ -288,7 +284,6 @@ func (g *ConstraintGraph) restore(cache []*V, max int) (err error) {
 func (g *ConstraintGraph) pushTo(u *Variable, min, max int) (err error) {
 	for j, cs := range u.D2 {
 		if j >= min && j < max {
-			fmt.Println(j)
 			w := g.Variables[j]
 
 			// Update the incoming D2 constraints by using .Dual to find them

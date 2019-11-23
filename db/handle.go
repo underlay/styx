@@ -7,7 +7,6 @@ import (
 
 	badger "github.com/dgraph-io/badger"
 	cid "github.com/ipfs/go-cid"
-	multihash "github.com/multiformats/go-multihash"
 	ld "github.com/piprate/json-gold/ld"
 
 	types "github.com/underlay/styx/types"
@@ -39,8 +38,8 @@ var wasAttributedToIri = ld.NewIRI("http://www.w3.org/ns/prov#wasAttributedTo")
 var xsdDateIri = "http://www.w3.org/2001/XMLSchema#date"
 
 // HandleMessage is where all the magic happens.
-func (db *DB) HandleMessage(mh multihash.Multihash, size uint32) (*ld.RDFDataset, error) {
-	reader, err := db.Store.Get(mh)
+func (db *DB) HandleMessage(c cid.Cid, size uint32) (*ld.RDFDataset, error) {
+	reader, err := db.Store.Get(c)
 	if err != nil {
 		return nil, err
 	}
@@ -50,10 +49,7 @@ func (db *DB) HandleMessage(mh multihash.Multihash, size uint32) (*ld.RDFDataset
 		return nil, err
 	}
 
-	fmt.Println("parsed some messages", graphs, err)
-
 	if logging != "PROD" {
-		c := cid.NewCidV1(cid.Raw, mh)
 		log.Printf("Message: %s\n", c.String())
 	}
 
@@ -76,8 +72,6 @@ func (db *DB) HandleMessage(mh multihash.Multihash, size uint32) (*ld.RDFDataset
 		}
 	}
 
-	fmt.Println("queries", queries)
-
 	// Messages are strictly either queries or data.
 	// Any message that has a named graph typed to be a query in
 	// the default graph will *not* have *any* of its graphs ingested.
@@ -93,7 +87,7 @@ func (db *DB) HandleMessage(mh multihash.Multihash, size uint32) (*ld.RDFDataset
 			}
 
 			var origin uint64
-			origin, err = db.insertDataset(mh, uint32(len(quads)), uint32(size), graphList, valueMap, txn)
+			origin, err = db.insertDataset(c, uint32(len(quads)), uint32(size), graphList, valueMap, txn)
 			if err != nil {
 				return
 			}
@@ -127,9 +121,9 @@ func (db *DB) HandleMessage(mh multihash.Multihash, size uint32) (*ld.RDFDataset
 	for label := range queries {
 		graph := ld.NewBlankNode(label)
 		if query := matchQuery(label, graphs, quads); query != nil {
-			r.Graphs[label] = query.execute(label, graphs, quads, graph, mh, db)
+			r.Graphs[label] = query.execute(label, graphs, quads, graph, c, db)
 		}
-		instance := ld.NewIRI(db.uri.String(mh, fmt.Sprintf("#%s", label)))
+		instance := ld.NewIRI(db.uri.String(c, fmt.Sprintf("#%s", label)))
 		r.Graphs["@default"] = append(r.Graphs["@default"], ld.NewQuad(graph, instanceOfIri, instance, ""))
 	}
 
