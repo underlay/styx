@@ -13,8 +13,8 @@ import (
 	multibase "github.com/multiformats/go-multibase"
 	ld "github.com/piprate/json-gold/ld"
 
+	loader "github.com/underlay/go-ld-loader"
 	styx "github.com/underlay/styx/db"
-	loader "github.com/underlay/styx/loader"
 )
 
 var sampleData = []byte(`{
@@ -58,7 +58,7 @@ var sampleData2 = []byte(`{
 
 func TestIngest(t *testing.T) {
 	// Replace at your leisure
-	sh := ipfs.NewShell(defaultHost)
+	sh := ipfs.NewShell(loader.DefaultHTTPAddress)
 
 	if !sh.IsUp() {
 		t.Error("IPFS Daemon not running")
@@ -78,7 +78,7 @@ func TestIngest(t *testing.T) {
 		return
 	}
 
-	dl := loader.NewShellDocumentLoader(sh)
+	dl := loader.NewHTTPDocumentLoader(sh)
 
 	store := styx.NewHTTPDocumentStore(sh)
 
@@ -108,7 +108,7 @@ func TestIngest(t *testing.T) {
 
 func testQuery(double bool, query []byte) (err error) {
 	// Replace at your leisure
-	sh := ipfs.NewShell(defaultHost)
+	sh := ipfs.NewShell(loader.DefaultHTTPAddress)
 
 	if !sh.IsUp() {
 		return fmt.Errorf("IPFS Daemon not running")
@@ -121,7 +121,7 @@ func testQuery(double bool, query []byte) (err error) {
 		return
 	}
 
-	dl := loader.NewShellDocumentLoader(sh)
+	dl := loader.NewHTTPDocumentLoader(sh)
 
 	store := styx.NewHTTPDocumentStore(sh)
 

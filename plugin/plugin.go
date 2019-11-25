@@ -15,7 +15,7 @@ import (
 	path "github.com/ipfs/interface-go-ipfs-core/path"
 
 	styx "github.com/underlay/styx/db"
-	loader "github.com/underlay/styx/loader"
+	loader "github.com/underlay/go-ld-loader"
 )
 
 // CoreDocumentStore is a DocumentStore made from a core.BlockAPI

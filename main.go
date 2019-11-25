@@ -6,8 +6,8 @@ import (
 
 	ipfs "github.com/ipfs/go-ipfs-api"
 
+	loader "github.com/underlay/go-ld-loader"
 	styx "github.com/underlay/styx/db"
-	loader "github.com/underlay/styx/loader"
 )
 
 var path = os.Getenv("STYX_PATH")
@@ -31,7 +31,7 @@ func main() {
 		log.Fatal(shError)
 	}
 
-	dl := loader.NewShellDocumentLoader(sh)
+	dl := loader.NewHTTPDocumentLoader(sh)
 	store := styx.NewHTTPDocumentStore(sh)
 
 	peerID, err := sh.ID()
