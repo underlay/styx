@@ -2,17 +2,14 @@ package db
 
 import (
 	"bytes"
-	"context"
 	"encoding/binary"
 	"log"
-	"regexp"
 	"strings"
 
-	badger "github.com/dgraph-io/badger"
+	badger "github.com/dgraph-io/badger/v2"
 	proto "github.com/golang/protobuf/proto"
 	cid "github.com/ipfs/go-cid"
-	files "github.com/ipfs/go-ipfs-files"
-	core "github.com/ipfs/interface-go-ipfs-core"
+	multihash "github.com/multiformats/go-multihash"
 	ld "github.com/piprate/json-gold/ld"
 
 	query "github.com/underlay/styx/query"
@@ -26,8 +23,9 @@ const SequenceBandwidth = 512
 type DB struct {
 	Path     string
 	ID       string
+	uri      types.URI
 	Loader   ld.DocumentLoader
-	API      core.UnixfsAPI
+	Store    DocumentStore
 	Badger   *badger.DB
 	Sequence *badger.Sequence
 }
@@ -41,7 +39,7 @@ func (db *DB) Close() error {
 }
 
 // OpenDB opens a styx database
-func OpenDB(path string, id string, loader ld.DocumentLoader, api core.UnixfsAPI) (*DB, error) {
+func OpenDB(path string, id string, loader ld.DocumentLoader, store DocumentStore) (*DB, error) {
 	if path == "" {
 		path = DefaultPath
 	}
@@ -54,10 +52,11 @@ func OpenDB(path string, id string, loader ld.DocumentLoader, api core.UnixfsAPI
 		return nil, err
 	} else {
 		return &DB{
+			uri:      types.UlURI,
 			Path:     path,
 			ID:       id,
 			Loader:   loader,
-			API:      api,
+			Store:    store,
 			Badger:   db,
 			Sequence: seq,
 		}, nil
@@ -73,191 +72,123 @@ func (db *DB) IngestJSONLd(doc interface{}) error {
 	proc := ld.NewJsonLdProcessor()
 
 	var normalized string
-	if n, err := proc.Normalize(doc, options); err != nil {
-		return err
-	} else {
-		normalized = n.(string)
-	}
-
-	resolved, err := db.API.Add(context.Background(), files.NewReaderFile(strings.NewReader(normalized)))
+	n, err := proc.Normalize(doc, options)
 	if err != nil {
 		return err
 	}
+	normalized = n.(string)
 
-	c := resolved.Cid()
+	size := len(normalized)
+
+	reader := strings.NewReader(normalized)
+	c, err := db.Store.Put(reader)
+	if err != nil {
+		return err
+	}
 
 	quads, graphs, err := ParseMessage(strings.NewReader(normalized))
 	if err != nil {
 		return err
 	}
 
-	return db.Badger.Update(func(txn *badger.Txn) (err error) {
+	graphList := make([]string, len(graphs))
+	var i int
+	for label := range graphs {
+		graphList[i] = label
+		i++
+	}
+
+	return db.Badger.Update(func(txn *badger.Txn) error {
+		indexMap := types.IndexMap{}
+		valueMap := types.ValueMap{}
+		origin, err := db.insertDataset(c, uint32(len(quads)), uint32(size), graphList, valueMap, txn)
+		if err != nil {
+			return err
+		}
+
 		for label, graph := range graphs {
 			if len(graph) == 0 {
 				continue
-			} else if err = db.insert(c, quads, label, graph, txn); err != nil {
-				return
+			}
+
+			err := db.insertGraph(origin, quads, label, graph, indexMap, valueMap, txn)
+			if err != nil {
+				return err
 			}
 		}
-		return
+
+		err = indexMap.Commit(txn)
+		if err != nil {
+			return err
+		}
+		return valueMap.Commit(txn)
 	})
 }
 
-// Ingest inserts a specific graph into the database
-func (db *DB) Ingest(cid cid.Cid, quads []*ld.Quad, label string, graph []int) error {
-	return db.Badger.Update(func(txn *badger.Txn) (err error) {
-		return db.insert(cid, quads, label, graph, txn)
-	})
-}
-
-// Query the database for a single result set
+// Query the database!
 func (db *DB) Query(
 	quads []*ld.Quad,
-	label string,
 	graph []int,
-	variables chan []string,
-	data chan map[string]*types.Value,
-	prov chan map[int]*types.SourceList,
-) (err error) {
-	return db.Badger.View(func(txn *badger.Txn) (err error) {
-		d := map[string]*types.Value{}
-		var s map[int]*types.SourceList
-		var slice []string
-
-		defer func() {
-			variables <- slice
-			data <- d
-			prov <- s
-		}()
-
-		var g *query.ConstraintGraph
-		g, err = query.MakeConstraintGraph(quads, label, graph, nil, nil, txn)
-		defer g.Close()
-		if err != nil {
-			return
-		}
-
-		slice = g.Slice
-
-		if err = g.Solve(txn); err != nil {
-			return
-		}
-
-		if s, err = g.GetSources(txn); err != nil {
-			return
-		}
-
-		var item *badger.Item
-		var val []byte
-		ids := map[uint64]*types.Value{}
-		for p, u := range g.Index {
-			// Translate u.Value into an RDF term string and save it to v
-			id := binary.BigEndian.Uint64(u.Value)
-			if value, has := ids[id]; has {
-				d[p] = value
-			} else {
-				d[p] = &types.Value{}
-				ids[id] = d[p]
-
-				key := make([]byte, 9)
-				key[0] = types.ValuePrefix
-				copy(key[1:9], u.Value)
-
-				if item, err = txn.Get(key); err != nil {
-					return
-				} else if val, err = item.ValueCopy(nil); err != nil {
-					return
-				} else if err = proto.Unmarshal(val, ids[id]); err != nil {
-					return
-				}
-			}
-		}
-		return
-	})
-}
-
-// Enumerate multiple result sets
-func (db *DB) Enumerate(
-	quads []*ld.Quad,
-	label string,
-	graph []int,
-	extent int,
 	domain []string,
-	index []ld.Node,
+	cursor []ld.Node,
+	extent int,
 	variables chan []string,
-	data chan map[string]*types.Value,
-	prov chan map[int]*types.SourceList,
+	data chan []ld.Node,
+	prov chan query.Prov,
 ) (err error) {
+	if extent == 0 {
+		return nil
+	}
+
 	return db.Badger.View(func(txn *badger.Txn) (err error) {
-		var slice []string
-		d := make([]map[string]*types.Value, extent)
-		sources := make([]map[int]*types.SourceList, extent)
-		defer func() {
-			variables <- slice
-			for _, v := range d {
-				data <- v
-			}
-			for _, s := range sources {
-				prov <- s
-			}
-		}()
+		defer close(variables)
+		defer close(data)
+		defer close(prov)
 
 		var g *query.ConstraintGraph
-		g, err = query.MakeConstraintGraph(quads, label, graph, domain, index, txn)
+		g, err = query.MakeConstraintGraph(quads, graph, domain, cursor, db.uri, txn)
 		defer g.Close()
 		if err != nil {
 			return
 		}
 
-		slice = g.Slice
+		variables <- g.Domain
 
-		if err = g.Solve(txn); err != nil {
-			return
-		}
-
-		var results [][][]byte
-		if results, err = g.Collect(extent, sources, txn); err != nil {
-			return
-		}
-
-		ids := map[uint64]*types.Value{}
-		var item *badger.Item
-		var val []byte
-		for x, r := range results {
-			d[x] = map[string]*types.Value{}
-			for i, p := range g.Slice {
-				// Translate u.Value into an RDF term string and save it to v
-				id := binary.BigEndian.Uint64(r[i])
-				if value, has := ids[id]; has {
-					d[x][p] = value
-				} else {
-					d[x][p] = &types.Value{}
-					ids[id] = d[x][p]
-
-					key := make([]byte, 9)
-					key[0] = types.ValuePrefix
-					copy(key[1:9], r[i])
-
-					if item, err = txn.Get(key); err != nil {
-						return
-					} else if val, err = item.ValueCopy(nil); err != nil {
-						return
-					} else if err = proto.Unmarshal(val, ids[id]); err != nil {
-						return
+		valueMap := types.ValueMap{}
+		for i := 0; i < extent; i++ {
+			tail, p, err := g.Next(txn)
+			if err != nil {
+				return err
+			} else if tail == nil {
+				break
+			}
+			d := make([]ld.Node, len(tail))
+			for j, t := range tail {
+				if t != nil {
+					id := binary.BigEndian.Uint64(t)
+					value, err := valueMap.Get(id, txn)
+					if err != nil {
+						return err
 					}
+					d[j] = types.ValueToNode(value, valueMap, db.uri, txn)
 				}
 			}
+			data <- d
+			prov <- p
 		}
 		return
 	})
 }
 
-var regexGraphIri = regexp.MustCompile("^ul:\\/ipfs\\/([123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{46})#(_:[a-zA-Z0-9]+)?$")
+// Rm deletes a dataset from the database
+func (db *DB) Rm(mh multihash.Multihash) (err error) {
+	return
+}
 
-// Ls lists the graphs in the database
-func (db *DB) Ls(index ld.Node, extent int, graphs chan *types.Blank) error {
+// Ls lists the datasets in the database
+func (db *DB) Ls(index cid.Cid, extent int, datasets chan string) error {
 	var prefix = make([]byte, 1)
-	prefix[0] = types.GraphPrefix
+	prefix[0] = types.DatasetPrefix
 
 	prefetchSize := extent
 	if prefetchSize > 100 {
@@ -275,43 +206,31 @@ func (db *DB) Ls(index ld.Node, extent int, graphs chan *types.Blank) error {
 	return db.Badger.View(func(txn *badger.Txn) (err error) {
 		iter := txn.NewIterator(iteratorOptions)
 		defer iter.Close()
+		defer close(datasets)
 
 		var seek []byte
-		if iri, is := index.(*ld.IRI); is && index != nil && regexGraphIri.MatchString(iri.Value) {
-			match := regexGraphIri.FindStringSubmatch(iri.Value)
-			if c, err := cid.Decode(match[0]); err == nil {
-				value, err := proto.Marshal(&types.Blank{
-					Cid: c.Bytes(),
-					Id:  match[2],
-				})
-				if err == nil {
-					seek = make([]byte, 1+len(value))
-					copy(seek[1:], value)
-				}
-			}
-		}
-		if seek == nil {
+		if index != cid.Undef {
+			b := index.Bytes()
+			seek = make([]byte, len(b)+1)
+			copy(seek[1:], b)
+		} else {
 			seek = make([]byte, 1)
 		}
-		seek[0] = types.GraphPrefix
+
+		seek[0] = types.DatasetPrefix
 
 		i := 0
 		for iter.Seek(seek); iter.Valid() && i < extent; iter.Next() {
 			item := iter.Item()
 
 			// Get the key
-			blank := &types.Blank{}
-			if err = proto.Unmarshal(item.Key()[1:], blank); err != nil {
-				return
+			c, err := cid.Cast(item.KeyCopy(nil)[1:])
+			if err != nil {
+				return err
 			}
 
-			graphs <- blank
-
+			datasets <- db.uri.String(c, "")
 			i++
-		}
-
-		for ; i < extent; i++ {
-			graphs <- nil
 		}
 
 		return
@@ -321,6 +240,7 @@ func (db *DB) Ls(index ld.Node, extent int, graphs chan *types.Blank) error {
 // Log will print the *entire database contents* to log
 func (db *DB) Log() error {
 	return db.Badger.View(func(txn *badger.Txn) error {
+		valueMap := types.ValueMap{}
 		iter := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer iter.Close()
 		var i int
@@ -350,7 +270,7 @@ func (db *DB) Log() error {
 					return err
 				}
 				id := binary.BigEndian.Uint64(key[1:])
-				log.Printf("Value: %02d %s\n", id, value.GetValue())
+				log.Printf("Value: %02d %s\n", id, value.GetValue(valueMap, db.uri, txn))
 			} else if _, has := types.TriplePrefixMap[prefix]; has {
 				// Value key
 				sourceList := &types.SourceList{}
@@ -360,7 +280,7 @@ func (db *DB) Log() error {
 					binary.BigEndian.Uint64(key[1:9]),
 					binary.BigEndian.Uint64(key[9:17]),
 					binary.BigEndian.Uint64(key[17:25]),
-					types.PrintSources(sourceList.Sources),
+					types.PrintSources(sourceList.GetSources(), valueMap, db.uri, txn),
 				)
 			} else if _, has := types.MinorPrefixMap[prefix]; has {
 				// Minor key
@@ -378,15 +298,12 @@ func (db *DB) Log() error {
 					binary.BigEndian.Uint64(key[9:17]),
 					binary.BigEndian.Uint64(val),
 				)
-			} else if prefix == types.GraphPrefix {
-				blank := &types.Blank{}
-				if err := proto.Unmarshal(key[1:], blank); err != nil {
+			} else if prefix == types.DatasetPrefix {
+				c, err := cid.Cast(key[1:])
+				if err != nil {
 					return err
-				} else if c, err := cid.Cast(blank.Cid); err != nil {
-					return err
-				} else {
-					log.Printf("Graph entry: <ul:/ipfs/%s#%s>\n", c.String(), blank.Id)
 				}
+				log.Printf("Dataset entry: <%s>\n", db.uri.String(c, ""))
 			}
 			i++
 		}

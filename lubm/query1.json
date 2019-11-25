@@ -4,16 +4,18 @@
 		"dcterms": "http://purl.org/dc/terms/",
 		"prov": "http://www.w3.org/ns/prov#",
 		"u": "http://underlay.mit.edu/ns#",
-		"u:index": { "@container": "@list" }
+		"u:index": { "@container": "@list" },
+		"u:domain": { "@container": "@list" }
 	},
 	"@type": "u:Query",
 	"@graph": {
-		"@type": "prov:Bundle",
-		"u:index": { "@id": "_:x" },
+		"@type": "prov:Entity",
+		"u:domain": { "@id": "_:student" },
+		"u:index": [],
 		"dcterms:extent": 5,
-		"u:enumerates": {
+		"u:satisfies": {
 			"@graph": {
-				"@id": "_:x",
+				"@id": "_:student",
 				"@type": "GraduateStudent",
 				"takesCourse": {
 					"@id": "http://www.Department0.University0.edu/GraduateCourse0"

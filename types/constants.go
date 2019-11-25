@@ -9,8 +9,8 @@ const Format = "application/n-quads"
 // SequenceKey to store the id counter
 var SequenceKey = []byte(">")
 
-// GraphPrefix keys track the CIDs of the documents in the database
-const GraphPrefix = byte('g')
+// DatasetPrefix keys track the Multihashes of the documents in the database
+const DatasetPrefix = byte('<')
 
 // ValuePrefix keys translate uint64 ids to ld.Node values
 const ValuePrefix = byte('p')

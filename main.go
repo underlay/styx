@@ -32,14 +32,14 @@ func main() {
 	}
 
 	dl := loader.NewShellDocumentLoader(sh)
-	api := &styx.HTTPAPI{Shell: sh}
+	store := styx.NewHTTPDocumentStore(sh)
 
 	peerID, err := sh.ID()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	db, err := styx.OpenDB(path, peerID.ID, dl, api)
+	db, err := styx.OpenDB(path, peerID.ID, dl, store)
 	if err != nil {
 		log.Fatal(err)
 	}

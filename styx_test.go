@@ -10,6 +10,7 @@ import (
 
 	cid "github.com/ipfs/go-cid"
 	ipfs "github.com/ipfs/go-ipfs-api"
+	multibase "github.com/multiformats/go-multibase"
 	ld "github.com/piprate/json-gold/ld"
 
 	styx "github.com/underlay/styx/db"
@@ -43,6 +44,18 @@ var sampleData = []byte(`{
 	}
 }`)
 
+var sampleData2 = []byte(`{
+	"@context": {
+		"@vocab": "http://schema.org/",
+		"xsd": "http://www.w3.org/2001/XMLSchema#",
+		"birthDate": { "@type": "xsd:date" }
+	},
+	"@type": "Person",
+	"name": "Johnanthan Appleseed",
+	"birthDate": "1780-01-10",
+	"knows": { "@id": "http://people.com/jane" }
+}`)
+
 func TestIngest(t *testing.T) {
 	// Replace at your leisure
 	sh := ipfs.NewShell(defaultHost)
@@ -67,9 +80,9 @@ func TestIngest(t *testing.T) {
 
 	dl := loader.NewShellDocumentLoader(sh)
 
-	api := &styx.HTTPAPI{Shell: sh}
+	store := styx.NewHTTPDocumentStore(sh)
 
-	db, err := styx.OpenDB(styx.DefaultPath, peerID.ID, dl, api)
+	db, err := styx.OpenDB(styx.DefaultPath, peerID.ID, dl, store)
 	if err != nil {
 		t.Error(err)
 		return
@@ -93,100 +106,109 @@ func TestIngest(t *testing.T) {
 	}
 }
 
-func testQuery(query []byte) error {
+func testQuery(double bool, query []byte) (err error) {
 	// Replace at your leisure
 	sh := ipfs.NewShell(defaultHost)
 
 	if !sh.IsUp() {
 		return fmt.Errorf("IPFS Daemon not running")
-	} else if err := os.RemoveAll(styx.DefaultPath); err != nil {
-		return err
+	} else if err = os.RemoveAll(styx.DefaultPath); err != nil {
+		return
 	}
 
 	peerID, err := sh.ID()
 	if err != nil {
-		return err
+		return
 	}
 
 	dl := loader.NewShellDocumentLoader(sh)
 
-	api := &styx.HTTPAPI{Shell: sh}
+	store := styx.NewHTTPDocumentStore(sh)
 
-	db, err := styx.OpenDB(styx.DefaultPath, peerID.ID, dl, api)
+	db, err := styx.OpenDB(styx.DefaultPath, peerID.ID, dl, store)
 	if err != nil {
-		return err
+		return
 	}
 
 	defer db.Close()
 
 	var data map[string]interface{}
-	if err := json.Unmarshal(sampleData, &data); err != nil {
-		return err
+	if err = json.Unmarshal(sampleData, &data); err != nil {
+		return
 	}
 
-	if err := db.IngestJSONLd(data); err != nil {
-		return err
+	if err = db.IngestJSONLd(data); err != nil {
+		return
+	}
+
+	if double {
+		var data2 map[string]interface{}
+		if err = json.Unmarshal(sampleData2, &data2); err != nil {
+			return
+		}
+
+		if err = db.IngestJSONLd(data2); err != nil {
+			return
+		}
 	}
 
 	db.Log()
 
 	var queryData map[string]interface{}
-	if err := json.Unmarshal(query, &queryData); err != nil {
-		return err
+	if err = json.Unmarshal(query, &queryData); err != nil {
+		return
 	}
 
 	proc := ld.NewJsonLdProcessor()
 	stringOptions := styx.GetStringOptions(dl)
 	rdf, err := proc.ToRDF(queryData, stringOptions)
 	if err != nil {
-		return err
+		return
 	}
 
-	hash, err := sh.Add(strings.NewReader(rdf.(string)))
+	size := uint32(len(rdf.(string)))
+
+	c, err := store.Put(strings.NewReader(rdf.(string)))
 	if err != nil {
-		return err
+		return
 	}
 
-	c, err := cid.Decode(hash)
+	result, err := db.HandleMessage(c, size)
 	if err != nil {
-		return err
+		return
 	}
 
-	fmt.Println("CID", c)
+	api := ld.NewJsonLdApi()
 
-	quads, graphs, err := styx.ParseMessage(strings.NewReader(rdf.(string)))
+	// doc, err := api.FromRDF(result, stringOptions)
+	// s, err := json.MarshalIndent(doc, "", "  ")
+	// fmt.Println(string(s), err)
 
-	fmt.Println("--- query graph ---")
-	for _, quad := range quads {
-		fmt.Printf(
-			"  %s %s %s",
-			quad.Subject.GetValue(),
-			quad.Predicate.GetValue(),
-			quad.Object.GetValue(),
-		)
-		if quad.Graph != nil {
-			fmt.Print(" " + quad.Graph.GetValue())
-		}
-		fmt.Print("\n")
+	normalized, err := api.Normalize(result, stringOptions)
+	fmt.Println(normalized, err)
+	s1, err := sh.Add(strings.NewReader(normalized.(string)), ipfs.RawLeaves(true), ipfs.Pin(false))
+	if err != nil {
+		return
 	}
-
-	result := db.HandleMessage(c, quads, graphs)
-
-	fmt.Println("Result:")
-	b, err := json.MarshalIndent(result, "", "  ")
-	fmt.Println(string(b))
-	return err
+	c2, err := cid.Decode(s1)
+	if err != nil {
+		return
+	}
+	s2, err := c2.StringOfBase(multibase.Base32)
+	if err != nil {
+		return
+	}
+	fmt.Println(s2)
+	return
 }
 
 func TestSPO(t *testing.T) {
-	if err := testQuery([]byte(`{
-	"@context": {
-		"@vocab": "http://schema.org/"
-	},
+	if err := testQuery(false, []byte(`{
+	"@context": { "@vocab": "http://schema.org/" },
 	"@type": "http://underlay.mit.edu/ns#Query",
 	"@graph": {
 		"@id": "http://people.com/jane",
-		"name": {}
+		"name": { }
 	}
 }`)); err != nil {
 		t.Error(err)
@@ -194,10 +216,8 @@ func TestSPO(t *testing.T) {
 }
 
 func TestOPS(t *testing.T) {
-	if err := testQuery([]byte(`{
-	"@context": {
-		"@vocab": "http://schema.org/"
-	},
+	if err := testQuery(false, []byte(`{
+	"@context": { "@vocab": "http://schema.org/" },
 	"@type": "http://underlay.mit.edu/ns#Query",
 	"@graph": {
 		"name": "Jane Doe"
@@ -208,7 +228,7 @@ func TestOPS(t *testing.T) {
 }
 
 func TestSimpleQuery(t *testing.T) {
-	if err := testQuery([]byte(`{
+	if err := testQuery(false, []byte(`{
 	"@context": {
 		"@vocab": "http://schema.org/"
 	},
@@ -226,19 +246,24 @@ func TestSimpleQuery(t *testing.T) {
 }
 
 func TestEntityQuery(t *testing.T) {
-	if err := testQuery([]byte(`{
+	if err := testQuery(false, []byte(`{
 	"@context": {
 		"@vocab": "http://schema.org/",
+		"dcterms": "http://purl.org/dc/terms/",
 		"prov": "http://www.w3.org/ns/prov#",
-		"u": "http://underlay.mit.edu/ns#"
+		"u": "http://underlay.mit.edu/ns#",
+		"u:index": { "@container": "@list" },
+		"u:domain": { "@container": "@list" }
 	},
 	"@type": "u:Query",
 	"@graph": {
 		"@type": "prov:Entity",
+		"dcterms:extent": 3,
+		"u:domain": [],
+		"u:index": [],
 		"u:satisfies": {
-			"@graph": {
+			"@graph":  {
 				"@type": "Person",
-				"birthDate": { },
 				"knows": {
 					"name": "Jane Doe"
 				}
@@ -250,48 +275,26 @@ func TestEntityQuery(t *testing.T) {
 	}
 }
 
-func TestBundleQuery(t *testing.T) {
-	if err := testQuery([]byte(`{
-	"@context": {
-		"@vocab": "http://schema.org/",
-		"dcterms": "http://purl.org/dc/terms/",
-		"prov": "http://www.w3.org/ns/prov#",
-		"u": "http://underlay.mit.edu/ns#",
-		"u:index": { "@container": "@list" }
-	},
-	"@type": "u:Query",
-	"@graph": {
-		"@type": "prov:Bundle",
-		"dcterms:extent": 3,
-		"u:index": [],
-		"u:enumerates": {
-			"@graph": {
-				"@type": "Person",
-				"name": { }
-			}
-		}
-	}
-}`)); err != nil {
-		t.Error(err)
-	}
-}
-
 func TestGraphQuery(t *testing.T) {
-	if err := testQuery([]byte(`{
+	if err := testQuery(true, []byte(`{
 	"@context": {
 		"dcterms": "http://purl.org/dc/terms/",
 		"prov": "http://www.w3.org/ns/prov#",
+		"ldp": "http://www.w3.org/ns/ldp#",
 		"u": "http://underlay.mit.edu/ns#",
-		"u:index": { "@container": "@list" }
+		"u:index": { "@container": "@list" },
+		"u:domain": { "@container": "@list" }
 	},
 	"@type": "u:Query",
 	"@graph": {
-		"@type": "prov:Bundle",
+		"@type": "prov:Entity",
 		"dcterms:extent": 3,
+		"u:domain": [],
 		"u:index": [],
-		"u:enumerates": {
+		"u:satisfies": {
 			"@graph": {
-				"@type": "u:Graph"
+				"@id": "dweb:/ipns/QmYxMiLd4GXeW8FTSFGUiaY8imCksY6HH9LBq86gaFiwXG",
+				"ldp:member": { }
 			}
 		}
 	}
@@ -301,26 +304,25 @@ func TestGraphQuery(t *testing.T) {
 }
 
 func TestGraphIndexQuery(t *testing.T) {
-	if err := testQuery([]byte(`{
+	if err := testQuery(true, []byte(`{
 	"@context": {
 		"dcterms": "http://purl.org/dc/terms/",
 		"prov": "http://www.w3.org/ns/prov#",
-		"rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+		"ldp": "http://www.w3.org/ns/ldp#",
 		"u": "http://underlay.mit.edu/ns#",
-		"u:index": { "@container": "@list" }
+		"u:index": { "@container": "@list" },
+		"u:domain": { "@container": "@list" }
 	},
 	"@type": "u:Query",
 	"@graph": {
-		"@type": "prov:Bundle",
+		"@type": "prov:Entity",
 		"dcterms:extent": 3,
-		"u:index": {
-			"@id": "_:b0",
-			"rdf:value": { "@id": "ul:/ipfs/QmRyaXPZpXxXBcdrikHTjnLr2w6rQK9bChsB7V1bUZv1er#_:c14n0" }
-		},
-		"u:enumerates": {
+		"u:domain": [{ "@id": "_:member" }],
+		"u:index": [{ "@id": "ul:/ipfs/bafybeibwbdi2renonku7zsl7yv3ww6cumoqs7thipex2slfp7j5qtfwbhm" }],
+		"u:satisfies": {
 			"@graph": {
-				"@id": "_:b0",
-				"@type": "u:Graph"
+				"@id": "dweb:/ipns/QmYxMiLd4GXeW8FTSFGUiaY8imCksY6HH9LBq86gaFiwXG",
+				"ldp:member": { "@id": "_:member" }
 			}
 		}
 	}
@@ -330,23 +332,24 @@ func TestGraphIndexQuery(t *testing.T) {
 }
 
 func TestDomainQuery(t *testing.T) {
-	if err := testQuery([]byte(`{
+	if err := testQuery(true, []byte(`{
 	"@context": {
 		"@vocab": "http://schema.org/",
 		"dcterms": "http://purl.org/dc/terms/",
 		"prov": "http://www.w3.org/ns/prov#",
 		"u": "http://underlay.mit.edu/ns#",
-		"u:index": { "@container": "@list" }
+		"u:index": { "@container": "@list" },
+		"u:domain": { "@container": "@list" }
 	},
 	"@type": "u:Query",
 	"@graph": {
-		"@type": "prov:Bundle",
-		"dcterms:extent": 3,
-		"u:index": { "@id": "_:b0" },
-		"u:enumerates": {
+		"@type": "prov:Entity",
+		"dcterms:extent": 4,
+		"u:domain": [{ "@id": "_:b0" }],
+		"u:index": [],
+		"u:satisfies": {
 			"@graph": {
 				"@id": "_:b0",
-				"@type": "Person",
 				"name": { "@id": "_:b1" }
 			}
 		}
@@ -357,27 +360,24 @@ func TestDomainQuery(t *testing.T) {
 }
 
 func TestIndexQuery(t *testing.T) {
-	if err := testQuery([]byte(`{
+	if err := testQuery(true, []byte(`{
 	"@context": {
 		"@vocab": "http://schema.org/",
 		"dcterms": "http://purl.org/dc/terms/",
 		"prov": "http://www.w3.org/ns/prov#",
-		"rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
 		"u": "http://underlay.mit.edu/ns#",
-		"u:index": { "@container": "@list" }
+		"u:index": { "@container": "@list" },
+		"u:domain": { "@container": "@list" }
 	},
 	"@type": "u:Query",
 	"@graph": {
-		"@type": "prov:Bundle",
-		"dcterms:extent": 2,
-		"u:index": {
-			"@id": "_:b0",
-			"rdf:value": { "@id": "ul:/ipfs/QmRyaXPZpXxXBcdrikHTjnLr2w6rQK9bChsB7V1bUZv1er#_:c14n1" }
-		},
-		"u:enumerates": {
+		"@type": "prov:Entity",
+		"dcterms:extent": 4,
+		"u:domain": [{ "@id": "_:b0" }],
+		"u:index": [{ "@id": "ul:/ipfs/bafybeibwbdi2renonku7zsl7yv3ww6cumoqs7thipex2slfp7j5qtfwbhm#_:c14n1" }],
+		"u:satisfies": {
 			"@graph": {
 				"@id": "_:b0",
-				"@type": "Person",
 				"name": { "@id": "_:b1" }
 			}
 		}
@@ -385,132 +385,6 @@ func TestIndexQuery(t *testing.T) {
 }`)); err != nil {
 		t.Error(err)
 	}
-}
-
-func TestIndexQuery2(t *testing.T) {
-	if err := testQuery([]byte(`{
-	"@context": {
-		"dcterms": "http://purl.org/dc/terms/",
-		"prov": "http://www.w3.org/ns/prov#",
-		"u": "http://underlay.mit.edu/ns#",
-		"u:index": { "@container": "@list" }
-	},
-	"@type": "u:Query",
-	"@graph": {
-		"@type": "prov:Bundle",
-		"dcterms:extent": 2,
-		"u:index": { "@id": "_:b0" },
-		"u:enumerates": {
-			"@graph": {
-				"@id": "ul:/ipfs/QmRyaXPZpXxXBcdrikHTjnLr2w6rQK9bChsB7V1bUZv1er#_:c14n1",
-				"_:b0": {}
-			}
-		}
-	}
-}`)); err != nil {
-		t.Error(err)
-	}
-}
-
-func TestNT(t *testing.T) {
-	// Replace at your leisure
-	sh := ipfs.NewShell(defaultHost)
-	if !sh.IsUp() {
-		t.Error("IPFS Daemon not running")
-		return
-	}
-
-	peerID, err := sh.ID()
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	// Remove old db
-	fmt.Println("removing path", styx.DefaultPath)
-	if err := os.RemoveAll(styx.DefaultPath); err != nil {
-		t.Error(err)
-		return
-	}
-
-	dl := loader.NewShellDocumentLoader(sh)
-	api := &styx.HTTPAPI{Shell: sh}
-
-	db, err := styx.OpenDB(styx.DefaultPath, peerID.ID, dl, api)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	defer db.Close()
-
-	// names, err := openFile("/samples/nt/names.json", dl, store)
-	// if err != nil {
-	// 	t.Error(err)
-	// 	return
-	// }
-
-	// if err = db.IngestJSONLd(names, dl, store); err != nil {
-	// 	t.Error(err)
-	// 	return
-	// }
-
-	individuals, err := openFile("/samples/nt/individuals.json", dl)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	if err = db.IngestJSONLd(individuals); err != nil {
-		t.Error(err)
-		return
-	}
-
-	query, err := openFile("/samples/nt/small.json", dl)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	documentLoader := loader.NewShellDocumentLoader(sh)
-
-	proc := ld.NewJsonLdProcessor()
-	stringOptions := styx.GetStringOptions(documentLoader)
-	rdf, err := proc.ToRDF(query, stringOptions)
-
-	if err != nil {
-		t.Error(err)
-	}
-
-	quads, graphs, err := styx.ParseMessage(strings.NewReader(rdf.(string)))
-
-	hash, err := sh.Add(strings.NewReader(rdf.(string)))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	c, err := cid.Decode(hash)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	fmt.Println("--- query graph ---")
-	for _, quad := range quads {
-		fmt.Printf(
-			"  %s %s %s\n",
-			quad.Subject.GetValue(),
-			quad.Predicate.GetValue(),
-			quad.Object.GetValue(),
-		)
-	}
-
-	result := db.HandleMessage(c, quads, graphs)
-
-	fmt.Println("Result:")
-	b, err := json.MarshalIndent(result, "", "  ")
-	fmt.Println(string(b))
 }
 
 func openFile(path string, dl ld.DocumentLoader) (doc map[string]interface{}, err error) {

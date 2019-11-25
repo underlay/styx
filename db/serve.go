@@ -1,7 +1,6 @@
 package db
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,8 +13,8 @@ import (
 
 	uuid "github.com/google/uuid"
 	cid "github.com/ipfs/go-cid"
-	files "github.com/ipfs/go-ipfs-files"
 	ld "github.com/piprate/json-gold/ld"
+	types "github.com/underlay/styx/types"
 )
 
 // DefaultPath for the Badger database files
@@ -65,6 +64,7 @@ func (db *DB) Serve(port string) error {
 	}
 
 	proc := ld.NewJsonLdProcessor()
+	api := ld.NewJsonLdApi()
 	options := GetStringOptions(db.Loader)
 
 	dir := http.Dir(db.Path + "/www")
@@ -81,7 +81,7 @@ func (db *DB) Serve(port string) error {
 			}
 
 			var c cid.Cid
-			var reader io.Reader
+			var size uint32
 			if m == "application/ld+json" {
 				decoder := json.NewDecoder(req.Body)
 
@@ -91,37 +91,17 @@ func (db *DB) Serve(port string) error {
 					res.Write([]byte(err.Error() + "\n"))
 					return
 				}
-
-				// Convert to RDF
 				rdf, err := proc.Normalize(doc, options)
-				if s, is := rdf.(string); !is || err != nil {
+				if err != nil {
 					res.WriteHeader(400)
 					res.Write([]byte(err.Error() + "\n"))
 					return
-				} else if resolved, err := db.API.Add(context.Background(), files.NewReaderFile(strings.NewReader(s))); err != nil {
-					res.WriteHeader(500)
-					res.Write([]byte(err.Error() + "\n"))
-					return
-				} else {
-					c = resolved.Cid()
-					reader = strings.NewReader(s)
 				}
+				reader := strings.NewReader(rdf.(string))
+				c, err = db.Store.Put(reader)
+				size = uint32(len(rdf.(string)))
 			} else if m == "application/n-quads" {
-				if resolved, err := db.API.Add(context.Background(), files.NewReaderFile(req.Body)); err != nil {
-					res.WriteHeader(400)
-					res.Write([]byte(err.Error() + "\n"))
-					return
-				} else if node, err := db.API.Get(context.Background(), resolved); err != nil {
-					res.WriteHeader(400)
-					res.Write([]byte(err.Error() + "\n"))
-					return
-				} else if file, is := node.(files.File); is {
-					reader = file
-					c = resolved.Cid()
-				} else {
-					res.WriteHeader(400)
-					return
-				}
+				c, err = db.Store.Put(req.Body)
 			} else if boundary, has := params["boundary"]; m == "multipart/form-data" && has {
 				r := multipart.NewReader(req.Body, boundary)
 				filesMap := map[string]string{}
@@ -159,64 +139,63 @@ func (db *DB) Serve(port string) error {
 						} else {
 							graph = flattened.([]interface{})
 						}
-					} else if resolved, err := db.API.Add(context.Background(), files.NewReaderFile(p)); err != nil {
+					} else if file, err := db.Store.Put(p); err != nil {
 						res.WriteHeader(400)
 						res.Write([]byte(err.Error() + "\n"))
 						return
 					} else {
-						id := base + name
-						uri := fmt.Sprintf("dweb:/ipfs/%s", resolved.String())
-						filesMap[id] = uri
+						filesMap[base+name] = types.MakeFileURI(file)
 					}
 				}
 
 				walk(graph, filesMap)
 
-				// Convert to RDF
 				rdf, err := proc.Normalize(graph, options)
-				if s, is := rdf.(string); !is || err != nil {
+				if err != nil {
 					res.WriteHeader(400)
 					res.Write([]byte(err.Error() + "\n"))
 					return
-				} else if resolved, err := db.API.Add(context.Background(), files.NewReaderFile(strings.NewReader(s))); err != nil {
-					res.WriteHeader(500)
-					res.Write([]byte(err.Error() + "\n"))
-					return
-				} else {
-					c = resolved.Cid()
-					reader = strings.NewReader(s)
 				}
+				reader := strings.NewReader(rdf.(string))
+				size = uint32(len(rdf.(string)))
+				c, err = db.Store.Put(reader)
 			} else {
 				res.WriteHeader(415)
 				res.Write([]byte(err.Error() + "\n"))
 				return
 			}
 
-			if quads, graphs, err := ParseMessage(reader); err != nil {
-				res.WriteHeader(400)
+			if err != nil {
+				res.WriteHeader(500)
+				res.Write([]byte(err.Error() + "\n"))
+				return
+			}
+
+			var r *ld.RDFDataset
+			if logging == "PROD" {
+				r, err = db.HandleMessage(c, size)
+			} else {
+				start := time.Now()
+				r, err = db.HandleMessage(c, size)
+				log.Printf("Handled message in %s\n", time.Since(start))
+			}
+
+			if err != nil {
+				res.WriteHeader(500)
+				res.Write([]byte(err.Error() + "\n"))
+			} else if r == nil {
+				// cs := c.String()
+				// res.Header().Add("Content-Type", "text/plain")
+				// res.Header().Add("Location", fmt.Sprintf("/directory/?%s", cs))
+				res.WriteHeader(201)
+				// res.Write([]byte(cs))
+			} else if normalized, err := api.Normalize(r, GetStringOptions(db.Loader)); err != nil {
+				res.WriteHeader(500)
 				res.Write([]byte(err.Error() + "\n"))
 			} else {
-				var r map[string]interface{}
-				if logging == "PROD" {
-					r = db.HandleMessage(c, quads, graphs)
-				} else {
-					start := time.Now()
-					r = db.HandleMessage(c, quads, graphs)
-					log.Printf("Handled message in %s\n", time.Since(start))
-				}
-
-				if res == nil {
-					cs := c.String()
-					res.Header().Add("Content-Type", "text/plain")
-					res.Header().Add("Location", fmt.Sprintf("/directory/?%s", cs))
-					res.WriteHeader(201)
-					res.Write([]byte(cs))
-				} else {
-					res.Header().Add("Content-Type", "application/ld+json")
-					res.WriteHeader(200)
-					encoder := json.NewEncoder(res)
-					encoder.Encode(r)
-				}
+				res.Header().Add("Content-Type", "application/n-quads")
+				res.WriteHeader(200)
+				res.Write([]byte(normalized.(string)))
 			}
 			return
 		}

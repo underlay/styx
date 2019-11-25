@@ -1,7 +1,9 @@
 package query
 
 import (
-	badger "github.com/dgraph-io/badger"
+	"encoding/binary"
+
+	badger "github.com/dgraph-io/badger/v2"
 	types "github.com/underlay/styx/types"
 )
 
@@ -10,300 +12,300 @@ import (
 // u, v, w... are *Variable pointers
 // x, y... are dependency slice indices, where e.g. g.In[p][x] == i
 
-// Solve the constraint graph, one variable at as time
-func (g *ConstraintGraph) Solve(txn *badger.Txn) (err error) {
-	_, u := g.GetIndex(0)
-	u.Value = u.Root
-	for i := 0; i < len(g.Slice); i++ {
-		if err = g.solve(i, txn); err != nil {
-			return
-		} else if _, u := g.GetIndex(i); u.Value == nil {
-			return ErrEmptyJoin
-		}
-	}
+// Prov representation hasn't been figured out yet
+type Prov = []map[int][]*types.Statement
 
-	g.Root = make(map[string][]byte, len(g.Slice))
-	for p, u := range g.Index {
-		g.Root[p] = u.Value
-	}
+// Next advances to the next solution in the domain and returns a *tail slice* of assignment ids
+func (g *ConstraintGraph) Next(txn *badger.Txn) (tail []I, prov Prov, err error) {
+	l := g.Len()
+	blacklist := make([]bool, l)
 
-	return
-}
-
-// solve for the first *cumulatively satisfying value* at the given index.
-func (g *ConstraintGraph) solve(i int, txn *badger.Txn) (err error) {
-	p, u := g.GetIndex(i)
-
-	if u.Value == nil {
-		u.Value = u.Seek(u.Root)
-	}
-
-	if u.Value != nil {
-		// We got a valid value for u!
-		return g.propagate(u.D2, i, len(g.Slice), u.Value, txn)
-	}
-
-	in, out := g.In[p], g.Out[p]
-
-	// First we need to save a snapshot of the current values, counts,
-	// and prefixes of all the variables so that we can reset them
-	// when we backtrack. This just iterates over all the dependencies
-	// of i and puts their values into a map.
-
-	values := make([][]byte, len(in))
-	counts := map[[2]string][]uint64{}
-	prefixes := map[[2]string][][]byte{}
-
-	for x, j := range in {
-		q, v := g.GetIndex(j)
-		values[x] = v.Value
-
-		// Now iterate over the second-degree constraints *in-between* j and i
-		for r, cs := range v.D2 {
-			if g.Map[r] > j {
-				continue
-			}
-			key := [2]string{q, r}
-			counts[key] = make([]uint64, len(cs))
-			prefixes[key] = make([][]byte, len(cs))
-			for k, c := range cs {
-				counts[key][k] = c.Count
-				prefixes[key][k] = c.Prefix
-			}
-		}
-	}
-
-	// Now that we've saved the current state, we can start
-	var x = len(in) - 1
-	for x >= 0 {
-		j := in[x]
-		q, v := g.GetIndex(j)
-		if v.Value = v.Next(); v.Value == nil {
-			// Reset everything, *including* the current index
-			for y, k := range in[x:] {
-				g.reset(k, values[x+y], counts, prefixes)
-			}
-			x--
-			continue
-		}
-
-		if err = g.propagate(v.D2, j, i+1, v.Value, txn); err != nil {
-			return
-		}
-
-		// Now that the updates have been propagated we need to iterate through the
-		// dependencies in between j and i, getting the next value from _them_,
-		// and propagating _that_!
-		for _, k := range g.Out[q] {
-			_, w := g.GetIndex(k)
-			if w.Value = w.Seek(w.Root); w.Value == nil {
-				break
-			}
-
-			if err = g.propagate(w.D2, k, len(g.Slice), w.Value, txn); err != nil {
-				return
-			}
-
-			if k == j {
-				break
-			}
-		}
-
-		if u.Value != nil {
-			// We got a valid new value for u!
-			for _, k := range out {
-				if err = g.propagate(u.D2, k, len(g.Slice), u.Value, txn); err != nil {
-					return
-				}
-			}
-
-			return
-		}
-
-		// Reset everything, *excluding* the current index
-		for y, k := range in[x+1:] {
-			g.reset(k, values[x+1+y], counts, prefixes)
-		}
-		x = len(in) - 1
-	}
-
-	// We ran out of variables to backtrack on!
-	// This means the variable is unsatisfiable :-/
-	return
-}
-
-func (g *ConstraintGraph) GetSources(txn *badger.Txn) (sources map[int]*types.SourceList, err error) {
-	sources = map[int]*types.SourceList{}
-	for q, v := range g.Index {
-		// Collect the sources for every first-degree constriant
-		for _, c := range v.D1 {
-			if sources[c.Index], err = c.Sources(v.Value, txn); err != nil {
-				return
-			}
-		}
-
-		// Collect the sources for every second-degree constriant
-		for r, cs := range v.D2 {
-			if g.Map[r] < g.Map[q] {
-				for _, c := range cs {
-					if sources[c.Index], err = c.Sources(v.Value, txn); err != nil {
+	var ok bool
+	if g.Cache == nil {
+		g.Cache = make([]*V, l)
+		for i, u := range g.Variables {
+			if u.Value == nil {
+				for u.Value = u.Seek(u.Root); u.Value == nil; u.Value = u.Seek(u.Root) {
+					if ok, err = g.tick(i, 0, blacklist, g.Cache); err != nil {
+						return
+					} else if !ok {
 						return
 					}
 				}
 			}
-		}
-	}
-	return
-}
 
-// Collect must be called *after* Solve.
-func (g *ConstraintGraph) Collect(n int, sources []map[int]*types.SourceList, txn *badger.Txn) (results [][][]byte, err error) {
-	if n < 1 {
-		return
-	}
-
-	results = make([][][]byte, 1, n)
-	results[0] = make([][]byte, len(g.Slice))
-	for i, p := range g.Slice {
-		results[0][i] = g.Index[p].Value
-	}
-
-	if sources[0], err = g.GetSources(txn); err != nil {
-		return
-	}
-
-	values := make([][]byte, g.Pivot)
-
-	var x = 1
-	var i = g.Pivot - 1
-	for i >= 0 && x < n {
-		counts := map[[2]string][]uint64{}
-		prefixes := map[[2]string][][]byte{}
-
-		for y, q := range g.Slice[i:g.Pivot] {
-			j := i + y
-			v := g.Index[q]
-
-			values[j] = v.Value
-
-			// Now iterate over the second-degree constraints
-			for r, cs := range v.D2 {
-				if g.Map[r] > j {
-					continue
-				}
-				key := [2]string{q, r}
-				counts[key] = make([]uint64, len(cs))
-				prefixes[key] = make([][]byte, len(cs))
-				for k, c := range cs {
-					counts[key][k] = c.Count
-					prefixes[key][k] = c.Prefix
+			// We've got a non-nil value for u!
+			g.pushTo(u, i, l)
+			for j, saved := range g.Cache[:i] {
+				if saved != nil {
+					g.pushTo(g.Variables[j], i, l)
+					g.Cache[j] = nil
 				}
 			}
 		}
 
-		p, u := g.GetIndex(i)
+		tail = make([]I, g.Len())
+		for i, u := range g.Variables {
+			tail[i] = u.Value
+		}
+		return
+	}
+
+	i := g.Pivot - 1
+	for i >= 0 {
+		u := g.Variables[i]
+		self := u.Value
 		if u.Value = u.Next(); u.Value == nil {
-			// Reset everything, *including* the current index
-			for j := i; j < g.Pivot; j++ {
-				g.reset(j, values[j], counts, prefixes)
-			}
+			u.Value = u.Seek(self)
 			i--
 			continue
-		} else if err = g.propagate(u.D2, i, len(g.Slice), u.Value, txn); err != nil {
+		}
+
+		if err = g.pushTo(u, i, g.Len()); err != nil {
 			return
 		}
 
-		// Now that the updates have been propagated we need to iterate through the
-		// dependencies in between j and i, getting the next value from _them_,
-		// and propagating _that_!
-		failed := false
-		for _, j := range g.Out[p] {
-			_, v := g.GetIndex(j)
-			if v.Value = v.Seek(v.Root); v.Value == nil {
-				failed = true
+		cursor := i
+		blacklist[i] = true
+		for _, j := range g.Out[i] {
+			v := g.Variables[j]
+			d := make([]*V, j)
+			for v.Value = v.Seek(v.Root); v.Value == nil; v.Value = v.Seek(v.Root) {
+				if ok, err = g.tick(j, i, blacklist[:j], d); err != nil {
+					return
+				} else if !ok {
+					break
+				}
+			}
+
+			if v.Value == nil {
+				cursor = j
 				break
-			} else if err = g.propagate(v.D2, j, len(g.Slice), v.Value, txn); err != nil {
+			} else if err = g.pushTo(v, j, g.Len()); err != nil {
 				return
+			}
+
+			for x, saved := range d[i:] {
+				if saved != nil {
+					k := i + x
+					w := g.Variables[k]
+					if err = g.pushTo(w, k, g.Len()); err != nil {
+						return
+					}
+					if g.Cache[k] == nil {
+						g.Cache[k] = saved
+					}
+				}
 			}
 		}
 
-		if failed {
-			// Reset everything, *excluding* the current index
-			for _, j := range g.Out[p] {
-				g.reset(j, values[j], counts, prefixes)
+		blacklist[i] = false
+
+		if cursor == i {
+			// success!!
+			tail = make([]I, g.Len()-i)
+			for x, v := range g.Variables[i:] {
+				tail[x] = v.Value
 			}
+			clear(g.Cache)
+			// prov = make([]map[int][]*types.Statement, len(tail))
+			return
+		}
+
+		if err = g.restore(g.Cache[:cursor+1], g.Len()); err != nil {
+			return
+		}
+		clear(g.Cache)
+	}
+	return
+}
+
+func clear(delta []*V) {
+	for i, saved := range delta {
+		if saved != nil {
+			delta[i] = nil
+		}
+	}
+}
+
+// tick advances the given index's dependencies into their next valid state, giving
+// the variable at the index (at least) one new value at its incoming constraints.
+// tick makes two promises. The first is that it will leave your blacklist in the same
+// state that it found it. The second is that either a) it will return ok = false, the
+// variables will be in their initial states, and delta is in its initial state; or b)
+// it will return ok = true, the variables rest in a new consensus state, every changed
+// variable's initial state is added to delta if it doesn't already exist, and no
+// non-nil element of delta is overwritten.
+func (g *ConstraintGraph) tick(i, min int, blacklist []bool, delta []*V) (ok bool, err error) {
+	next := make([]*V, i)
+
+	// The biggest outer loop is walking backwards over g.In[i]
+	x := len(g.In[i])
+	for x > 0 {
+		j := g.In[i][x-1]
+
+		if j < min {
+			return false, g.restore(next, i)
+		} else if blacklist[j] {
+			x--
+			continue
+		}
+
+		v := g.Variables[j]
+
+		self := v.save()
+
+		if v.Value = v.Next(); v.Value == nil {
+			// That sucks. Now we need to restore the value
+			// that was changed and decrement x.
+			v.Value = self.I
+			v.Seek(v.Value)
+			x--
 		} else {
-			// We got a valid new value!
-			results = append(results, make([][]byte, len(g.Slice)))
-			for j, q := range g.Slice {
-				results[x][j] = g.Index[q].Value
-			}
+			// We got a non-nil value for v, so now we
+			// propagate between j and i, then crawl forward
+			// over the indices in g.Out[q] that are less than i
+			// and seek to their new values.
 
-			if sources[x], err = g.GetSources(txn); err != nil {
+			// Propagate up to but not including i
+			if err = g.pushTo(v, j, i); err != nil {
 				return
 			}
 
-			i = g.Pivot - 1
-			x++
+			// Fantastic. Now that we've propagated the value we found for v,
+			// we start "the crawl" from j to i, seeking to the new satisfying root
+			// and recursing on tick when necessary.
+			cursor := j
+			blacklist[j] = true
+			for _, k := range g.Out[j] {
+				if k >= i {
+					break
+				}
+
+				w := g.Variables[k]
+
+				if next[k] == nil {
+					next[k] = w.save()
+				}
+
+				d := make([]*V, k)
+
+				// Here we keep seeking and ticking until we have a real value.
+				for w.Value = w.Seek(w.Root); w.Value == nil; w.Value = w.Seek(w.Root) {
+					// There's no real reason to pass blacklist[:k] instead of just blacklist
+					// here, but it feels cleaner since we know that it's all it needs.
+					if ok, err = g.tick(k, min, blacklist[:k], d); err != nil {
+						return
+					} else if ok {
+						continue
+					} else if err = g.restore(d, i); err != nil {
+						return
+					} else {
+						break
+					}
+				}
+
+				if w.Value == nil {
+					// We were unable to complete the crawl.
+					// We've already reset our state.
+					// This is how far we got:
+					cursor = k + 1
+					break
+				}
+
+				// We got a real value for w! Now we propagate the affected values
+				// through i and stash them into next if they're not there already,
+				// and then continue with the tick-crawl.
+				if err = g.pushTo(w, k, i); err != nil {
+					return
+				}
+				for l, saved := range d {
+					if saved != nil {
+						if err = g.pushTo(g.Variables[l], l, i); err != nil {
+							return
+						}
+						if next[l] == nil {
+							next[l] = saved
+						}
+					}
+				}
+			}
+
+			// We need to *unset* the blacklist after recursing.
+			// Variables are only blacklisted when they appear as
+			// a parent in the call stack - they might be visited
+			// twice as siblings in the call tree, etc.
+			blacklist[j] = false
+
+			if cursor == j {
+				// Hooray!
+				// Now here we need to push every affected value
+				// through to the rest of the domain
+				delta[j] = self
+				for l, saved := range next {
+					if saved != nil {
+						if delta[l] == nil {
+							delta[l] = saved
+						}
+						if err = g.pushTo(g.Variables[l], i, g.Len()); err != nil {
+							return
+						}
+					}
+				}
+				return true, nil
+			}
+
+			// This means we reset (all) those affected to their previous state
+			if err = g.restore(next, i); err != nil {
+				return
+			}
 		}
 	}
 	return
 }
 
-func (g *ConstraintGraph) propagate(
-	cs ConstraintMap,
-	i int, max int,
-	value []byte,
-	txn *badger.Txn,
-) (err error) {
-	// We have the next value for the dependency, so now we set temporary
-	// values and update counts for the duals of all the second-degree
-	// constraints that "point forward". This effectively upgrades them
-	// to function as first-degree dependencies.
-	for q, cs := range cs {
-		j, v := g.Map[q], g.Index[q]
-		if j < i || j >= max {
-			continue
-		}
-
-		// Set the value to nil, like I promised you earlier.
-		v.Value = nil
-		for _, c := range cs {
-			if err = c.Dual.Set(value, txn); err != nil {
+func (g *ConstraintGraph) restore(cache []*V, max int) (err error) {
+	for i, saved := range cache {
+		// If the variable at k has been modified by the
+		// (potentially) multiple recursive calls to tick,
+		// then reset it to its previous state.
+		if saved != nil {
+			u := g.Variables[i]
+			u.load(saved)
+			// Push the restored state through the max
+			if err = g.pushTo(u, i, max); err != nil {
 				return
 			}
 		}
-
-		// Now that we'e changed some of the counts, we need to re-sort
-		v.Sort()
 	}
 	return
 }
 
-func (g *ConstraintGraph) reset(
-	i int,
-	value []byte,
-	counts map[[2]string][]uint64,
-	prefixes map[[2]string][][]byte,
-) {
-	p, u := g.GetIndex(i)
-	u.Value = value
+func (g *ConstraintGraph) pushTo(u *Variable, min, max int) (err error) {
+	for j, cs := range u.D2 {
+		if j >= min && j < max {
+			w := g.Variables[j]
 
-	for q, cs := range u.D2 {
-		if g.Map[q] > i {
-			continue
-		}
-		key := [2]string{p, q}
-		for k, c := range cs {
-			c.Count = counts[key][k]
-			c.Prefix = prefixes[key][k]
-			if u.Value != nil {
-				c.Seek(u.Value)
-			} else {
-				c.Seek(u.Root)
+			// Update the incoming D2 constraints by using .Dual to find them
+			for _, c := range cs {
+				// Since v has a value, all of its constraints are in consensus.
+				// That means we can freely access their iterators!
+				// In this case, all the iterators for the outgoing v.D2s have
+				// values that are the counts (uint64) of them *and their dual*.
+				// This is insanely elegant...
+				item := c.Iterator.Item()
+				val := make([]byte, 8)
+				if val, err = item.ValueCopy(val); err != nil {
+					return
+				}
+				count := binary.BigEndian.Uint64(val)
+				c.Dual.Set(u.Value, count)
 			}
+
+			// Set the value to nil, like I promised you earlier.
+			w.Value = nil
+			w.Sort()
 		}
-		// delete(counts, key)
-		// delete(prefixes, key)
 	}
+	return
 }

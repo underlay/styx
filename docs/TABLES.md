@@ -11,14 +11,14 @@ In this table, `l`, `m`, and `n` are all big-endian unsigned 64-bit integer iden
 | minor   | 3   | `l \| n`      | `uint64`           | `x`, `y`, `z` |
 | value   | 1   | `l`           | `types.Value`      | `p`           |
 | index   | 1   | `<term>`      | `types.Index`      | `q`           |
-| graph   | 1   | `types.Blank` |                    | `g`           |
+| dataset | 1   | `<multihash>` | `types.Dataset`    | `<`           |
 | counter | 1   |               | `uint64`           | `>`           |
 
 - [Index table](#index-table)
 - [Value table](#value-table)
 - [Triple tables](#triple-tables)
 - [Major and Minor tables](#major-and-minor-tables)
-- [Graph table](#graph-table)
+- [Dataset table](#dataset-table)
 
 ## Index table
 
@@ -49,7 +49,7 @@ The `id` identifers are issued for new terms monotonically by a [Badger Sequence
 | `q"2011-04-09T20:00:00Z"^^<http://www.w3.org/2001/XMLSchema#dateTime>` | `{ Id: 1129, Subject: 0, Predicate: 0, Object: 1 }`   |
 | `q"N-Triples"@en-US`                                                   | `{ Id: 18123, Subject: 0, Predicate: 0, Object: 2 }`  |
 
-The Index table is the first table accessed during both insertion and querying. Both memoize deserialized structs (which include term identifiers) in an index map to deduplicate lookups.
+The Index table is the first table accessed during both insertion and querying. Both cache deserialized structs (which include term identifiers) in an index map to deduplicate lookups.
 
 ```golang
 type IndexMap map[string]*Index
@@ -110,7 +110,7 @@ During insertion, only newly issued identifers for previously-unseen terms need 
 type ValueMap map[uint64]*Value
 ```
 
-The variable assignments that the querying process returns are all uint64 identifiers, so they need to be converted into explicit RDF terms that can be returned to the user. The in-memory index map gets inverted to create an initial value map, which is used to memoize the Value table lookups for every term in the solution graph.
+The variable assignments that the querying process returns are all uint64 identifiers, so they need to be converted into explicit RDF terms that can be returned to the user. The in-memory index map gets inverted to create an initial value map, which is used to cache the Value table lookups for every term in the solution graph.
 
 ## Triple tables
 
@@ -158,10 +158,10 @@ Every major key has a "dual" minor key that encodes the same two terms in revers
 | `[105 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 2]` | `5`   |
 | `[121 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0 1]` | `5`   |
 
-## Graph table
+## Dataset table
 
 ```golang
-const GraphPrefix = byte('g')
+const DatasetPrefix = byte('<')
 ```
 
-The Graph table lists every _graph_ in the database, with keys serialized directly as `Blank` structs re-used from the Value table. The values are empty for now, but may be used to store graph-level metadata in the future.
+The Dataset table lists every _dataset_ in the database, with keys serialized directly as Multihash bytes. The values are the same as the Index table

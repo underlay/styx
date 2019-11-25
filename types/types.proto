@@ -1,33 +1,41 @@
 syntax = "proto3";
 package types;
 
-message SourceList {
-	repeated Source sources = 1;
-}
-
-message Source {
-	bytes cid = 1;
+message Statement {
+	uint64 origin = 1;
 	uint32 index = 2;
 	string graph = 3;
 }
 
-message Blank {
-	bytes cid = 1;
-	string id = 2;
-}
-
-message Literal {
-	string value = 1;
-	string language = 2;
-	string datatype = 3;
+message SourceList {
+	repeated Statement sources = 1;
 }
 
 message Value {
+	message Blank {
+		uint64 origin = 1;
+		string id = 2;
+	}
+	
+	message Literal {
+		string value = 1;
+		string language = 2;
+		string datatype = 3;
+	}
+
 	oneof node {
 		string iri = 1;
-		Blank blank = 2;
-		Literal literal = 3;
+		Literal literal = 2;
+		Blank blank = 3;
+		bytes dataset = 4;
 	}
+}
+
+message Dataset {
+	uint64 id = 1;
+	uint32 length = 2;
+	uint32 size = 3;
+	repeated string graphs = 4;
 }
 
 message Index {
@@ -36,3 +44,4 @@ message Index {
 	uint64 predicate = 3;
 	uint64 object = 4;
 }
+

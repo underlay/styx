@@ -6,13 +6,13 @@
 	"@graph": {
 		"@type": "GraduateStudent",
 		"undergraduateDegreeFrom": {
-			"@id": "_:uni",
+			"@id": "_:university",
 			"@type": "University"
 		},
 		"memberOf": {
 			"@type": "Department",
 			"subOrganizationOf": {
-				"@id": "_:uni"
+				"@id": "_:university"
 			}
 		}
 	}

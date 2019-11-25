@@ -2,7 +2,6 @@ package db
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"io"
 	"regexp"
@@ -10,10 +9,7 @@ import (
 
 	cid "github.com/ipfs/go-cid"
 	ipfs "github.com/ipfs/go-ipfs-api"
-	files "github.com/ipfs/go-ipfs-files"
-	core "github.com/ipfs/interface-go-ipfs-core"
-	coreOptions "github.com/ipfs/interface-go-ipfs-core/options"
-	corePath "github.com/ipfs/interface-go-ipfs-core/path"
+	multibase "github.com/multiformats/go-multibase"
 	ld "github.com/piprate/json-gold/ld"
 
 	types "github.com/underlay/styx/types"
@@ -39,40 +35,44 @@ func permuteMinor(permutation uint8, s, p, o []byte) ([]byte, []byte, []byte) {
 	}
 }
 
-// HTTPAPI is satisfies core.UnixfsAPI with an HTTP IPFS Shell
-type HTTPAPI struct {
-	Shell *ipfs.Shell
+// DocumentStore is an interface for either an HTTP API or Core API instance
+type DocumentStore interface {
+	Put(io.Reader) (cid.Cid, error)
+	Get(cid.Cid) (io.Reader, error)
 }
 
-// Add a file to IPFS (directories not supported)
-func (api *HTTPAPI) Add(ctx context.Context, node files.Node, options ...coreOptions.UnixfsAddOption) (corePath.Resolved, error) {
-	if file, is := node.(files.File); !is {
-		return nil, nil
-	} else if cs, err := api.Shell.Add(file); err != nil {
-		return nil, err
-	} else if c, err := cid.Decode(cs); err != nil {
-		return nil, err
+// HTTPDocumentStore is satisfies core.UnixfsAPI with an HTTP IPFS Shell
+type HTTPDocumentStore struct {
+	shell *ipfs.Shell
+}
+
+// NewHTTPDocumentStore creates a new HTTP Document Store
+func NewHTTPDocumentStore(shell *ipfs.Shell) *HTTPDocumentStore {
+	return &HTTPDocumentStore{shell}
+}
+
+// Put a stream to a multihash
+func (api *HTTPDocumentStore) Put(reader io.Reader) (cid.Cid, error) {
+	if s, err := api.shell.Add(reader, ipfs.RawLeaves(false)); err != nil {
+		return cid.Undef, err
+	} else if c, err := cid.Decode(s); err != nil {
+		return cid.Undef, err
 	} else {
-		return corePath.IpfsPath(c), nil
+		return cid.NewCidV1(c.Prefix().Codec, c.Hash()), nil
 	}
 }
 
-// Get a file from IPFS
-func (api *HTTPAPI) Get(ctx context.Context, path corePath.Path) (files.Node, error) {
-	if reader, err := api.Shell.Cat(path.String()); err != nil {
+// Get a stream by multihash
+func (api *HTTPDocumentStore) Get(c cid.Cid) (io.Reader, error) {
+	s, err := c.StringOfBase(multibase.Base32)
+	if err != nil {
 		return nil, err
-	} else {
-		return files.NewReaderFile(reader), nil
 	}
-}
-
-// Ls things in places and stuff
-func (api *HTTPAPI) Ls(ctx context.Context, path corePath.Path, options ...coreOptions.UnixfsLsOption) (<-chan core.DirEntry, error) {
-	return nil, nil
+	return api.shell.Cat(s)
 }
 
 // Compile-time type check
-var _ core.UnixfsAPI = (*HTTPAPI)(nil)
+var _ DocumentStore = (*HTTPDocumentStore)(nil)
 
 // GetDatasetOptions returns JsonLdOptions for parsing a document into a dataset
 func GetDatasetOptions(loader ld.DocumentLoader) *ld.JsonLdOptions {

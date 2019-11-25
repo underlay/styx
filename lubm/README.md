@@ -40,6 +40,10 @@ Results measured on an other-wise empty database on a 2017 Macbook Pro with 16 G
 
 103,104 total triples
 
+```
+curl --data-binary @query1.json -H 'Content-Type: application/ld+json' localhost:8086/
+```
+
 |        | avg            | 1        | 2        | 3        | 4        | 5        | 6        | 7        | 8        | 9        | 10       |
 | ------ | -------------- | -------- | -------- | -------- | -------- | -------- | -------- | -------- | -------- | -------- | -------- |
 | query1 | **0.394347ms** | 0.362919 | 0.288016 | 0.540329 | 0.415967 | 0.392153 | 0.340841 | 0.333268 | 0.558645 | 0.30682  | 0.404513 |

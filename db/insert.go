@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	badger "github.com/dgraph-io/badger"
+	badger "github.com/dgraph-io/badger/v2"
 	proto "github.com/golang/protobuf/proto"
 	cid "github.com/ipfs/go-cid"
 	ld "github.com/piprate/json-gold/ld"
@@ -13,36 +13,42 @@ import (
 	types "github.com/underlay/styx/types"
 )
 
-func (db *DB) insert(c cid.Cid, quads []*ld.Quad, label string, graph []int, txn *badger.Txn) (err error) {
-	value, err := proto.Marshal(&types.Blank{
-		Cid: c.Bytes(),
-		Id:  label,
-	})
-
-	if err != nil {
-		return err
-	}
-
-	graphKey := types.AssembleKey(types.GraphPrefix, value, nil, nil)
-
-	var item *badger.Item
+func (db *DB) insertDataset(
+	c cid.Cid, length uint32, size uint32, graphs []string, valueMap types.ValueMap, txn *badger.Txn,
+) (origin uint64, err error) {
+	b := c.Bytes()
+	datasetKey := types.AssembleKey(types.DatasetPrefix, b, nil, nil)
 
 	// Check to see if this document is already in the database
-	if item, err = txn.Get(graphKey); err != badger.ErrKeyNotFound {
-		return item.Value(func(val []byte) (err error) {
-			log.Printf("Duplicate document inserted previously on %s\n", string(val))
-			return
-		})
-	}
-
-	// Write the current date to the graph key
-	if err = txn.Set(graphKey, nil); err != nil {
+	if _, err = txn.Get(datasetKey); err != badger.ErrKeyNotFound {
+		if err == nil {
+			log.Println("Dataset already inserted")
+		}
 		return
 	}
 
-	valueMap := types.ValueMap{}
-	indexMap := types.IndexMap{}
+	if origin, err = db.Sequence.Next(); err != nil {
+		return
+	}
 
+	valueMap[origin] = &types.Value{Node: &types.Value_Dataset{Dataset: b}}
+
+	dataset := &types.Dataset{Id: origin, Length: length, Size: size, Graphs: graphs}
+
+	var val []byte
+	if val, err = proto.Marshal(dataset); err != nil {
+		return
+	}
+	err = txn.Set(datasetKey, val)
+	return
+}
+
+func (db *DB) insertGraph(
+	origin uint64, quads []*ld.Quad, label string, graph []int,
+	indexMap types.IndexMap,
+	valueMap types.ValueMap,
+	txn *badger.Txn,
+) (err error) {
 	for index, quad := range quads {
 		var g string
 		if quad.Graph != nil {
@@ -53,19 +59,19 @@ func (db *DB) insert(c cid.Cid, quads []*ld.Quad, label string, graph []int, txn
 			continue
 		}
 
-		source := &types.Source{
-			Cid:   c.Bytes(),
-			Index: uint32(index),
-			Graph: g,
+		source := &types.Statement{
+			Origin: origin,
+			Index:  uint32(index),
+			Graph:  g,
 		}
 
 		// Get the uint64 ids for the subject, predicate, and object
 		var s, p, o []byte
-		if s, err = db.getID(c, quad.Subject, 0, indexMap, valueMap, txn); err != nil {
+		if s, err = db.getID(origin, quad.Subject, 0, indexMap, valueMap, txn); err != nil {
 			return
-		} else if p, err = db.getID(c, quad.Predicate, 1, indexMap, valueMap, txn); err != nil {
+		} else if p, err = db.getID(origin, quad.Predicate, 1, indexMap, valueMap, txn); err != nil {
 			return
-		} else if o, err = db.getID(c, quad.Object, 2, indexMap, valueMap, txn); err != nil {
+		} else if o, err = db.getID(origin, quad.Object, 2, indexMap, valueMap, txn); err != nil {
 			return
 		}
 
@@ -102,7 +108,7 @@ func (db *DB) insert(c cid.Cid, quads []*ld.Quad, label string, graph []int, txn
 			if item, err = txn.Get(key); err == badger.ErrKeyNotFound {
 				if i == 0 {
 					// Create a new SourceList container with the source
-					sources := &types.SourceList{Sources: []*types.Source{source}}
+					sources := &types.SourceList{Sources: []*types.Statement{source}}
 					if val, err = proto.Marshal(sources); err != nil {
 						return
 					}
@@ -130,17 +136,11 @@ func (db *DB) insert(c cid.Cid, quads []*ld.Quad, label string, graph []int, txn
 		}
 	}
 
-	if err = indexMap.Commit(txn); err != nil {
-		return
-	} else if err = valueMap.Commit(txn); err != nil {
-		return
-	}
-
 	return
 }
 
 func (db *DB) getID(
-	origin cid.Cid,
+	origin uint64,
 	node ld.Node,
 	place uint8,
 	indexMap types.IndexMap,
@@ -148,8 +148,8 @@ func (db *DB) getID(
 	txn *badger.Txn,
 ) ([]byte, error) {
 	ID := make([]byte, 8)
-	value := types.NodeToValue(origin, node)
-	v := value.GetValue()
+	value := types.NodeToValue(node, origin, db.uri, txn)
+	v := value.GetValue(valueMap, db.uri, txn)
 
 	if index, has := indexMap[v]; has {
 		index.Increment(place)
