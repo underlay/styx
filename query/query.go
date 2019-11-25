@@ -3,7 +3,7 @@ package query
 import (
 	"encoding/binary"
 
-	badger "github.com/dgraph-io/badger"
+	badger "github.com/dgraph-io/badger/v2"
 	types "github.com/underlay/styx/types"
 )
 
@@ -12,7 +12,7 @@ import (
 // u, v, w... are *Variable pointers
 // x, y... are dependency slice indices, where e.g. g.In[p][x] == i
 
-// Prov!
+// Prov representation hasn't been figured out yet
 type Prov = []map[int][]*types.Statement
 
 // Next advances to the next solution in the domain and returns a *tail slice* of assignment ids

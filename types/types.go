@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	badger "github.com/dgraph-io/badger"
+	badger "github.com/dgraph-io/badger/v2"
 	proto "github.com/golang/protobuf/proto"
-	"github.com/ipfs/go-cid"
+	cid "github.com/ipfs/go-cid"
 	multibase "github.com/multiformats/go-multibase"
 	ld "github.com/piprate/json-gold/ld"
 )
@@ -22,6 +22,7 @@ var testUlURI = regexp.MustCompile(fmt.Sprintf("^ul:\\/ipfs\\/([a-zA-Z0-9]{59})%
 var testDwebURI = regexp.MustCompile(fmt.Sprintf("^dweb:\\/ipfs\\/([a-zA-Z0-9]+)%s$", fragment))
 var testHashlinkURI = regexp.MustCompile(fmt.Sprintf("^hl:([a-zA-Z0-9]+):%s%s$", tail, fragment))
 
+// URI is an interface type for content-addressable semantic URIs
 type URI interface {
 	Parse(uri string) (c cid.Cid, fragment string)
 	String(c cid.Cid, fragment string) (uri string)
@@ -43,6 +44,7 @@ func (*hlURI) String(c cid.Cid, fragment string) (uri string) {
 	return fmt.Sprintf("hl:%s:%s%s", s, tail, fragment)
 }
 
+// HlURI are Hashlink URIs
 var HlURI URI = (*hlURI)(nil)
 
 type ulURI struct{}
@@ -60,8 +62,10 @@ func (*ulURI) String(c cid.Cid, fragment string) (uri string) {
 	return fmt.Sprintf("ul:/ipfs/%s%s", s, fragment)
 }
 
+// UlURI are URIs that use a ul: protocol scheme
 var UlURI URI = (*ulURI)(nil)
 
+// MakeFileURI assembles a dweb URI for files on IPFS
 func MakeFileURI(c cid.Cid) string {
 	s, _ := c.StringOfBase(multibase.Base32)
 	return fmt.Sprintf("dweb:/ipfs/%s", s)
@@ -126,10 +130,10 @@ func (value *Value) ToJSON(valueMap ValueMap, uri URI, txn *badger.Txn) (r inter
 // GetValue serializes the value to a string.
 func (value *Value) GetValue(valueMap ValueMap, uri URI, txn *badger.Txn) (s string) {
 	if blank := value.GetBlank(); blank != nil {
-		if v, err := valueMap.Get(blank.Origin, txn); err != nil {
-		} else if c, err := cid.Cast(v.GetDataset()); err != nil {
-		} else {
-			s = fmt.Sprintf("<%s>", uri.String(c, fmt.Sprintf("#%s", blank.Id)))
+		if v, err := valueMap.Get(blank.Origin, txn); err == nil {
+			if c, err := cid.Cast(v.GetDataset()); err == nil {
+				s = fmt.Sprintf("<%s>", uri.String(c, fmt.Sprintf("#%s", blank.Id)))
+			}
 		}
 	} else if iri := value.GetIri(); iri != "" {
 		s = fmt.Sprintf("<%s>", iri)
@@ -143,8 +147,7 @@ func (value *Value) GetValue(valueMap ValueMap, uri URI, txn *badger.Txn) (s str
 			s = fmt.Sprintf("\"%s\"", escaped)
 		}
 	} else if ds := value.GetDataset(); ds != nil {
-		if c, err := cid.Cast(ds); err != nil {
-		} else {
+		if c, err := cid.Cast(ds); err == nil {
 			s = fmt.Sprintf("<%s>", uri.String(c, ""))
 		}
 	}
@@ -156,7 +159,7 @@ func ValueToNode(value *Value, valueMap ValueMap, uri URI, txn *badger.Txn) ld.N
 	if blank := value.GetBlank(); blank != nil {
 		if v, err := valueMap.Get(blank.GetOrigin(), txn); err == nil {
 			if ds := v.GetDataset(); ds != nil {
-				if c, err := cid.Cast(ds); err != nil {
+				if c, err := cid.Cast(ds); err == nil {
 					fragment := fmt.Sprintf("#%s", blank.GetId())
 					return ld.NewIRI(uri.String(c, fragment))
 				}

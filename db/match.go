@@ -182,6 +182,9 @@ func (q entityQuery) execute(
 		}
 
 		for i := len(t); i > 0; i-- {
+			if i == 3 {
+				log.Println(t[i-1])
+			}
 			b := ld.NewBlankNode(fmt.Sprintf("%s-t-%d", g, i-1))
 			var o ld.Node
 			l := len(t[i-1])

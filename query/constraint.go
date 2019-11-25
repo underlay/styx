@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	badger "github.com/dgraph-io/badger"
+	badger "github.com/dgraph-io/badger/v2"
 	proto "github.com/gogo/protobuf/proto"
 	types "github.com/underlay/styx/types"
 )

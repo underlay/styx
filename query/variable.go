@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sort"
 
-	badger "github.com/dgraph-io/badger"
+	badger "github.com/dgraph-io/badger/v2"
 )
 
 // HasID is either a string representing a variable reference,

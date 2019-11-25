@@ -2,17 +2,11 @@
 
 > Experimental graph store. Gateway to the Underworld.
 
-```
-go get github.com/underlay/styx
-```
-
-Make sure your IPFS daemon is running, and run `styx`.
+Styx is like a key/value store for graph data. It takes RDF datasets in, and then you get data out with WHERE clauses where the pattern and result are expressed as RDF graphs.
 
 ## Usage
 
-Styx registers a handler for the `/ul/0.1.1/cbor-ld` libp2p protocol so that connections dialed to your IPFS node's PeerId under that protocol will get forwarded to Styx. Underlay messages (RDF datasets expressing queries or data) can then be sent (serialized as cbor-encoded JSON-LD, or as utf-8 `application/n-quads`), and the Styx plugin will process them (storing the quads, pinning n-quads messages to IPFS, and responding to queries).
-
-Styx runs an HTTP interface at `http://localhost:8086` that you can also interact with. It supports the following methods:
+Styx runs an HTTP interface at `http://localhost:8086` that you can interact with. It supports the following methods:
 
 - `GET /` serves the WebUI built from `webui/www`.
 - `POST /` with a `Content-Type` of either `application/ld+json` or `application/n-quads`. If the attached message contains queries, the response `200` body will contain a JSON-LD query response. Otherwise the route will respond `204` and persist the message to disk (and pin it to the local IPFS repo).

@@ -6,7 +6,7 @@ import (
 	"log"
 	"strings"
 
-	badger "github.com/dgraph-io/badger"
+	badger "github.com/dgraph-io/badger/v2"
 	proto "github.com/golang/protobuf/proto"
 	cid "github.com/ipfs/go-cid"
 	multihash "github.com/multiformats/go-multihash"

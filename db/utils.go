@@ -9,7 +9,7 @@ import (
 
 	cid "github.com/ipfs/go-cid"
 	ipfs "github.com/ipfs/go-ipfs-api"
-	"github.com/multiformats/go-multibase"
+	multibase "github.com/multiformats/go-multibase"
 	ld "github.com/piprate/json-gold/ld"
 
 	types "github.com/underlay/styx/types"
@@ -58,13 +58,13 @@ func (api *HTTPDocumentStore) Put(reader io.Reader) (cid.Cid, error) {
 	} else if c, err := cid.Decode(s); err != nil {
 		return cid.Undef, err
 	} else {
-		return c, nil
+		return cid.NewCidV1(c.Prefix().Codec, c.Hash()), nil
 	}
 }
 
 // Get a stream by multihash
 func (api *HTTPDocumentStore) Get(c cid.Cid) (io.Reader, error) {
-	s, err := c.StringOfBase(multibase.Base58BTC)
+	s, err := c.StringOfBase(multibase.Base32)
 	if err != nil {
 		return nil, err
 	}

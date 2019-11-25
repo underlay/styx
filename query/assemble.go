@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sort"
 
-	badger "github.com/dgraph-io/badger"
+	badger "github.com/dgraph-io/badger/v2"
 	ld "github.com/piprate/json-gold/ld"
 
 	types "github.com/underlay/styx/types"
