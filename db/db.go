@@ -2,6 +2,7 @@ package db
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"log"
 	"strings"
@@ -9,9 +10,13 @@ import (
 	badger "github.com/dgraph-io/badger/v2"
 	proto "github.com/golang/protobuf/proto"
 	cid "github.com/ipfs/go-cid"
+	files "github.com/ipfs/go-ipfs-files"
+	core "github.com/ipfs/interface-go-ipfs-core"
+	options "github.com/ipfs/interface-go-ipfs-core/options"
 	multihash "github.com/multiformats/go-multihash"
 	ld "github.com/piprate/json-gold/ld"
 
+	loader "github.com/underlay/go-dweb-loader/loader"
 	query "github.com/underlay/styx/query"
 	types "github.com/underlay/styx/types"
 )
@@ -24,10 +29,10 @@ type DB struct {
 	Path     string
 	ID       string
 	uri      types.URI
-	Loader   ld.DocumentLoader
-	Store    DocumentStore
+	FS       core.UnixfsAPI
 	Badger   *badger.DB
 	Sequence *badger.Sequence
+	Opts     *ld.JsonLdOptions
 }
 
 // Close the database
@@ -39,7 +44,7 @@ func (db *DB) Close() error {
 }
 
 // OpenDB opens a styx database
-func OpenDB(path string, id string, loader ld.DocumentLoader, store DocumentStore) (*DB, error) {
+func OpenDB(path string, id string, api core.CoreAPI) (*DB, error) {
 	if path == "" {
 		path = DefaultPath
 	}
@@ -55,10 +60,19 @@ func OpenDB(path string, id string, loader ld.DocumentLoader, store DocumentStor
 			uri:      types.UlURI,
 			Path:     path,
 			ID:       id,
-			Loader:   loader,
-			Store:    store,
+			FS:       api.Unixfs(),
 			Badger:   db,
 			Sequence: seq,
+			Opts: &ld.JsonLdOptions{
+				Base:                  "",
+				CompactArrays:         true,
+				ProcessingMode:        ld.JsonLd_1_1,
+				DocumentLoader:        loader.NewDwebDocumentLoader(api),
+				ProduceGeneralizedRdf: true,
+				Format:                types.Format,
+				Algorithm:             types.Algorithm,
+				UseNativeTypes:        true,
+			},
 		}, nil
 	}
 }
@@ -67,12 +81,9 @@ func OpenDB(path string, id string, loader ld.DocumentLoader, store DocumentStor
 // This is mostly a convenience method for testing;
 // actual messages should get handled at HandleMessage.
 func (db *DB) IngestJSONLd(doc interface{}) error {
-	options := GetStringOptions(db.Loader)
-
 	proc := ld.NewJsonLdProcessor()
-
 	var normalized string
-	n, err := proc.Normalize(doc, options)
+	n, err := proc.Normalize(doc, db.Opts)
 	if err != nil {
 		return err
 	}
@@ -81,7 +92,12 @@ func (db *DB) IngestJSONLd(doc interface{}) error {
 	size := len(normalized)
 
 	reader := strings.NewReader(normalized)
-	c, err := db.Store.Put(reader)
+	resolved, err := db.FS.Add(
+		context.TODO(),
+		files.NewReaderFile(reader),
+		options.Unixfs.CidVersion(1),
+		options.Unixfs.RawLeaves(true),
+	)
 	if err != nil {
 		return err
 	}
@@ -101,7 +117,7 @@ func (db *DB) IngestJSONLd(doc interface{}) error {
 	return db.Badger.Update(func(txn *badger.Txn) error {
 		indexMap := types.IndexMap{}
 		valueMap := types.ValueMap{}
-		origin, err := db.insertDataset(c, uint32(len(quads)), uint32(size), graphList, valueMap, txn)
+		origin, err := db.insertDataset(resolved, uint32(len(quads)), uint32(size), graphList, valueMap, txn)
 		if err != nil {
 			return err
 		}

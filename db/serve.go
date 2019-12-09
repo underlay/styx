@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,7 +13,8 @@ import (
 	"time"
 
 	uuid "github.com/google/uuid"
-	cid "github.com/ipfs/go-cid"
+	files "github.com/ipfs/go-ipfs-files"
+	"github.com/ipfs/interface-go-ipfs-core/options"
 	ld "github.com/piprate/json-gold/ld"
 	types "github.com/underlay/styx/types"
 )
@@ -65,7 +67,6 @@ func (db *DB) Serve(port string) error {
 
 	proc := ld.NewJsonLdProcessor()
 	api := ld.NewJsonLdApi()
-	options := GetStringOptions(db.Loader)
 
 	dir := http.Dir(db.Path + "/www")
 
@@ -80,7 +81,8 @@ func (db *DB) Serve(port string) error {
 				return
 			}
 
-			var c cid.Cid
+			// var resolved path.Resolved
+			var reader io.Reader
 			var size uint32
 			if m == "application/ld+json" {
 				decoder := json.NewDecoder(req.Body)
@@ -91,17 +93,29 @@ func (db *DB) Serve(port string) error {
 					res.Write([]byte(err.Error() + "\n"))
 					return
 				}
-				rdf, err := proc.Normalize(doc, options)
+				rdf, err := proc.Normalize(doc, db.Opts)
 				if err != nil {
 					res.WriteHeader(400)
 					res.Write([]byte(err.Error() + "\n"))
 					return
 				}
-				reader := strings.NewReader(rdf.(string))
-				c, err = db.Store.Put(reader)
-				size = uint32(len(rdf.(string)))
+				rdfString, _ := rdf.(string)
+				size = uint32(len(rdfString))
+				reader = strings.NewReader(rdfString)
+				// resolved, err = db.FS.Add(
+				// 	context.TODO(),
+				// 	files.NewReaderFile(reader),
+				// 	options.Unixfs.CidVersion(1),
+				// 	options.Unixfs.RawLeaves(true),
+				// )
 			} else if m == "application/n-quads" {
-				c, err = db.Store.Put(req.Body)
+				reader = req.Body
+				// resolved, err = db.FS.Add(
+				// 	context.TODO(),
+				// 	files.NewReaderFile(req.Body),
+				// 	options.Unixfs.CidVersion(1),
+				// 	options.Unixfs.RawLeaves(true),
+				// )
 			} else if boundary, has := params["boundary"]; m == "multipart/form-data" && has {
 				r := multipart.NewReader(req.Body, boundary)
 				filesMap := map[string]string{}
@@ -112,9 +126,7 @@ func (db *DB) Serve(port string) error {
 					return
 				}
 				base := fmt.Sprintf("uuid://%s/", u.String())
-				opts := ld.NewJsonLdOptions(base)
-				opts.DocumentLoader = db.Loader
-				opts.ProcessingMode = ld.JsonLd_1_1
+				db.Opts.Base = base
 				var graph []interface{}
 				for {
 					if p, err := r.NextPart(); err == io.EOF {
@@ -128,42 +140,60 @@ func (db *DB) Serve(port string) error {
 							res.WriteHeader(400)
 							res.Write([]byte(err.Error() + "\n"))
 							return
-						} else if expanded, err := proc.Expand(doc, opts); err != nil {
+						} else if expanded, err := proc.Expand(doc, db.Opts); err != nil {
 							res.WriteHeader(400)
 							res.Write([]byte(err.Error() + "\n"))
 							return
-						} else if flattened, err := proc.Flatten(expanded, nil, opts); err != nil {
+						} else if flattened, err := proc.Flatten(expanded, nil, db.Opts); err != nil {
 							res.WriteHeader(400)
 							res.Write([]byte(err.Error() + "\n"))
 							return
 						} else {
 							graph = flattened.([]interface{})
 						}
-					} else if file, err := db.Store.Put(p); err != nil {
+					} else if file, err := db.FS.Add(
+						context.TODO(),
+						files.NewReaderFile(p),
+						options.Unixfs.CidVersion(1),
+						options.Unixfs.RawLeaves(true),
+					); err != nil {
 						res.WriteHeader(400)
 						res.Write([]byte(err.Error() + "\n"))
 						return
 					} else {
-						filesMap[base+name] = types.MakeFileURI(file)
+						filesMap[base+name] = types.DwebURI.String(file.Cid(), "")
 					}
 				}
 
 				walk(graph, filesMap)
 
-				rdf, err := proc.Normalize(graph, options)
+				rdf, err := proc.Normalize(graph, db.Opts)
 				if err != nil {
 					res.WriteHeader(400)
 					res.Write([]byte(err.Error() + "\n"))
 					return
 				}
-				reader := strings.NewReader(rdf.(string))
-				size = uint32(len(rdf.(string)))
-				c, err = db.Store.Put(reader)
+				rdfString, _ := rdf.(string)
+				size = uint32(len(rdfString))
+				reader = strings.NewReader(rdfString)
+				// resolved, err = db.FS.Add(
+				// 	context.TODO(),
+				// 	files.NewReaderFile(reader),
+				// 	options.Unixfs.CidVersion(1),
+				// 	options.Unixfs.RawLeaves(true),
+				// )
 			} else {
 				res.WriteHeader(415)
 				res.Write([]byte(err.Error() + "\n"))
 				return
 			}
+
+			resolved, err := db.FS.Add(
+				context.TODO(),
+				files.NewReaderFile(reader),
+				options.Unixfs.CidVersion(1),
+				options.Unixfs.RawLeaves(true),
+			)
 
 			if err != nil {
 				res.WriteHeader(500)
@@ -173,10 +203,10 @@ func (db *DB) Serve(port string) error {
 
 			var r *ld.RDFDataset
 			if logging == "PROD" {
-				r, err = db.HandleMessage(c, size)
+				r, err = db.HandleMessage(resolved, size)
 			} else {
 				start := time.Now()
-				r, err = db.HandleMessage(c, size)
+				r, err = db.HandleMessage(resolved, size)
 				log.Printf("Handled message in %s\n", time.Since(start))
 			}
 
@@ -189,7 +219,7 @@ func (db *DB) Serve(port string) error {
 				// res.Header().Add("Location", fmt.Sprintf("/directory/?%s", cs))
 				res.WriteHeader(201)
 				// res.Write([]byte(cs))
-			} else if normalized, err := api.Normalize(r, GetStringOptions(db.Loader)); err != nil {
+			} else if normalized, err := api.Normalize(r, db.Opts); err != nil {
 				res.WriteHeader(500)
 				res.Write([]byte(err.Error() + "\n"))
 			} else {

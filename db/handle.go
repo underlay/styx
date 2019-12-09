@@ -1,12 +1,14 @@
 package db
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
 
 	badger "github.com/dgraph-io/badger/v2"
-	cid "github.com/ipfs/go-cid"
+	files "github.com/ipfs/go-ipfs-files"
+	path "github.com/ipfs/interface-go-ipfs-core/path"
 	ld "github.com/piprate/json-gold/ld"
 
 	types "github.com/underlay/styx/types"
@@ -38,19 +40,19 @@ var wasAttributedToIri = ld.NewIRI("http://www.w3.org/ns/prov#wasAttributedTo")
 var xsdDateIri = "http://www.w3.org/2001/XMLSchema#date"
 
 // HandleMessage is where all the magic happens.
-func (db *DB) HandleMessage(c cid.Cid, size uint32) (*ld.RDFDataset, error) {
-	reader, err := db.Store.Get(c)
+func (db *DB) HandleMessage(resolved path.Resolved, size uint32) (*ld.RDFDataset, error) {
+	node, err := db.FS.Get(context.TODO(), resolved)
 	if err != nil {
 		return nil, err
 	}
 
-	quads, graphs, err := ParseMessage(reader)
+	quads, graphs, err := ParseMessage(files.ToFile(node))
 	if err != nil {
 		return nil, err
 	}
 
 	if logging != "PROD" {
-		log.Printf("Message: %s\n", c.String())
+		log.Printf("Message: %s\n", resolved.String())
 	}
 
 	queries := map[string]bool{}
@@ -87,7 +89,7 @@ func (db *DB) HandleMessage(c cid.Cid, size uint32) (*ld.RDFDataset, error) {
 			}
 
 			var origin uint64
-			origin, err = db.insertDataset(c, uint32(len(quads)), uint32(size), graphList, valueMap, txn)
+			origin, err = db.insertDataset(resolved, uint32(len(quads)), uint32(size), graphList, valueMap, txn)
 			if err != nil {
 				return
 			}
@@ -121,9 +123,9 @@ func (db *DB) HandleMessage(c cid.Cid, size uint32) (*ld.RDFDataset, error) {
 	for label := range queries {
 		graph := ld.NewBlankNode(label)
 		if query := matchQuery(label, graphs, quads); query != nil {
-			r.Graphs[label] = query.execute(label, graphs, quads, graph, c, db)
+			r.Graphs[label] = query.execute(label, graphs, quads, graph, resolved.Cid(), db)
 		}
-		instance := ld.NewIRI(db.uri.String(c, fmt.Sprintf("#%s", label)))
+		instance := ld.NewIRI(db.uri.String(resolved.Cid(), fmt.Sprintf("#%s", label)))
 		r.Graphs["@default"] = append(r.Graphs["@default"], ld.NewQuad(graph, instanceOfIri, instance, ""))
 	}
 

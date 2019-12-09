@@ -1,19 +1,20 @@
 package main
 
 import (
+	"context"
 	"log"
+	"net/http"
 	"os"
 
-	ipfs "github.com/ipfs/go-ipfs-api"
+	ipfs "github.com/ipfs/go-ipfs-http-client"
 
-	loader "github.com/underlay/go-ld-loader"
 	styx "github.com/underlay/styx/db"
 )
 
 var path = os.Getenv("STYX_PATH")
 var host = os.Getenv("IPFS_HOST")
 
-const defaultHost = "localhost:5001"
+const defaultHost = "http://localhost:5001"
 
 var port = os.Getenv("STYX_PORT")
 
@@ -25,21 +26,19 @@ func main() {
 	}
 
 	// Replace at your leisure
-	var sh = ipfs.NewShell(host)
-
-	if !sh.IsUp() {
-		log.Fatal(shError)
-	}
-
-	dl := loader.NewHTTPDocumentLoader(sh)
-	store := styx.NewHTTPDocumentStore(sh)
-
-	peerID, err := sh.ID()
+	api, err := ipfs.NewURLApiWithClient(host, http.DefaultClient)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	db, err := styx.OpenDB(path, peerID.ID, dl, store)
+	key, err := api.Key().Self(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	id := key.ID().String()
+
+	db, err := styx.OpenDB(path, id, api)
 	if err != nil {
 		log.Fatal(err)
 	}

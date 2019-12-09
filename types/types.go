@@ -10,69 +10,8 @@ import (
 	badger "github.com/dgraph-io/badger/v2"
 	proto "github.com/golang/protobuf/proto"
 	cid "github.com/ipfs/go-cid"
-	multibase "github.com/multiformats/go-multibase"
 	ld "github.com/piprate/json-gold/ld"
 )
-
-const tail = "zkiKpvWP3HqVQEfLDhexQzHj4sN413x"
-
-const fragment = "(#(?:_:c14n\\d+)?)?"
-
-var testUlURI = regexp.MustCompile(fmt.Sprintf("^ul:\\/ipfs\\/([a-zA-Z0-9]{59})%s$", fragment))
-var testDwebURI = regexp.MustCompile(fmt.Sprintf("^dweb:\\/ipfs\\/([a-zA-Z0-9]+)%s$", fragment))
-var testHashlinkURI = regexp.MustCompile(fmt.Sprintf("^hl:([a-zA-Z0-9]+):%s%s$", tail, fragment))
-
-// URI is an interface type for content-addressable semantic URIs
-type URI interface {
-	Parse(uri string) (c cid.Cid, fragment string)
-	String(c cid.Cid, fragment string) (uri string)
-}
-
-type hlURI struct{}
-
-func (*hlURI) Parse(uri string) (c cid.Cid, fragment string) {
-	if match := testHashlinkURI.FindStringSubmatch(uri); match != nil {
-		_, mh, _ := multibase.Decode(match[1])
-		c = cid.NewCidV1(cid.Raw, mh)
-		fragment = match[2]
-	}
-	return
-}
-
-func (*hlURI) String(c cid.Cid, fragment string) (uri string) {
-	s, _ := multibase.Encode(multibase.Base58BTC, c.Hash())
-	return fmt.Sprintf("hl:%s:%s%s", s, tail, fragment)
-}
-
-// HlURI are Hashlink URIs
-var HlURI URI = (*hlURI)(nil)
-
-type ulURI struct{}
-
-func (*ulURI) Parse(uri string) (c cid.Cid, fragment string) {
-	if match := testUlURI.FindStringSubmatch(uri); match != nil {
-		c, _ = cid.Decode(match[1])
-		fragment = match[2]
-	}
-	return
-}
-
-func (*ulURI) String(c cid.Cid, fragment string) (uri string) {
-	s, _ := c.StringOfBase(multibase.Base32)
-	return fmt.Sprintf("ul:/ipfs/%s%s", s, fragment)
-}
-
-// UlURI are URIs that use a ul: protocol scheme
-var UlURI URI = (*ulURI)(nil)
-
-// MakeFileURI assembles a dweb URI for files on IPFS
-func MakeFileURI(c cid.Cid) string {
-	s, _ := c.StringOfBase(multibase.Base32)
-	return fmt.Sprintf("dweb:/ipfs/%s", s)
-}
-
-// TestURI tests URIs
-var TestURI = testHashlinkURI
 
 // GetValue serializes the statement to a string.
 func (statement *Statement) GetValue(valueMap ValueMap, txn *badger.Txn, uri URI) string {
@@ -247,34 +186,40 @@ func (indexMap IndexMap) Get(node ld.Node, uri URI, txn *badger.Txn) (*Index, er
 	}
 
 	key := AssembleKey(IndexPrefix, []byte(value), nil, nil)
-	if item, err := txn.Get(key); err != nil {
+	item, err := txn.Get(key)
+	if err != nil {
 		return nil, err
-	} else if val, err := item.ValueCopy(nil); err != nil {
-		return nil, err
-	} else {
-		indexMap[value] = &Index{}
-		if err = proto.Unmarshal(val, indexMap[value]); err != nil {
-			return nil, err
-		}
-		return indexMap[value], nil
 	}
+
+	index := &Index{}
+	err = item.Value(func(val []byte) error {
+		return proto.Unmarshal(val, index)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	indexMap[value] = index
+	return index, err
 }
 
 // NodeToValue parses a uint64 and an ld.Node into a Value struct.
 func NodeToValue(node ld.Node, origin uint64, uri URI, txn *badger.Txn) *Value {
 	value := &Value{}
 	if iri, isIri := node.(*ld.IRI); isIri {
-		if TestURI.MatchString(iri.Value) {
+		if uri.Test(iri.Value) {
 			if c, fragment := uri.Parse(iri.Value); fragment != "" {
 				key := AssembleKey(DatasetPrefix, c.Bytes(), nil, nil)
-				if item, err := txn.Get(key); err != nil {
-					if val, err := item.ValueCopy(nil); err != nil {
-						dataset := &Dataset{}
-						if err = proto.Unmarshal(val, dataset); err != nil {
-							b := &Value_Blank{Origin: dataset.GetId(), Id: fragment}
-							value.Node = &Value_Blank_{Blank: b}
-							return value
-						}
+				item, err := txn.Get(key)
+				if err != nil {
+					dataset := &Dataset{}
+					err = item.Value(func(val []byte) error {
+						return proto.Unmarshal(val, dataset)
+					})
+					if err != nil {
+						b := &Value_Blank{Origin: dataset.GetId(), Id: fragment}
+						value.Node = &Value_Blank_{Blank: b}
+						return value
 					}
 				}
 			}
@@ -329,16 +274,20 @@ func (valueMap ValueMap) Get(id uint64, txn *badger.Txn) (*Value, error) {
 	key := make([]byte, 9)
 	key[0] = ValuePrefix
 	binary.BigEndian.PutUint64(key[1:], id)
-	v := &Value{}
-	if item, err := txn.Get(key); err != nil {
+	item, err := txn.Get(key)
+	if err != nil {
 		return nil, err
-	} else if val, err := item.ValueCopy(nil); err != nil {
-		return nil, err
-	} else {
-		err := proto.Unmarshal(val, v)
-		valueMap[id] = v
-		return v, err
 	}
+
+	v := &Value{}
+	item.Value(func(val []byte) error {
+		return proto.Unmarshal(val, v)
+	})
+	if err != nil {
+		return nil, err
+	}
+	valueMap[id] = v
+	return v, err
 }
 
 // AssembleKey will look at the prefix byte to determine

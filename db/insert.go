@@ -7,16 +7,16 @@ import (
 
 	badger "github.com/dgraph-io/badger/v2"
 	proto "github.com/golang/protobuf/proto"
-	cid "github.com/ipfs/go-cid"
+	path "github.com/ipfs/interface-go-ipfs-core/path"
 	ld "github.com/piprate/json-gold/ld"
 
 	types "github.com/underlay/styx/types"
 )
 
 func (db *DB) insertDataset(
-	c cid.Cid, length uint32, size uint32, graphs []string, valueMap types.ValueMap, txn *badger.Txn,
+	resolved path.Resolved, length uint32, size uint32, graphs []string, valueMap types.ValueMap, txn *badger.Txn,
 ) (origin uint64, err error) {
-	b := c.Bytes()
+	b := resolved.Cid().Bytes()
 	datasetKey := types.AssembleKey(types.DatasetPrefix, b, nil, nil)
 
 	// Check to see if this document is already in the database
@@ -109,27 +109,32 @@ func (db *DB) insertGraph(
 				if i == 0 {
 					// Create a new SourceList container with the source
 					sources := &types.SourceList{Sources: []*types.Statement{source}}
-					if val, err = proto.Marshal(sources); err != nil {
+					val, err = proto.Marshal(sources)
+					if err != nil {
 						return
 					}
 				}
-
-				if err = txn.Set(key, val); err != nil {
+				err = txn.Set(key, val)
+				if err != nil {
 					return
 				}
 			} else if err != nil {
 				return
 			} else if i == 0 {
 				sources := &types.SourceList{}
-				if val, err = item.ValueCopy(nil); err != nil {
-					return
-				} else if err = proto.Unmarshal(val, sources); err != nil {
+				err = item.Value(func(val []byte) error {
+					return proto.Unmarshal(val, sources)
+				})
+				if err != nil {
 					return
 				}
 				sources.Sources = append(sources.GetSources(), source)
-				if val, err = proto.Marshal(sources); err != nil {
+				val, err = proto.Marshal(sources)
+				if err != nil {
 					return
-				} else if err = txn.Set(key, val); err != nil {
+				}
+				err = txn.Set(key, val)
+				if err != nil {
 					return
 				}
 			}
@@ -164,19 +169,23 @@ func (db *DB) getID(
 
 	// var index *types.Index
 	index := &types.Index{}
-	if item, err := txn.Get(key); err == badger.ErrKeyNotFound {
+	item, err := txn.Get(key)
+	if err == badger.ErrKeyNotFound {
 		// Generate a new id and create an Index struct for it
-		if index.Id, err = db.Sequence.Next(); err != nil {
+		index.Id, err = db.Sequence.Next()
+		if err != nil {
 			return nil, err
 		}
 		valueMap[index.Id] = value
 	} else if err != nil {
 		return nil, err
-	} else if val, err := item.ValueCopy(nil); err != nil {
-		return nil, err
-	} else if err := proto.Unmarshal(val, index); err != nil {
-		return nil, err
-
+	} else {
+		err = item.Value(func(val []byte) error {
+			return proto.Unmarshal(val, index)
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	indexMap[v] = index

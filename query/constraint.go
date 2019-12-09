@@ -79,14 +79,14 @@ func (c *Constraint) Sources(value I, txn *badger.Txn) (statements []*types.Stat
 	}
 
 	sources := &types.SourceList{}
-	var val []byte
-	if val, err = item.ValueCopy(nil); err != nil {
+	err = item.Value(func(val []byte) error {
+		return proto.Unmarshal(val, sources)
+	})
+	if err != nil {
 		return
-	} else if err = proto.Unmarshal(val, sources); err != nil {
-		return
-	} else {
-		statements = sources.GetSources()
 	}
+
+	statements = sources.GetSources()
 	return
 }
 
@@ -190,15 +190,17 @@ func (c *Constraint) getCount(txn *badger.Txn) (count uint64, err error) {
 	// key = types.AssembleKey(types.MinorPrefixes[(c.Place+2)%3], c.n, c.m, nil)
 
 	var item *badger.Item
-	val := make([]byte, 8)
 	if item, err = txn.Get(key); err == badger.ErrKeyNotFound {
 		return 0, nil
 	} else if err != nil {
 		return
-	} else if val, err = item.ValueCopy(val); err != nil {
-		return
 	}
-	count = binary.BigEndian.Uint64(val)
+
+	err = item.Value(func(val []byte) error {
+		count = binary.BigEndian.Uint64(val)
+		return nil
+	})
+
 	return
 }
 

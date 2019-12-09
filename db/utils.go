@@ -7,12 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	cid "github.com/ipfs/go-cid"
-	ipfs "github.com/ipfs/go-ipfs-api"
-	multibase "github.com/multiformats/go-multibase"
 	ld "github.com/piprate/json-gold/ld"
-
-	types "github.com/underlay/styx/types"
 )
 
 func permuteMajor(permutation uint8, s, p, o []byte) ([]byte, []byte, []byte) {
@@ -33,67 +28,6 @@ func permuteMinor(permutation uint8, s, p, o []byte) ([]byte, []byte, []byte) {
 	} else {
 		return o, p, s
 	}
-}
-
-// DocumentStore is an interface for either an HTTP API or Core API instance
-type DocumentStore interface {
-	Put(io.Reader) (cid.Cid, error)
-	Get(cid.Cid) (io.Reader, error)
-}
-
-// HTTPDocumentStore is satisfies core.UnixfsAPI with an HTTP IPFS Shell
-type HTTPDocumentStore struct {
-	shell *ipfs.Shell
-}
-
-// NewHTTPDocumentStore creates a new HTTP Document Store
-func NewHTTPDocumentStore(shell *ipfs.Shell) *HTTPDocumentStore {
-	return &HTTPDocumentStore{shell}
-}
-
-// Put a stream to a multihash
-func (api *HTTPDocumentStore) Put(reader io.Reader) (cid.Cid, error) {
-	if s, err := api.shell.Add(reader, ipfs.RawLeaves(false)); err != nil {
-		return cid.Undef, err
-	} else if c, err := cid.Decode(s); err != nil {
-		return cid.Undef, err
-	} else {
-		return cid.NewCidV1(c.Prefix().Codec, c.Hash()), nil
-	}
-}
-
-// Get a stream by multihash
-func (api *HTTPDocumentStore) Get(c cid.Cid) (io.Reader, error) {
-	s, err := c.StringOfBase(multibase.Base32)
-	if err != nil {
-		return nil, err
-	}
-	return api.shell.Cat(s)
-}
-
-// Compile-time type check
-var _ DocumentStore = (*HTTPDocumentStore)(nil)
-
-// GetDatasetOptions returns JsonLdOptions for parsing a document into a dataset
-func GetDatasetOptions(loader ld.DocumentLoader) *ld.JsonLdOptions {
-	options := ld.NewJsonLdOptions("")
-	options.ProcessingMode = ld.JsonLd_1_1
-	options.DocumentLoader = loader
-	options.UseNativeTypes = true
-	options.CompactArrays = true
-	return options
-}
-
-// GetStringOptions returns JsonLdOptions for serializing a dataset into a string
-func GetStringOptions(loader ld.DocumentLoader) *ld.JsonLdOptions {
-	options := ld.NewJsonLdOptions("")
-	options.ProcessingMode = ld.JsonLd_1_1
-	options.DocumentLoader = loader
-	options.CompactArrays = true
-	options.Algorithm = types.Algorithm
-	options.Format = types.Format
-	options.ProduceGeneralizedRdf = true
-	return options
 }
 
 /*

@@ -294,11 +294,16 @@ func (g *ConstraintGraph) pushTo(u *Variable, min, max int) (err error) {
 				// values that are the counts (uint64) of them *and their dual*.
 				// This is insanely elegant...
 				item := c.Iterator.Item()
-				val := make([]byte, 8)
-				if val, err = item.ValueCopy(val); err != nil {
+				var count uint64
+				err = item.Value(func(val []byte) error {
+					count = binary.BigEndian.Uint64(val)
+					return nil
+				})
+
+				if err != nil {
 					return
 				}
-				count := binary.BigEndian.Uint64(val)
+
 				c.Dual.Set(u.Value, count)
 			}
 

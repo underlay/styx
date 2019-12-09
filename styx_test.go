@@ -1,19 +1,20 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
 
-	cid "github.com/ipfs/go-cid"
-	ipfs "github.com/ipfs/go-ipfs-api"
-	multibase "github.com/multiformats/go-multibase"
+	files "github.com/ipfs/go-ipfs-files"
+	ipfs "github.com/ipfs/go-ipfs-http-client"
+	options "github.com/ipfs/interface-go-ipfs-core/options"
 	ld "github.com/piprate/json-gold/ld"
 
-	loader "github.com/underlay/go-ld-loader"
 	styx "github.com/underlay/styx/db"
 )
 
@@ -57,32 +58,23 @@ var sampleData2 = []byte(`{
 }`)
 
 func TestIngest(t *testing.T) {
-	// Replace at your leisure
-	sh := ipfs.NewShell(loader.DefaultHTTPAddress)
-
-	if !sh.IsUp() {
-		t.Error("IPFS Daemon not running")
-		return
+	api, err := ipfs.NewURLApiWithClient("http://localhost:5001", http.DefaultClient)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	peerID, err := sh.ID()
+	key, err := api.Key().Self(context.TODO())
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
 	// Remove old db
 	fmt.Println("removing path", styx.DefaultPath)
 	if err := os.RemoveAll(styx.DefaultPath); err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 
-	dl := loader.NewHTTPDocumentLoader(sh)
-
-	store := styx.NewHTTPDocumentStore(sh)
-
-	db, err := styx.OpenDB(styx.DefaultPath, peerID.ID, dl, store)
+	db, err := styx.OpenDB(styx.DefaultPath, key.ID().String(), api)
 	if err != nil {
 		t.Error(err)
 		return
@@ -107,25 +99,24 @@ func TestIngest(t *testing.T) {
 }
 
 func testQuery(double bool, query []byte) (err error) {
-	// Replace at your leisure
-	sh := ipfs.NewShell(loader.DefaultHTTPAddress)
-
-	if !sh.IsUp() {
-		return fmt.Errorf("IPFS Daemon not running")
-	} else if err = os.RemoveAll(styx.DefaultPath); err != nil {
+	if err = os.RemoveAll(styx.DefaultPath); err != nil {
 		return
 	}
 
-	peerID, err := sh.ID()
+	api, err := ipfs.NewURLApiWithClient("http://localhost:5001", http.DefaultClient)
+
+	if err != nil {
+		return err
+	}
+
+	key, err := api.Key().Self(context.TODO())
 	if err != nil {
 		return
 	}
 
-	dl := loader.NewHTTPDocumentLoader(sh)
+	id := key.ID().String()
 
-	store := styx.NewHTTPDocumentStore(sh)
-
-	db, err := styx.OpenDB(styx.DefaultPath, peerID.ID, dl, store)
+	db, err := styx.OpenDB(styx.DefaultPath, id, api)
 	if err != nil {
 		return
 	}
@@ -160,45 +151,42 @@ func testQuery(double bool, query []byte) (err error) {
 	}
 
 	proc := ld.NewJsonLdProcessor()
-	stringOptions := styx.GetStringOptions(dl)
-	rdf, err := proc.ToRDF(queryData, stringOptions)
+	rdf, err := proc.ToRDF(queryData, db.Opts)
 	if err != nil {
 		return
 	}
 
 	size := uint32(len(rdf.(string)))
+	reader := strings.NewReader(rdf.(string))
 
-	c, err := store.Put(strings.NewReader(rdf.(string)))
+	resolved, err := db.FS.Add(
+		context.TODO(),
+		files.NewReaderFile(reader),
+		options.Unixfs.CidVersion(1),
+		options.Unixfs.RawLeaves(true),
+	)
 	if err != nil {
 		return
 	}
 
-	result, err := db.HandleMessage(c, size)
+	result, err := db.HandleMessage(resolved, size)
 	if err != nil {
 		return
 	}
 
-	api := ld.NewJsonLdApi()
+	jsonLdAPI := ld.NewJsonLdApi()
 
-	// doc, err := api.FromRDF(result, stringOptions)
-	// s, err := json.MarshalIndent(doc, "", "  ")
-	// fmt.Println(string(s), err)
-
-	normalized, err := api.Normalize(result, stringOptions)
+	normalized, err := jsonLdAPI.Normalize(result, db.Opts)
 	fmt.Println(normalized, err)
-	s1, err := sh.Add(strings.NewReader(normalized.(string)), ipfs.RawLeaves(true), ipfs.Pin(false))
-	if err != nil {
-		return
-	}
-	c2, err := cid.Decode(s1)
-	if err != nil {
-		return
-	}
-	s2, err := c2.StringOfBase(multibase.Base32)
-	if err != nil {
-		return
-	}
-	fmt.Println(s2)
+	reader = strings.NewReader(normalized.(string))
+	resolved, err = db.FS.Add(
+		context.TODO(),
+		files.NewReaderFile(reader),
+		options.Unixfs.CidVersion(1),
+		options.Unixfs.RawLeaves(true),
+		options.Unixfs.Pin(false),
+	)
+	fmt.Println(resolved)
 	return
 }
 
@@ -293,7 +281,7 @@ func TestGraphQuery(t *testing.T) {
 		"u:index": [],
 		"u:satisfies": {
 			"@graph": {
-				"@id": "dweb:/ipns/QmYxMiLd4GXeW8FTSFGUiaY8imCksY6HH9LBq86gaFiwXG",
+				"@id": "dweb:/ipns/QmRybuaATHF1mnVy3VhhcbRhUedc3DkrpgMQBVEXx7oT9r",
 				"ldp:member": { }
 			}
 		}
@@ -321,7 +309,7 @@ func TestGraphIndexQuery(t *testing.T) {
 		"u:index": [{ "@id": "ul:/ipfs/bafybeibwbdi2renonku7zsl7yv3ww6cumoqs7thipex2slfp7j5qtfwbhm" }],
 		"u:satisfies": {
 			"@graph": {
-				"@id": "dweb:/ipns/QmYxMiLd4GXeW8FTSFGUiaY8imCksY6HH9LBq86gaFiwXG",
+				"@id": "dweb:/ipns/QmRybuaATHF1mnVy3VhhcbRhUedc3DkrpgMQBVEXx7oT9r",
 				"ldp:member": { "@id": "_:member" }
 			}
 		}
