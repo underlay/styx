@@ -63,7 +63,9 @@ func TestIngest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	key, err := api.Key().Self(context.TODO())
+	ctx := context.Background()
+
+	key, err := api.Key().Self(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +90,7 @@ func TestIngest(t *testing.T) {
 		return
 	}
 
-	if err = db.IngestJSONLd(data); err != nil {
+	if err = db.IngestJSONLd(ctx, data); err != nil {
 		t.Error(err)
 		return
 	}
@@ -104,12 +106,13 @@ func testQuery(double bool, query []byte) (err error) {
 	}
 
 	api, err := ipfs.NewURLApiWithClient("http://localhost:5001", http.DefaultClient)
-
 	if err != nil {
 		return err
 	}
 
-	key, err := api.Key().Self(context.TODO())
+	ctx := context.Background()
+
+	key, err := api.Key().Self(ctx)
 	if err != nil {
 		return
 	}
@@ -128,7 +131,7 @@ func testQuery(double bool, query []byte) (err error) {
 		return
 	}
 
-	if err = db.IngestJSONLd(data); err != nil {
+	if err = db.IngestJSONLd(ctx, data); err != nil {
 		return
 	}
 
@@ -138,7 +141,7 @@ func testQuery(double bool, query []byte) (err error) {
 			return
 		}
 
-		if err = db.IngestJSONLd(data2); err != nil {
+		if err = db.IngestJSONLd(ctx, data2); err != nil {
 			return
 		}
 	}
@@ -160,7 +163,7 @@ func testQuery(double bool, query []byte) (err error) {
 	reader := strings.NewReader(rdf.(string))
 
 	resolved, err := db.FS.Add(
-		context.TODO(),
+		ctx,
 		files.NewReaderFile(reader),
 		options.Unixfs.CidVersion(1),
 		options.Unixfs.RawLeaves(true),
@@ -169,7 +172,7 @@ func testQuery(double bool, query []byte) (err error) {
 		return
 	}
 
-	result, err := db.HandleMessage(resolved, size)
+	result, err := db.HandleMessage(ctx, resolved, size)
 	if err != nil {
 		return
 	}
@@ -180,7 +183,7 @@ func testQuery(double bool, query []byte) (err error) {
 	fmt.Println(normalized, err)
 	reader = strings.NewReader(normalized.(string))
 	resolved, err = db.FS.Add(
-		context.TODO(),
+		ctx,
 		files.NewReaderFile(reader),
 		options.Unixfs.CidVersion(1),
 		options.Unixfs.RawLeaves(true),

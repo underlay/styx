@@ -80,7 +80,7 @@ func OpenDB(path string, id string, api core.CoreAPI) (*DB, error) {
 // IngestJSONLd takes a JSON-LD document and ingests it.
 // This is mostly a convenience method for testing;
 // actual messages should get handled at HandleMessage.
-func (db *DB) IngestJSONLd(doc interface{}) error {
+func (db *DB) IngestJSONLd(ctx context.Context, doc interface{}) error {
 	proc := ld.NewJsonLdProcessor()
 	var normalized string
 	n, err := proc.Normalize(doc, db.Opts)
@@ -93,7 +93,7 @@ func (db *DB) IngestJSONLd(doc interface{}) error {
 
 	reader := strings.NewReader(normalized)
 	resolved, err := db.FS.Add(
-		context.TODO(),
+		ctx,
 		files.NewReaderFile(reader),
 		options.Unixfs.CidVersion(1),
 		options.Unixfs.RawLeaves(true),

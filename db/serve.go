@@ -72,6 +72,7 @@ func (db *DB) Serve(port string) error {
 
 	fs := http.FileServer(dir)
 	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
+		ctx := context.Background()
 		if req.Method == "POST" && req.URL.Path == "/" {
 			ct := req.Header.Get("Content-Type")
 			m, params, err := mime.ParseMediaType(ct)
@@ -81,7 +82,6 @@ func (db *DB) Serve(port string) error {
 				return
 			}
 
-			// var resolved path.Resolved
 			var reader io.Reader
 			var size uint32
 			if m == "application/ld+json" {
@@ -102,20 +102,8 @@ func (db *DB) Serve(port string) error {
 				rdfString, _ := rdf.(string)
 				size = uint32(len(rdfString))
 				reader = strings.NewReader(rdfString)
-				// resolved, err = db.FS.Add(
-				// 	context.TODO(),
-				// 	files.NewReaderFile(reader),
-				// 	options.Unixfs.CidVersion(1),
-				// 	options.Unixfs.RawLeaves(true),
-				// )
 			} else if m == "application/n-quads" {
 				reader = req.Body
-				// resolved, err = db.FS.Add(
-				// 	context.TODO(),
-				// 	files.NewReaderFile(req.Body),
-				// 	options.Unixfs.CidVersion(1),
-				// 	options.Unixfs.RawLeaves(true),
-				// )
 			} else if boundary, has := params["boundary"]; m == "multipart/form-data" && has {
 				r := multipart.NewReader(req.Body, boundary)
 				filesMap := map[string]string{}
@@ -152,7 +140,7 @@ func (db *DB) Serve(port string) error {
 							graph = flattened.([]interface{})
 						}
 					} else if file, err := db.FS.Add(
-						context.TODO(),
+						ctx,
 						files.NewReaderFile(p),
 						options.Unixfs.CidVersion(1),
 						options.Unixfs.RawLeaves(true),
@@ -176,12 +164,6 @@ func (db *DB) Serve(port string) error {
 				rdfString, _ := rdf.(string)
 				size = uint32(len(rdfString))
 				reader = strings.NewReader(rdfString)
-				// resolved, err = db.FS.Add(
-				// 	context.TODO(),
-				// 	files.NewReaderFile(reader),
-				// 	options.Unixfs.CidVersion(1),
-				// 	options.Unixfs.RawLeaves(true),
-				// )
 			} else {
 				res.WriteHeader(415)
 				res.Write([]byte(err.Error() + "\n"))
@@ -189,7 +171,7 @@ func (db *DB) Serve(port string) error {
 			}
 
 			resolved, err := db.FS.Add(
-				context.TODO(),
+				ctx,
 				files.NewReaderFile(reader),
 				options.Unixfs.CidVersion(1),
 				options.Unixfs.RawLeaves(true),
@@ -203,10 +185,10 @@ func (db *DB) Serve(port string) error {
 
 			var r *ld.RDFDataset
 			if logging == "PROD" {
-				r, err = db.HandleMessage(resolved, size)
+				r, err = db.HandleMessage(ctx, resolved, size)
 			} else {
 				start := time.Now()
-				r, err = db.HandleMessage(resolved, size)
+				r, err = db.HandleMessage(ctx, resolved, size)
 				log.Printf("Handled message in %s\n", time.Since(start))
 			}
 

@@ -40,8 +40,8 @@ var wasAttributedToIri = ld.NewIRI("http://www.w3.org/ns/prov#wasAttributedTo")
 var xsdDateIri = "http://www.w3.org/2001/XMLSchema#date"
 
 // HandleMessage is where all the magic happens.
-func (db *DB) HandleMessage(resolved path.Resolved, size uint32) (*ld.RDFDataset, error) {
-	node, err := db.FS.Get(context.TODO(), resolved)
+func (db *DB) HandleMessage(ctx context.Context, resolved path.Resolved, size uint32) (*ld.RDFDataset, error) {
+	node, err := db.FS.Get(ctx, resolved)
 	if err != nil {
 		return nil, err
 	}
