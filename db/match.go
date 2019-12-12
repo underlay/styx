@@ -232,33 +232,12 @@ func matchQuery(label string, graphs map[string][]int, quads []*ld.Quad) Query {
 		return nil
 	} else if array, is := first["@graph"].([]interface{}); !is {
 		return nil
-		// } else if entity := matchEntity(label, graphs, array); entity != nil {
-		// 	return entity
 	} else if entity := matchEntity(label, graphs, array); entity != nil {
 		return entity
 	} else {
 		return &instanceQuery{}
 	}
 }
-
-// // (I'm an idiot and don't know how to use Go)
-// func matchEntity(label string, graphs map[string][]int, doc []interface{}) (entity *entityQuery) {
-// 	if len(doc) != 1 {
-// 		return
-// 	} else if node, is := doc[0].(map[string]interface{}); !is {
-// 		return
-// 	} else if len(node) != 3 {
-// 		return
-// 	} else if types, is := node["@type"].([]interface{}); !is || len(types) != 1 || types[0] != entityIri {
-// 		return
-// 	} else if target := matchBlankNode(matchValue(node[satisfiesIri])); target == "" {
-// 		return
-// 	} else if _, has := graphs[target]; !has || target == label {
-// 		return
-// 	} else {
-// 		return &entityQuery{target}
-// 	}
-// }
 
 // (I'm really really dumb)
 func matchEntity(label string, graphs map[string][]int, doc []interface{}) (entity *entityQuery) {
