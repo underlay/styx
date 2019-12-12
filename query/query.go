@@ -38,8 +38,10 @@ func (g *ConstraintGraph) Next(txn *badger.Txn) (tail []I, prov Prov, err error)
 			g.pushTo(u, i, l)
 			for j, saved := range g.Cache[:i] {
 				if saved != nil {
-					g.pushTo(g.Variables[j], i, l)
 					g.Cache[j] = nil
+					if i+1 < l {
+						g.pushTo(g.Variables[j], i, l)
+					}
 				}
 			}
 		}

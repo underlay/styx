@@ -14,7 +14,7 @@ import (
 
 	uuid "github.com/google/uuid"
 	files "github.com/ipfs/go-ipfs-files"
-	"github.com/ipfs/interface-go-ipfs-core/options"
+	options "github.com/ipfs/interface-go-ipfs-core/options"
 	ld "github.com/piprate/json-gold/ld"
 	types "github.com/underlay/styx/types"
 )

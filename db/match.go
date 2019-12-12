@@ -61,8 +61,9 @@ func (q instanceQuery) execute(
 	data := make(chan []ld.Node)
 	prov := make(chan query.Prov)
 	go func() {
-		if err := db.Query(quads, graphs[label], nil, nil, 1, variables, data, prov); err != nil {
-			log.Println("hmm", err.Error())
+		err := db.Query(quads, graphs[label], nil, nil, 1, variables, data, prov)
+		if err != nil {
+			log.Println(err)
 		}
 	}()
 	v, _ := <-variables
@@ -182,9 +183,6 @@ func (q entityQuery) execute(
 		}
 
 		for i := len(t); i > 0; i-- {
-			if i == 3 {
-				log.Println(t[i-1])
-			}
 			b := ld.NewBlankNode(fmt.Sprintf("%s-t-%d", g, i-1))
 			var o ld.Node
 			l := len(t[i-1])
