@@ -88,7 +88,7 @@ func TestIngest(t *testing.T) {
 
 	defer db.Close()
 
-	if err = db.IngestJSONLd(ctx, sampleData); err != nil {
+	if err = db.IngestJSONLd(ctx, httpAPI.Unixfs(), sampleData); err != nil {
 		t.Error(err)
 		return
 	}
@@ -121,7 +121,7 @@ func testQuery(query string, data ...interface{}) (db *styx.DB, pattern []*ld.Qu
 	}
 
 	for _, d := range data {
-		err = db.IngestJSONLd(ctx, d)
+		err = db.IngestJSONLd(ctx, httpAPI.Unixfs(), d)
 		if err != nil {
 			return
 		}

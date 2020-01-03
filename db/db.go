@@ -75,7 +75,6 @@ func OpenDB(path string, id string, api core.CoreAPI) (*DB, error) {
 			uri:      types.UnderlayURI,
 			Path:     path,
 			ID:       id,
-			FS:       api.Unixfs(),
 			Badger:   db,
 			Sequence: seq,
 			Opts: &ld.JsonLdOptions{
