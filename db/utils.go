@@ -1,34 +1,11 @@
 package db
 
 import (
-	"bufio"
-	"fmt"
-	"io"
 	"regexp"
 	"strings"
-
-	ld "github.com/piprate/json-gold/ld"
 )
 
-func permuteMajor(permutation uint8, s, p, o []byte) ([]byte, []byte, []byte) {
-	if permutation == 0 {
-		return s, p, o
-	} else if permutation == 1 {
-		return p, o, s
-	} else {
-		return o, s, p
-	}
-}
-
-func permuteMinor(permutation uint8, s, p, o []byte) ([]byte, []byte, []byte) {
-	if permutation == 0 {
-		return s, o, p
-	} else if permutation == 1 {
-		return p, s, o
-	} else {
-		return o, p, s
-	}
-}
+var initialCount uint64 = 1
 
 /*
 The following adapted from
@@ -111,84 +88,84 @@ var regexGraph = regexp.MustCompile("(?:\\.|(?:(?:" + iri + "|" + bnode + ")" + 
 var regexQuad = regexp.MustCompile("^" + wso + subject + property + object + graph + wso + "$")
 
 // ParseMessage parses RDF in the form of N-Quads from io.Reader, []byte or string.
-func ParseMessage(input io.Reader) ([]*ld.Quad, map[string][]int, error) {
-	scanner := bufio.NewScanner(input)
+// func ParseMessage(input io.Reader) ([]*ld.Quad, map[string][]int, error) {
+// 	scanner := bufio.NewScanner(input)
 
-	quads := []*ld.Quad{}
+// 	quads := []*ld.Quad{}
 
-	// graphs *always* has an entry for the default graph, even if it's empty.
-	graphs := map[string][]int{"": []int{}}
+// 	// graphs *always* has an entry for the default graph, even if it's empty.
+// 	graphs := map[string][]int{"": []int{}}
 
-	// scan N-Quad input lines
-	lineNumber := 0
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		lineNumber++
+// 	// scan N-Quad input lines
+// 	lineNumber := 0
+// 	for scanner.Scan() {
+// 		line := scanner.Bytes()
+// 		lineNumber++
 
-		// skip empty lines
-		if regexEmpty.Match(line) {
-			continue
-		}
+// 		// skip empty lines
+// 		if regexEmpty.Match(line) {
+// 			continue
+// 		}
 
-		// parse quad
-		if !regexQuad.Match(line) {
-			return nil, nil, fmt.Errorf("Error while parsing N-Quads; invalid quad. line: %d", lineNumber)
-		}
+// 		// parse quad
+// 		if !regexQuad.Match(line) {
+// 			return nil, nil, fmt.Errorf("Error while parsing N-Quads; invalid quad. line: %d", lineNumber)
+// 		}
 
-		match := regexQuad.FindStringSubmatch(string(line))
+// 		match := regexQuad.FindStringSubmatch(string(line))
 
-		// get subject
-		var subject ld.Node
-		if match[1] != "" {
-			subject = ld.NewIRI(unescape(match[1]))
-		} else {
-			subject = ld.NewBlankNode(unescape(match[2]))
-		}
+// 		// get subject
+// 		var subject ld.Node
+// 		if match[1] != "" {
+// 			subject = ld.NewIRI(unescape(match[1]))
+// 		} else {
+// 			subject = ld.NewBlankNode(unescape(match[2]))
+// 		}
 
-		// get predicate
-		// predicate := ld.NewIRI(unescape(match[3]))
-		var predicate ld.Node
-		if match[3] != "" {
-			predicate = ld.NewIRI(unescape(match[3]))
-		} else {
-			predicate = ld.NewBlankNode(unescape(match[4]))
-		}
+// 		// get predicate
+// 		// predicate := ld.NewIRI(unescape(match[3]))
+// 		var predicate ld.Node
+// 		if match[3] != "" {
+// 			predicate = ld.NewIRI(unescape(match[3]))
+// 		} else {
+// 			predicate = ld.NewBlankNode(unescape(match[4]))
+// 		}
 
-		// get object
-		var object ld.Node
-		if match[5] != "" {
-			object = ld.NewIRI(unescape(match[5]))
-		} else if match[6] != "" {
-			object = ld.NewBlankNode(unescape(match[6]))
-		} else {
-			language := unescape(match[9])
-			var datatype string
-			if match[8] != "" {
-				datatype = unescape(match[8])
-			} else if match[9] != "" {
-				datatype = ld.RDFLangString
-			} else {
-				datatype = ld.XSDString
-			}
-			unescaped := unescape(match[7])
-			object = ld.NewLiteral(unescaped, datatype, language)
-		}
+// 		// get object
+// 		var object ld.Node
+// 		if match[5] != "" {
+// 			object = ld.NewIRI(unescape(match[5]))
+// 		} else if match[6] != "" {
+// 			object = ld.NewBlankNode(unescape(match[6]))
+// 		} else {
+// 			language := unescape(match[9])
+// 			var datatype string
+// 			if match[8] != "" {
+// 				datatype = unescape(match[8])
+// 			} else if match[9] != "" {
+// 				datatype = ld.RDFLangString
+// 			} else {
+// 				datatype = ld.XSDString
+// 			}
+// 			unescaped := unescape(match[7])
+// 			object = ld.NewLiteral(unescaped, datatype, language)
+// 		}
 
-		name := ""
-		if match[10] != "" {
-			name = unescape(match[10])
-		} else if match[11] != "" {
-			name = unescape(match[11])
-		}
+// 		name := ""
+// 		if match[10] != "" {
+// 			name = unescape(match[10])
+// 		} else if match[11] != "" {
+// 			name = unescape(match[11])
+// 		}
 
-		if graph, has := graphs[name]; has {
-			graphs[name] = append(graph, len(quads))
-		} else {
-			graphs[name] = []int{len(quads)}
-		}
+// 		if graph, has := graphs[name]; has {
+// 			graphs[name] = append(graph, len(quads))
+// 		} else {
+// 			graphs[name] = []int{len(quads)}
+// 		}
 
-		quads = append(quads, ld.NewQuad(subject, predicate, object, name))
-	}
+// 		quads = append(quads, ld.NewQuad(subject, predicate, object, name))
+// 	}
 
-	return quads, graphs, scanner.Err()
-}
+// 	return quads, graphs, scanner.Err()
+// }

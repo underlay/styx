@@ -6,40 +6,50 @@ import (
 	"sort"
 
 	badger "github.com/dgraph-io/badger/v2"
+	cid "github.com/ipfs/go-cid"
 	ld "github.com/piprate/json-gold/ld"
 
 	types "github.com/underlay/styx/types"
 )
 
-const pC uint8 = 255 // zoot zoot
-const pS uint8 = 0
-const pP uint8 = 1
-const pO uint8 = 2
-const pSP uint8 = 3 // it's important that pSP % 3 == pS, etc
-const pPO uint8 = 4
-const pOS uint8 = 5
-const pSPO uint8 = 9
-
 // MakeConstraintGraph populates, scores, sorts, and connects a new constraint graph
 func MakeConstraintGraph(
-	quads []*ld.Quad,
-	graph []int,
-	domain []string,
-	cursor []ld.Node,
+	pattern []*ld.Quad,
+	domain []*ld.BlankNode, index []ld.Node,
 	uri types.URI,
 	txn *badger.Txn,
-) (g *ConstraintGraph, err error) {
+) (cursor types.Cursor, err error) {
 
-	indexMap := types.IndexMap{}
+	g := &cursorGraph{
+		variables: make([]*variable, len(domain)),
+		domain:    make([]*ld.BlankNode, len(domain)),
+		ids:       make(map[string]int, len(domain)),
+		pivot:     len(domain),
+		indices:   types.NewIndexCache(),
+		values:    types.NewValueCache(),
+		uri:       uri,
+		txn:       txn,
+	}
 
-	g = &ConstraintGraph{}
+	// Copy the initial domain
+	for i, node := range domain {
+		g.variables[i] = &variable{}
+		g.domain[i] = node
+		g.ids[node.Attribute] = i
+	}
 
-	for _, i := range graph {
-		quad := quads[i]
+	cursor = g
 
-		s, S := getAttribute(quad.Subject)
-		p, P := getAttribute(quad.Predicate)
-		o, O := getAttribute(quad.Object)
+	// Check that the domian is valid
+	if len(domain) < len(index) {
+		err = ErrInvalidDomain
+		return
+	}
+
+	for i, quad := range pattern {
+		s, S := quad.Subject.(*ld.BlankNode)
+		p, P := quad.Predicate.(*ld.BlankNode)
+		o, O := quad.Object.(*ld.BlankNode)
 
 		if !S && !P && !O {
 			continue
@@ -47,32 +57,32 @@ func MakeConstraintGraph(
 			return nil, fmt.Errorf("Cannot handle all-blank triple: %d", i)
 		} else if (S && !P && !O) || (!S && P && !O) || (!S && !P && O) {
 			// Only one of the terms is a blank node, so this is a first-degree constraint.
-			c := &Constraint{Index: i}
-			if S {
-				c.Place = 0
-				if c.M, c.m, err = getID(quad.Predicate, indexMap, uri, txn); err != nil {
-					return
-				} else if c.N, c.n, err = getID(quad.Object, indexMap, uri, txn); err != nil {
-					return
-				}
-			} else if P {
-				c.Place = 1
-				if c.M, c.m, err = getID(quad.Object, indexMap, uri, txn); err != nil {
-					return
-				} else if c.N, c.n, err = getID(quad.Subject, indexMap, uri, txn); err != nil {
-					return
-				}
+			c := &constraint{index: i}
+
+			// By default c.place == 0 == S
+			u := s
+			if P {
+				u = p
+				c.place = 1
 			} else if O {
-				c.Place = 2
-				if c.M, c.m, err = getID(quad.Subject, indexMap, uri, txn); err != nil {
-					return
-				} else if c.N, c.n, err = getID(quad.Predicate, indexMap, uri, txn); err != nil {
-					return
-				}
+				u = o
+				c.place = 2
 			}
 
-			// (two of s, p, and o are the empty string)
-			if err = g.insertD1(s+p+o, c, txn); err != nil {
+			m, n := types.GetNode(quad, (c.place+1)%3), types.GetNode(quad, (c.place+2)%3)
+
+			c.m, c.mID, err = g.getID(m)
+			if err != nil {
+				return
+			}
+
+			c.n, c.nID, err = g.getID(n)
+			if err != nil {
+				return
+			}
+
+			err = g.insertD1(u, c, txn)
+			if err != nil {
 				return
 			}
 		} else {
@@ -80,43 +90,43 @@ func MakeConstraintGraph(
 			// If they're the same blank node, then we insert one z-degree constraint.
 			// If they're different, we insert two second-degree constraints.
 			if !O && s == p {
-				c := &Constraint{Index: i, Place: pSP}
+				c := &constraint{index: i, place: types.SP}
 
-				if c.N, c.n, err = getID(quad.Object, indexMap, uri, txn); err != nil {
+				if c.n, c.nID, err = g.getID(quad.Object); err != nil {
 					return
 				}
 
 				g.insertDZ(s, c, txn)
 			} else if !P && o == s {
-				c := &Constraint{Index: i, Place: pOS}
+				c := &constraint{index: i, place: types.OS}
 
-				if c.N, c.n, err = getID(quad.Predicate, indexMap, uri, txn); err != nil {
+				if c.n, c.nID, err = g.getID(quad.Predicate); err != nil {
 					return
 				}
 
 				g.insertDZ(o, c, txn)
 			} else if !S && p == o {
-				c := &Constraint{Index: i, Place: pPO}
+				c := &constraint{index: i, place: types.PO}
 
-				if c.N, c.n, err = getID(quad.Subject, indexMap, uri, txn); err != nil {
+				if c.n, c.nID, err = g.getID(quad.Subject); err != nil {
 					return
 				}
 
 				g.insertDZ(p, c, txn)
 			} else if S && P && !O {
-				u, v := &Constraint{Index: i, Place: pS}, &Constraint{Index: i, Place: pP}
+				u, v := &constraint{index: i, place: types.S}, &constraint{index: i, place: types.P}
 
-				if u.M, u.m, err = getID(quad.Predicate, indexMap, uri, txn); err != nil {
+				if u.m, u.mID, err = g.getID(quad.Predicate); err != nil {
 					return
-				} else if u.N, u.n, err = getID(quad.Object, indexMap, uri, txn); err != nil {
+				} else if u.n, u.nID, err = g.getID(quad.Object); err != nil {
 					return
-				} else if v.M, v.m, err = getID(quad.Object, indexMap, uri, txn); err != nil {
+				} else if v.m, v.mID, err = g.getID(quad.Object); err != nil {
 					return
-				} else if v.N, v.n, err = getID(quad.Subject, indexMap, uri, txn); err != nil {
+				} else if v.n, v.nID, err = g.getID(quad.Subject); err != nil {
 					return
 				}
 
-				u.Dual, v.Dual = v, u
+				u.dual, v.dual = v, u
 
 				if err = g.insertD2(s, p, u, txn); err != nil {
 					return
@@ -124,19 +134,19 @@ func MakeConstraintGraph(
 					return
 				}
 			} else if S && !P && O {
-				u, v := &Constraint{Index: i, Place: pS}, &Constraint{Index: i, Place: pO}
+				u, v := &constraint{index: i, place: types.S}, &constraint{index: i, place: types.O}
 
-				if u.M, u.m, err = getID(quad.Predicate, indexMap, uri, txn); err != nil {
+				if u.m, u.mID, err = g.getID(quad.Predicate); err != nil {
 					return
-				} else if u.N, u.n, err = getID(quad.Object, indexMap, uri, txn); err != nil {
+				} else if u.n, u.nID, err = g.getID(quad.Object); err != nil {
 					return
-				} else if v.M, v.m, err = getID(quad.Subject, indexMap, uri, txn); err != nil {
+				} else if v.m, v.mID, err = g.getID(quad.Subject); err != nil {
 					return
-				} else if v.N, v.n, err = getID(quad.Predicate, indexMap, uri, txn); err != nil {
+				} else if v.n, v.nID, err = g.getID(quad.Predicate); err != nil {
 					return
 				}
 
-				u.Dual, v.Dual = v, u
+				u.dual, v.dual = v, u
 
 				if err = g.insertD2(s, o, u, txn); err != nil {
 					return
@@ -144,19 +154,19 @@ func MakeConstraintGraph(
 					return
 				}
 			} else if !S && P && O {
-				u, v := &Constraint{Index: i, Place: pP}, &Constraint{Index: i, Place: pO}
+				u, v := &constraint{index: i, place: types.P}, &constraint{index: i, place: types.O}
 
-				if u.M, u.m, err = getID(quad.Object, indexMap, uri, txn); err != nil {
+				if u.m, u.mID, err = g.getID(quad.Object); err != nil {
 					return
-				} else if u.N, u.n, err = getID(quad.Subject, indexMap, uri, txn); err != nil {
+				} else if u.n, u.nID, err = g.getID(quad.Subject); err != nil {
 					return
-				} else if v.M, v.m, err = getID(quad.Subject, indexMap, uri, txn); err != nil {
+				} else if v.m, v.mID, err = g.getID(quad.Subject); err != nil {
 					return
-				} else if v.N, v.n, err = getID(quad.Predicate, indexMap, uri, txn); err != nil {
+				} else if v.n, v.nID, err = g.getID(quad.Predicate); err != nil {
 					return
 				}
 
-				u.Dual, v.Dual = v, u
+				u.dual, v.dual = v, u
 
 				if err = g.insertD2(p, o, u, txn); err != nil {
 					return
@@ -167,16 +177,12 @@ func MakeConstraintGraph(
 		}
 	}
 
-	// Check that the domian is valid
-	if len(domain) < len(cursor) {
-		err = ErrInvalidDomain
-		return
-	}
-
+	// Make sure that every node in the domain
+	// actually occurs in the graph
 	for _, a := range domain {
 		err = ErrInvalidDomain
-		for _, b := range g.Domain {
-			if a == b {
+		for _, b := range g.domain {
+			if a.Attribute == b.Attribute {
 				err = nil
 				break
 			}
@@ -186,122 +192,65 @@ func MakeConstraintGraph(
 		}
 	}
 
-	delta := len(domain) - len(cursor)
-	for i, node := range cursor {
-		p := domain[i+delta]
-		j := g.Map[p]
-		v := g.Variables[j]
-		if _, v.Root, err = getID(node, indexMap, uri, txn); err != nil {
+	// Set the .root values from indices first
+	for i, node := range index {
+		// p := domain[i+delta]
+		// j := g.ids[p.Attribute]
+		// v := g.variables[j]
+		v := g.variables[i]
+		_, v.root, err = g.getID(node)
+		if err != nil {
 			return
 		}
 	}
 
 	// Score the variables
-	for _, u := range g.Variables {
-		if err = u.Score(txn); err != nil {
+	for _, u := range g.variables {
+		err = u.Score(txn)
+		if err != nil {
 			return
 		}
 
 		// Set the initial value of each variable.
 		// This will get overwritten to be nil if/when
 		// previous dependencies propagate their assignments.
-		u.Value = u.Root
+		u.value = u.root
 	}
 
 	// Reverse the domain (for REASONS)
-	for l, r := 0, len(domain)-1; l < r; l, r = l+1, r-1 {
-		domain[l], domain[r] = domain[r], domain[l]
-	}
+	// for l, r := 0, len(domain)-1; l < r; l, r = l+1, r-1 {
+	// 	domain[l], domain[r] = domain[r], domain[l]
+	// }
 
-	if len(domain) == len(g.Domain) {
-		g.Pivot = len(domain)
-
-		nextMap := make(map[string]int, len(domain))
-		for i, p := range domain {
-			nextMap[p] = i
-		}
-
-		transformation := make([]int, len(domain))
-		for i, p := range g.Domain {
-			transformation[i] = nextMap[p]
-		}
-
-		variables := make([]*Variable, len(domain))
-		for i, u := range g.Variables {
-			j := transformation[i]
-			variables[j] = u
-			u.relabel(transformation)
-		}
-
-		g.Map = nextMap
-		g.Domain = domain
-		g.Variables = variables
-	} else if len(domain) == 0 {
-		// If the domain is length 0 (aka not provided),
-		// we intepret it as being the entire implied g.Domain
-		g.Pivot = len(g.Domain)
+	// Sorting g keeps variables at indices less than g.pivot in place
+	if len(domain) < len(g.domain)+1 {
 		sort.Stable(g)
-
-		transformation := make([]int, len(g.Domain))
-		nextMap := make(map[string]int, len(g.Domain))
-		for i, p := range g.Domain {
-			j := g.Map[p]
+		// Now we're in a tricky spot. g.domain and g.variables
+		// have changed, but not g.ids or the variable constraint maps.
+		transformation := make([]int, len(g.domain))
+		sortedIds := make(map[string]int, len(g.domain))
+		for i, p := range g.domain {
+			j := g.ids[p.Attribute]
 			transformation[j] = i
-			nextMap[p] = i
+			sortedIds[p.Attribute] = i
 		}
 
-		for _, u := range g.Variables {
-			u.relabel(transformation)
-		}
+		// set the new id map
+		g.ids = sortedIds
 
-		g.Map = nextMap
-	} else {
-		g.Pivot = len(domain)
-		transformation := make([]int, len(g.Domain))
-		nextMap := make(map[string]int, len(g.Domain))
-		variables := make([]*Variable, len(domain))
-		for i, p := range domain {
-			j := g.Map[p]
-			variables[i] = g.Variables[j]
-			transformation[j] = i
-			nextMap[p] = i
-		}
-
-		// Get the variables outside the domain
-		l := len(g.Domain) - len(domain)
-		complement := make([]string, 0, l)
-		complementVars := make([]*Variable, 0, l)
-		for i, p := range g.Domain {
-			if _, has := nextMap[p]; !has {
-				complement = append(complement, p)
-				complementVars = append(complementVars, g.Variables[i])
+		// Now we relabel all the variables...
+		for _, u := range g.variables {
+			d2 := make(constraintMap, len(u.d2))
+			for i, cs := range u.d2 {
+				j := transformation[i]
+				d2[j] = cs
 			}
-		}
-
-		// Now sort _just those variables_, which is a little hacky.
-		g.Domain = complement
-		g.Variables = complementVars
-		sort.Stable(g)
-
-		for i, p := range complement {
-			j := len(domain) + i
-			transformation[len(domain)+i] = j
-			nextMap[p] = j
-		}
-
-		// Okay, now concatenate the provided domain (most significant)
-		// and the sorted complement (least significant)
-		g.Domain = append(domain, complement...)
-		g.Variables = append(variables, complementVars...)
-
-		for _, u := range g.Variables {
-			u.relabel(transformation)
+			u.d2 = d2
 		}
 	}
 
-	// Invert the slice index
-	for i, u := range g.Variables {
-		for j, cs := range u.D2 {
+	for i, u := range g.variables {
+		for j, cs := range u.d2 {
 			if j < i {
 				// So these are connections that point "backward"
 				// - i.e. q has already come before p.
@@ -310,27 +259,27 @@ func MakeConstraintGraph(
 				// (which is just for outgoing connections)
 				cs.Close()
 				for _, c := range cs {
-					p := types.TriplePrefixes[(c.Place+1)%3]
-					prefix := types.AssembleKey(p, c.m, nil, nil)
-					c.Iterator = txn.NewIterator(badger.IteratorOptions{
+					p := types.TriplePrefixes[(c.place+1)%3]
+					prefix := types.AssembleKey(p, c.mID, nil, nil)
+					c.iterator = txn.NewIterator(badger.IteratorOptions{
 						PrefetchValues: false,
 						Prefix:         prefix,
 					})
 				}
-				delete(u.D2, j)
+				delete(u.d2, j)
 			}
 		}
 	}
 
 	// Assemble the dependency maps
-	g.In = make([][]int, len(g.Domain))
-	g.Out = make([][]int, len(g.Domain))
+	g.in = make([][]int, len(g.domain))
+	g.out = make([][]int, len(g.domain))
 
-	in := make([]map[int]bool, len(g.Domain))
-	out := make([]map[int]bool, len(g.Domain))
-	for i := range g.Domain {
+	in := make([]map[int]bool, len(g.domain))
+	out := make([]map[int]bool, len(g.domain))
+	for i := range g.domain {
 		out[i] = map[int]bool{}
-		for j := range g.Variables[i].D2 {
+		for j := range g.variables[i].d2 {
 			if in[j] == nil {
 				in[j] = map[int]bool{i: true}
 			} else {
@@ -350,43 +299,45 @@ func MakeConstraintGraph(
 	}
 
 	// Sort the dependency maps
-	for i := range g.Domain {
-		g.In[i] = make([]int, 0, len(in[i]))
+	for i := range g.domain {
+		g.in[i] = make([]int, 0, len(in[i]))
 		for j := range in[i] {
-			g.In[i] = append(g.In[i], j)
+			g.in[i] = append(g.in[i], j)
 		}
-		sort.Ints(g.In[i])
+		sort.Ints(g.in[i])
 
-		g.Out[i] = make([]int, 0, len(out[i]))
+		g.out[i] = make([]int, 0, len(out[i]))
 		for j := range out[i] {
-			g.Out[i] = append(g.Out[i], j)
+			g.out[i] = append(g.out[i], j)
 		}
-		sort.Ints(g.Out[i])
+
+		sort.Ints(g.out[i])
 	}
+
+	l := len(g.domain)
+	g.cache = make([]*V, l)
+	g.blacklist = make([]bool, l)
 
 	// Viola! We are returning a newly scored, sorted, and connected constraint graph.
-	return
+	return cursor, g.initial()
 }
 
-func getAttribute(node ld.Node) (attribute string, is bool) {
-	var blank *ld.BlankNode
-	if blank, is = node.(*ld.BlankNode); is {
-		attribute = blank.Attribute
-	}
-	return
-}
-
-func getID(node ld.Node, indexMap types.IndexMap, uri types.URI, txn *badger.Txn) (hasID HasID, id I, err error) {
+func (g *cursorGraph) getID(n ld.Node) (node Node, id I, err error) {
 	var index *types.Index
-	if blank, isBlank := node.(*ld.BlankNode); isBlank {
-		hasID = VariableNode(blank.Attribute)
+	if blank, isBlank := n.(*ld.BlankNode); isBlank {
+		node = VariableNode(blank.Attribute)
 		return
-	} else if index, err = indexMap.Get(node, uri, txn); err == badger.ErrKeyNotFound {
+	}
+
+	term := types.NodeToTerm(n, cid.Undef, g.uri)
+	index, err = g.indices.Get(term, g.txn)
+	if err == badger.ErrKeyNotFound { // hmm
 		return
 	} else if err != nil {
 		return
 	}
-	hasID, id = index, make([]byte, 8)
+
+	node, id = index, make([]byte, 8)
 	binary.BigEndian.PutUint64(id, index.GetId())
 	return
 }

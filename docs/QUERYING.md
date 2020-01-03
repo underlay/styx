@@ -80,7 +80,7 @@ A key concept here is that the value generators of each constraint (the lines in
 // Seek to the next intersection
 func (cs ConstraintSet) Seek(v []byte) []byte {
   var count int
-  l := len(cs)
+  l := cs.Len()
   for i := 0; count < l; i = (i + 1) % l {
     c := cs[i]
     next := c.Seek(v)

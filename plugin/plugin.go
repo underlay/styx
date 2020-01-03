@@ -2,7 +2,6 @@ package plugin
 
 import (
 	"context"
-	"log"
 	"os"
 
 	plugin "github.com/ipfs/go-ipfs/plugin"
@@ -37,7 +36,6 @@ func (sp *StyxPlugin) Init(env *plugin.Environment) error {
 // Start gets passed a CoreAPI instance, satisfying the plugin.PluginDaemon interface.
 func (sp *StyxPlugin) Start(api core.CoreAPI) error {
 	path := os.Getenv("STYX_PATH")
-	port := os.Getenv("STYX_PORT")
 
 	key, err := api.Key().Self(context.Background())
 	if err != nil {
@@ -50,9 +48,7 @@ func (sp *StyxPlugin) Start(api core.CoreAPI) error {
 		return err
 	}
 
-	go func() {
-		log.Fatal(sp.db.Serve(port))
-	}()
+	// TODO: something...
 
 	return nil
 }

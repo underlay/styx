@@ -2,9 +2,6 @@ package query
 
 import (
 	"encoding/binary"
-
-	badger "github.com/dgraph-io/badger/v2"
-	types "github.com/underlay/styx/types"
 )
 
 // i, j, k, l... are int indices
@@ -12,112 +9,155 @@ import (
 // u, v, w... are *Variable pointers
 // x, y... are dependency slice indices, where e.g. g.In[p][x] == i
 
-// Prov representation hasn't been figured out yet
-type Prov = []map[int][]*types.Statement
-
-// Next advances to the next solution in the domain and returns a *tail slice* of assignment ids
-func (g *ConstraintGraph) Next(txn *badger.Txn) (tail []I, prov Prov, err error) {
+func (g *cursorGraph) initial() (err error) {
 	l := g.Len()
-	blacklist := make([]bool, l)
 
 	var ok bool
-	if g.Cache == nil {
-		g.Cache = make([]*V, l)
-		for i, u := range g.Variables {
-			if u.Value == nil {
-				for u.Value = u.Seek(u.Root); u.Value == nil; u.Value = u.Seek(u.Root) {
-					if ok, err = g.tick(i, 0, blacklist, g.Cache); err != nil {
-						return
-					} else if !ok {
-						return
-					}
-				}
-			}
 
-			// We've got a non-nil value for u!
-			g.pushTo(u, i, l)
-			for j, saved := range g.Cache[:i] {
-				if saved != nil {
-					g.Cache[j] = nil
-					if i+1 < l {
-						g.pushTo(g.Variables[j], i, l)
-					}
+	for i, u := range g.variables {
+		if u.value == nil {
+			for u.value = u.Seek(u.root); u.value == nil; u.value = u.Seek(u.root) {
+				if ok, err = g.tick(i, 0, g.cache); err != nil {
+					return
+				} else if !ok {
+					return
 				}
 			}
 		}
 
-		tail = make([]I, g.Len())
-		for i, u := range g.Variables {
-			tail[i] = u.Value
+		// We've got a non-nil value for u!
+		g.pushTo(u, i, l)
+		for j, saved := range g.cache[:i] {
+			if saved != nil {
+				g.cache[j] = nil
+				if i+1 < l {
+					g.pushTo(g.variables[j], i, l)
+				}
+			}
 		}
-		return
 	}
 
-	i := g.Pivot - 1
+	return
+}
+
+func (g *cursorGraph) next(i int) (tail int, err error) {
+	var ok bool
+	tail = g.Len()
+	// Okay so we start at the index given to us
 	for i >= 0 {
-		u := g.Variables[i]
-		self := u.Value
-		if u.Value = u.Next(); u.Value == nil {
-			u.Value = u.Seek(self)
+		u := g.variables[i]
+		self := u.value
+		// Try naively getting another value from u
+		u.value = u.Next()
+		if u.value == nil {
+			// It didn't work :-/
+			// This means we reset u, decrement i, and continue
+			u.value = u.Seek(self)
 			i--
 			continue
 		}
 
-		if err = g.pushTo(u, i, g.Len()); err != nil {
+		// It worked! We have a new value for u.
+		// New we need to propagate it to the rest of the
+		// variables in g.domain[i+1:], if they exist,
+		// and make sure they're satisfied.
+
+		// To do that, first push u's value to the rest of the domain
+		err = g.pushTo(u, i, g.Len())
+		if err != nil {
 			return
 		}
 
+		// Now set the `cursor` variable to our current index.
+		// If we fail to satisfy a variable in d.gomain[i:1:] while
+		// propagating here, then we'll set cursor to that failure index.
 		cursor := i
-		blacklist[i] = true
-		for _, j := range g.Out[i] {
-			v := g.Variables[j]
+		// Don't recurse on i!
+		g.blacklist[i] = true
+		for _, j := range g.out[i] {
+			v := g.variables[j]
+			// We have to give g.tick(j, ...) a fresh cache here.
+			// TODO: there some memory saving stuff to be done about caches :-/
 			d := make([]*V, j)
-			for v.Value = v.Seek(v.Root); v.Value == nil; v.Value = v.Seek(v.Root) {
-				if ok, err = g.tick(j, i, blacklist[:j], d); err != nil {
+
+			// Okay - what we want is a new value for v. Since we pushed a new u.value
+			// into v, we have to "start all over" with v.Seek(v.root).
+			// This might mean that v.Seek(v.root) gives us a non-nil value - that's great!
+			// Then we don't even enter the loop. But if v.Seek(v.root) _doesn't_ give us a
+			// value, then we have to use g.tick() on j to tick j's dependencies into their
+			// next valid state (passing the fresh cache in). That will either irrecovably
+			// fail or give us a new state to try v.Seek(v.root) again on.
+			for v.value = v.Seek(v.root); v.value == nil; v.value = v.Seek(v.root) {
+				ok, err = g.tick(j, i, d)
+				if err != nil {
 					return
 				} else if !ok {
 					break
 				}
 			}
 
-			if v.Value == nil {
+			// Cool! Either v.value == nil and there are no more solutions to the query...
+			if v.value == nil {
 				cursor = j
 				break
-			} else if err = g.pushTo(v, j, g.Len()); err != nil {
+			}
+
+			// ... or v.value != nil and we can push it to the rest of the domain!
+			err = g.pushTo(v, j, g.Len())
+			if err != nil {
 				return
 			}
 
-			for x, saved := range d[i:] {
+			// One really trick bit is that when we used g.tick(j, i, d) to satisfy v,
+			// it might have changed some other previous values in the domain.
+			// Specifically, if might have changed:
+			// - variables between i and j that are in out[i]
+			// - variables between i and j that are NOT in out[i] (!!)
+			// It will NOT change any variables before i (or i itself)
+			// So we can't use out[i] here - we have to use the cache d that we passed
+			// into g.tick(j, i, d) to tell which variables were changed.
+			for x, saved := range d[i+1:] {
 				if saved != nil {
-					k := i + x
-					w := g.Variables[k]
-					if err = g.pushTo(w, k, g.Len()); err != nil {
+					// This means that w has a new value that needs to be pushed to the
+					// rest of the domain.
+					k := i + 1 + x
+					w := g.variables[k]
+					err = g.pushTo(w, k, g.Len())
+					if err != nil {
 						return
 					}
-					if g.Cache[k] == nil {
-						g.Cache[k] = saved
+
+					// If g.cache[k] hasn't been saved yet, save it here.
+					if g.cache[k] == nil {
+						g.cache[k] = saved
 					}
 				}
 			}
 		}
 
-		blacklist[i] = false
+		g.blacklist[i] = false
 
+		// Cool - either we completed the loop over g.out[i] naturally,
+		// or we broke out early and set cursor = j. Check for that here:
 		if cursor == i {
-			// success!!
-			tail = make([]I, g.Len()-i)
-			for x, v := range g.Variables[i:] {
-				tail[x] = v.Value
-			}
-			clear(g.Cache)
-			// prov = make([]map[int][]*types.Statement, len(tail))
+			// Success!! We brought all of the variables before and after i into
+			// a valid state. Clear the cache and return.
+			clear(g.cache)
+			tail = i
 			return
 		}
 
-		if err = g.restore(g.Cache[:cursor+1], g.Len()); err != nil {
+		// Oh well - we broke out early at cursor = j, because the v.Seek / g.tick(j...)
+		// loop didn't give us a result. Now we restore the values that changed...
+		err = g.restore(g.cache[:cursor+1], g.Len())
+		if err != nil {
 			return
 		}
-		clear(g.Cache)
+
+		// ... and clear the cache, but don't decrement i.
+		// We want to try the same variable i over and over until it gives up!
+		// (I'm not actually sure if we need to clear the cache here...)
+		clear(g.cache)
 	}
 	return
 }
@@ -138,30 +178,30 @@ func clear(delta []*V) {
 // it will return ok = true, the variables rest in a new consensus state, every changed
 // variable's initial state is added to delta if it doesn't already exist, and no
 // non-nil element of delta is overwritten.
-func (g *ConstraintGraph) tick(i, min int, blacklist []bool, delta []*V) (ok bool, err error) {
+func (g *cursorGraph) tick(i, min int, delta []*V) (ok bool, err error) {
 	next := make([]*V, i)
 
 	// The biggest outer loop is walking backwards over g.In[i]
-	x := len(g.In[i])
+	x := len(g.in[i])
 	for x > 0 {
-		j := g.In[i][x-1]
+		j := g.in[i][x-1]
 
-		if j < min {
+		if j <= min {
 			return false, g.restore(next, i)
-		} else if blacklist[j] {
+		} else if g.blacklist[j] {
 			x--
 			continue
 		}
 
-		v := g.Variables[j]
+		v := g.variables[j]
 
 		self := v.save()
 
-		if v.Value = v.Next(); v.Value == nil {
+		if v.value = v.Next(); v.value == nil {
 			// That sucks. Now we need to restore the value
 			// that was changed and decrement x.
-			v.Value = self.I
-			v.Seek(v.Value)
+			v.value = self.I
+			v.Seek(v.value)
 			x--
 		} else {
 			// We got a non-nil value for v, so now we
@@ -178,13 +218,13 @@ func (g *ConstraintGraph) tick(i, min int, blacklist []bool, delta []*V) (ok boo
 			// we start "the crawl" from j to i, seeking to the new satisfying root
 			// and recursing on tick when necessary.
 			cursor := j
-			blacklist[j] = true
-			for _, k := range g.Out[j] {
+			g.blacklist[j] = true
+			for _, k := range g.out[j] {
 				if k >= i {
 					break
 				}
 
-				w := g.Variables[k]
+				w := g.variables[k]
 
 				if next[k] == nil {
 					next[k] = w.save()
@@ -193,10 +233,8 @@ func (g *ConstraintGraph) tick(i, min int, blacklist []bool, delta []*V) (ok boo
 				d := make([]*V, k)
 
 				// Here we keep seeking and ticking until we have a real value.
-				for w.Value = w.Seek(w.Root); w.Value == nil; w.Value = w.Seek(w.Root) {
-					// There's no real reason to pass blacklist[:k] instead of just blacklist
-					// here, but it feels cleaner since we know that it's all it needs.
-					if ok, err = g.tick(k, min, blacklist[:k], d); err != nil {
+				for w.value = w.Seek(w.root); w.value == nil; w.value = w.Seek(w.root) {
+					if ok, err = g.tick(k, min, d); err != nil {
 						return
 					} else if ok {
 						continue
@@ -207,7 +245,7 @@ func (g *ConstraintGraph) tick(i, min int, blacklist []bool, delta []*V) (ok boo
 					}
 				}
 
-				if w.Value == nil {
+				if w.value == nil {
 					// We were unable to complete the crawl.
 					// We've already reset our state.
 					// This is how far we got:
@@ -223,7 +261,7 @@ func (g *ConstraintGraph) tick(i, min int, blacklist []bool, delta []*V) (ok boo
 				}
 				for l, saved := range d {
 					if saved != nil {
-						if err = g.pushTo(g.Variables[l], l, i); err != nil {
+						if err = g.pushTo(g.variables[l], l, i); err != nil {
 							return
 						}
 						if next[l] == nil {
@@ -237,7 +275,7 @@ func (g *ConstraintGraph) tick(i, min int, blacklist []bool, delta []*V) (ok boo
 			// Variables are only blacklisted when they appear as
 			// a parent in the call stack - they might be visited
 			// twice as siblings in the call tree, etc.
-			blacklist[j] = false
+			g.blacklist[j] = false
 
 			if cursor == j {
 				// Hooray!
@@ -249,7 +287,7 @@ func (g *ConstraintGraph) tick(i, min int, blacklist []bool, delta []*V) (ok boo
 						if delta[l] == nil {
 							delta[l] = saved
 						}
-						if err = g.pushTo(g.Variables[l], i, g.Len()); err != nil {
+						if err = g.pushTo(g.variables[l], i, g.Len()); err != nil {
 							return
 						}
 					}
@@ -266,13 +304,13 @@ func (g *ConstraintGraph) tick(i, min int, blacklist []bool, delta []*V) (ok boo
 	return
 }
 
-func (g *ConstraintGraph) restore(cache []*V, max int) (err error) {
+func (g *cursorGraph) restore(cache []*V, max int) (err error) {
 	for i, saved := range cache {
 		// If the variable at k has been modified by the
 		// (potentially) multiple recursive calls to tick,
 		// then reset it to its previous state.
 		if saved != nil {
-			u := g.Variables[i]
+			u := g.variables[i]
 			u.load(saved)
 			// Push the restored state through the max
 			if err = g.pushTo(u, i, max); err != nil {
@@ -283,10 +321,10 @@ func (g *ConstraintGraph) restore(cache []*V, max int) (err error) {
 	return
 }
 
-func (g *ConstraintGraph) pushTo(u *Variable, min, max int) (err error) {
-	for j, cs := range u.D2 {
+func (g *cursorGraph) pushTo(u *variable, min, max int) (err error) {
+	for j, cs := range u.d2 {
 		if j >= min && j < max {
-			w := g.Variables[j]
+			w := g.variables[j]
 
 			// Update the incoming D2 constraints by using .Dual to find them
 			for _, c := range cs {
@@ -295,7 +333,7 @@ func (g *ConstraintGraph) pushTo(u *Variable, min, max int) (err error) {
 				// In this case, all the iterators for the outgoing v.D2s have
 				// values that are the counts (uint64) of them *and their dual*.
 				// This is insanely elegant...
-				item := c.Iterator.Item()
+				item := c.iterator.Item()
 				var count uint64
 				err = item.Value(func(val []byte) error {
 					count = binary.BigEndian.Uint64(val)
@@ -306,11 +344,11 @@ func (g *ConstraintGraph) pushTo(u *Variable, min, max int) (err error) {
 					return
 				}
 
-				c.Dual.Set(u.Value, count)
+				c.dual.Set(u.value, count)
 			}
 
 			// Set the value to nil, like I promised you earlier.
-			w.Value = nil
+			w.value = nil
 			w.Sort()
 		}
 	}

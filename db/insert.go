@@ -7,46 +7,71 @@ import (
 
 	badger "github.com/dgraph-io/badger/v2"
 	proto "github.com/golang/protobuf/proto"
-	path "github.com/ipfs/interface-go-ipfs-core/path"
+	cid "github.com/ipfs/go-cid"
 	ld "github.com/piprate/json-gold/ld"
 
 	types "github.com/underlay/styx/types"
 )
 
-func (db *DB) insertDataset(
-	resolved path.Resolved, length uint32, size uint32, graphs []string, valueMap types.ValueMap, txn *badger.Txn,
-) (origin uint64, err error) {
-	b := resolved.Cid().Bytes()
-	datasetKey := types.AssembleKey(types.DatasetPrefix, b, nil, nil)
-
-	// Check to see if this document is already in the database
-	if _, err = txn.Get(datasetKey); err != badger.ErrKeyNotFound {
-		if err == nil {
-			log.Println("Dataset already inserted")
+// Insert is the entrypoint to inserting stuff
+func (db *DB) Insert(c cid.Cid, dataset *ld.RDFDataset) error {
+	datasetKey := types.AssembleKey(types.DatasetPrefix, c.Bytes(), nil, nil)
+	return db.Badger.Update(func(txn *badger.Txn) (err error) {
+		// Check to see if this document is already in the database
+		_, err = txn.Get(datasetKey)
+		if err != badger.ErrKeyNotFound {
+			if err == nil {
+				log.Println("Dataset already inserted")
+			}
+			return
 		}
-		return
-	}
 
-	if origin, err = db.Sequence.Next(); err != nil {
-		return
-	}
+		var origin uint64
+		origin, err = db.Sequence.Next()
+		if err != nil {
+			return
+		}
 
-	valueMap[origin] = &types.Value{Node: &types.Value_Dataset{Dataset: b}}
+		values := types.NewValueCache()
+		indices := types.NewIndexCache()
 
-	dataset := &types.Dataset{Id: origin, Length: length, Size: size, Graphs: graphs}
+		values.Set(origin, types.Cid(c))
 
-	var val []byte
-	if val, err = proto.Marshal(dataset); err != nil {
-		return
-	}
-	err = txn.Set(datasetKey, val)
-	return
+		var val []byte
+		val, err = proto.Marshal(&types.Dataset{Id: origin})
+		if err != nil {
+			return
+		}
+
+		err = txn.Set(datasetKey, val)
+		if err != nil {
+			return
+		}
+
+		for _, graph := range dataset.Graphs {
+			err = db.insertGraph(c, origin, graph, indices, values, txn)
+			if err != nil {
+				return err
+			}
+		}
+
+		err = indices.Commit(txn)
+		if err != nil {
+			return err
+		}
+
+		err = values.Commit(txn)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 func (db *DB) insertGraph(
-	origin uint64, quads []*ld.Quad, label string, graph []int,
-	indexMap types.IndexMap,
-	valueMap types.ValueMap,
+	c cid.Cid, origin uint64, quads []*ld.Quad,
+	indices types.IndexCache, values types.ValueCache,
 	txn *badger.Txn,
 ) (err error) {
 	for index, quad := range quads {
@@ -55,8 +80,8 @@ func (db *DB) insertGraph(
 			g = quad.Graph.GetValue()
 		}
 
-		if g != label {
-			continue
+		if g == "@default" {
+			g = ""
 		}
 
 		source := &types.Statement{
@@ -66,18 +91,34 @@ func (db *DB) insertGraph(
 		}
 
 		// Get the uint64 ids for the subject, predicate, and object
-		var s, p, o []byte
-		if s, err = db.getID(origin, quad.Subject, 0, indexMap, valueMap, txn); err != nil {
-			return
-		} else if p, err = db.getID(origin, quad.Predicate, 1, indexMap, valueMap, txn); err != nil {
-			return
-		} else if o, err = db.getID(origin, quad.Object, 2, indexMap, valueMap, txn); err != nil {
-			return
+		ids := [3][]byte{}
+		for i := range ids {
+			p := types.Permutation(i)
+			ids[p], err = db.getID(c, origin, quad, p, indices, values, txn)
+			if err != nil {
+				return
+			}
 		}
 
+		// Set counts
 		var major, minor [3]uint64
-		if major, minor, err = setCounts(s, p, o, txn); err != nil {
-			return
+		var key []byte
+		for i := uint8(0); i < 3; i++ {
+			// Major Key
+			majorA, majorB, _ := types.Permute(i, types.MajorMatrix, ids)
+			key = types.AssembleKey(types.MajorPrefixes[i], majorA, majorB, nil)
+			major[i], err = incrementCount(key, txn)
+			if err != nil {
+				return
+			}
+
+			// Minor Key
+			minorA, minorB, _ := types.Permute(i, types.MinorMatrix, ids)
+			key = types.AssembleKey(types.MinorPrefixes[i], minorA, minorB, nil)
+			minor[i], err = incrementCount(key, txn)
+			if err != nil {
+				return
+			}
 		}
 
 		// Sanity check that majors and minors have the same values
@@ -101,7 +142,7 @@ func (db *DB) insertGraph(
 		// Triple loop
 		var item *badger.Item
 		for i := uint8(0); i < 3; i++ {
-			a, b, c := permuteMajor(i, s, p, o)
+			a, b, c := types.Permute(i, types.MajorMatrix, ids)
 			key := types.AssembleKey(types.TriplePrefixes[i], a, b, c)
 			// sources := &types.SourceList{}
 			var val []byte
@@ -145,90 +186,47 @@ func (db *DB) insertGraph(
 }
 
 func (db *DB) getID(
-	origin uint64,
-	node ld.Node,
-	place uint8,
-	indexMap types.IndexMap,
-	valueMap types.ValueMap,
+	c cid.Cid, origin uint64,
+	quad *ld.Quad, place types.Permutation,
+	indices types.IndexCache,
+	values types.ValueCache,
 	txn *badger.Txn,
 ) ([]byte, error) {
 	ID := make([]byte, 8)
-	value := types.NodeToValue(node, origin, db.uri, txn)
-	v := value.GetValue(valueMap, db.uri, txn)
-
-	if index, has := indexMap[v]; has {
-		index.Increment(place)
-		binary.BigEndian.PutUint64(ID, index.GetId())
-		return ID, nil
-	}
-
-	// Assemble the index key
-	key := make([]byte, 1, len(v)+1)
-	key[0] = types.IndexPrefix
-	key = append(key, []byte(v)...)
-
-	// var index *types.Index
-	index := &types.Index{}
-	item, err := txn.Get(key)
+	node := types.GetNode(quad, place)
+	term := types.NodeToTerm(node, c, db.uri)
+	index, err := indices.Get(term, txn)
 	if err == badger.ErrKeyNotFound {
-		// Generate a new id and create an Index struct for it
+		index = &types.Index{}
 		index.Id, err = db.Sequence.Next()
-		if err != nil {
-			return nil, err
-		}
-		valueMap[index.Id] = value
+		value := types.NodeToValue(node, origin, db.uri, txn)
+		values.Set(index.Id, value)
+		indices.Set(term, index)
 	} else if err != nil {
 		return nil, err
-	} else {
-		err = item.Value(func(val []byte) error {
-			return proto.Unmarshal(val, index)
-		})
-		if err != nil {
-			return nil, err
-		}
 	}
-
-	indexMap[v] = index
 	index.Increment(place)
-	binary.BigEndian.PutUint64(ID, index.GetId())
-
+	binary.BigEndian.PutUint64(ID, index.Id)
 	return ID, nil
 }
 
-func setCounts(s, p, o []byte, txn *badger.Txn) (major [3]uint64, minor [3]uint64, err error) {
-	var key []byte
-	for i := uint8(0); i < 3; i++ {
-		// Major Key
-		majorA, majorB, _ := permuteMajor(i, s, p, o)
-		key = types.AssembleKey(types.MajorPrefixes[i], majorA, majorB, nil)
-		if major[i], err = setCount(key, txn); err != nil {
-			return
-		}
-
-		// Minor Key
-		minorA, minorB, _ := permuteMinor(i, s, p, o)
-		key = types.AssembleKey(types.MinorPrefixes[i], minorA, minorB, nil)
-		if minor[i], err = setCount(key, txn); err != nil {
-			return
-		}
-	}
-	return
-}
-
-// setCount handles both major and minor keys, writing the initial counter
+// incrementCount handles both major and minor keys, writing the initial counter
 // for nonexistent keys and incrementing existing ones
-func setCount(key []byte, txn *badger.Txn) (count uint64, err error) {
+func incrementCount(key []byte, txn *badger.Txn) (count uint64, err error) {
 	val := make([]byte, 8)
-
 	item, err := txn.Get(key)
 	if err == badger.ErrKeyNotFound {
-		count = uint64(1)
+		count = initialCount
 	} else if err != nil {
 		return
-	} else if val, err = item.ValueCopy(val); err != nil {
-		return
 	} else {
-		count = binary.BigEndian.Uint64(val) + 1
+		err = item.Value(func(val []byte) error {
+			count = binary.BigEndian.Uint64(val) + 1
+			return nil
+		})
+		if err != nil {
+			return
+		}
 	}
 
 	binary.BigEndian.PutUint64(val, count)

@@ -62,3 +62,11 @@ curl -F doc=@usb.jsonld -F usb=@usb.pdf http://localhost:8000?doc
   - This will be how we implement provenance-based filtering (independent of Datlog or rules)
 - Pinning
   - How to actually manage a styx node? What sorts of control mechanisms?
+
+## Development
+
+Regenerate the protobuf type definitions with:
+
+```
+protoc --go_out=. types/types.proto
+```

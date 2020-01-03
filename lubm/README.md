@@ -32,6 +32,9 @@ Count triples
 find *.owl.nt | xargs wc -l
 ```
 
+first: 2019/12/12 10:34:53 Message: /ipfs/bafybeidmxqxhplipsnnrwmjoqccs4zqwvolp4xvxxzyvhjeufcyqvx7f4y
+last : 2019/12/12 10:58:22 Handled message in 538.707755ms
+
 ## Results
 
 Results measured on an other-wise empty database on a 2017 Macbook Pro with 16 GB 2133 MHz LPDDR3 and a 2.9 GHz Intel Core i7, with Go 1.13 and Badger 1.6.
@@ -69,3 +72,23 @@ curl --data-binary @query1.json -H 'Content-Type: application/ld+json' localhost
 | query1 | **0.5209887ms** | 0.445630 | 0.576025 | 0.408285 | 0.621839 | 0.484363 | 0.570337 | 0.477194 | 0.592727 | 0.499838 | 0.533649 |
 | query2 | **1.8194817ms** | 1.645319 | 2.145748 | 2.054479 | 1.500583 | 1.436753 | 1.585419 | 1.886467 | 2.120749 | 2.381642 | 1.437658 |
 | query3 | **0.1765463ms** | 0.181701 | 0.187435 | 0.221821 | 0.159671 | 0.156800 | 0.169522 | 0.196278 | 0.179919 | 0.159784 | 0.152532 |
+
+---
+
+lubm100
+query 1:
+
+- 10.347774ms
+- 01.417844ms
+- 01.682618ms
+- 01.490160ms
+- 01.231483ms
+
+query 2:
+
+- 5.889972ms
+- 3.825925ms
+- 4.004241ms
+-
+
+GOMAXPROCS=128

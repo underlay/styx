@@ -11,31 +11,19 @@ message SourceList {
 	repeated Statement sources = 1;
 }
 
-message Value {
-	message Blank {
-		uint64 origin = 1;
-		string id = 2;
-	}
-	
-	message Literal {
-		string value = 1;
-		string language = 2;
-		string datatype = 3;
-	}
+message Blank {
+	uint64 origin = 1;
+	string id = 2;
+}
 
-	oneof node {
-		string iri = 1;
-		Literal literal = 2;
-		Blank blank = 3;
-		bytes dataset = 4;
-	}
+message Literal {
+	string value = 1;
+	string language = 2;
+	string datatype = 3;
 }
 
 message Dataset {
 	uint64 id = 1;
-	uint32 length = 2;
-	uint32 size = 3;
-	repeated string graphs = 4;
 }
 
 message Index {
