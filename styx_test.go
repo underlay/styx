@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	ipfs "github.com/ipfs/go-ipfs-http-client"
-	ld "github.com/piprate/json-gold/ld"
+	ld "github.com/underlay/json-gold/ld"
 
 	styx "github.com/underlay/styx/db"
 	types "github.com/underlay/styx/types"

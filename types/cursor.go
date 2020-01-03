@@ -2,7 +2,7 @@ package types
 
 import (
 	cid "github.com/ipfs/go-cid"
-	ld "github.com/piprate/json-gold/ld"
+	ld "github.com/underlay/json-gold/ld"
 )
 
 // Cursor is the important thing here
@@ -18,8 +18,7 @@ type Cursor interface {
 
 // Styx is a stupid interface
 type Styx interface {
-	Query(pattern []*ld.Quad, domain []*ld.BlankNode, index []ld.Node) (Cursor, error)
-	// Get([]*ld.Quad, []string, Transaction) Cursor
-	Insert(c cid.Cid, dataset *ld.RDFDataset) error
-	Delete(cid.Cid, *ld.RDFDataset) error
+	Query(query []*ld.Quad, domain []*ld.BlankNode, index []ld.Node) (Cursor, error)
+	Insert(c cid.Cid, dataset []*ld.Quad) error
+	Delete(c cid.Cid, dataset []*ld.Quad) error
 }

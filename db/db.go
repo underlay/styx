@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"log"
+	"strings"
 
 	badger "github.com/dgraph-io/badger/v2"
 	proto "github.com/golang/protobuf/proto"
@@ -12,9 +13,8 @@ import (
 	files "github.com/ipfs/go-ipfs-files"
 	core "github.com/ipfs/interface-go-ipfs-core"
 	options "github.com/ipfs/interface-go-ipfs-core/options"
-	ld "github.com/piprate/json-gold/ld"
+	ld "github.com/underlay/json-gold/ld"
 
-	loader "github.com/underlay/go-dweb-loader/loader"
 	query "github.com/underlay/styx/query"
 	types "github.com/underlay/styx/types"
 )
@@ -31,7 +31,6 @@ type DB struct {
 	ID       string
 	uri      types.URI
 	FS       core.UnixfsAPI
-	Dag      core.APIDagService
 	Badger   *badger.DB
 	Sequence *badger.Sequence
 	Opts     *ld.JsonLdOptions
@@ -77,14 +76,13 @@ func OpenDB(path string, id string, api core.CoreAPI) (*DB, error) {
 			Path:     path,
 			ID:       id,
 			FS:       api.Unixfs(),
-			Dag:      api.Dag(),
 			Badger:   db,
 			Sequence: seq,
 			Opts: &ld.JsonLdOptions{
 				Base:                  "",
 				CompactArrays:         true,
 				ProcessingMode:        ld.JsonLd_1_1,
-				DocumentLoader:        loader.NewDwebDocumentLoader(api),
+				DocumentLoader:        ld.NewDwebDocumentLoader(api),
 				ProduceGeneralizedRdf: true,
 				Format:                types.Format,
 				Algorithm:             types.Algorithm,
@@ -97,9 +95,8 @@ func OpenDB(path string, id string, api core.CoreAPI) (*DB, error) {
 // IngestJSONLd takes a JSON-LD document and ingests it.
 // This is mostly a convenience method for testing;
 // actual messages should get handled at HandleMessage.
-func (db *DB) IngestJSONLd(ctx context.Context, doc interface{}) error {
+func (db *DB) IngestJSONLd(ctx context.Context, fs core.UnixfsAPI, doc interface{}) error {
 	proc := ld.NewJsonLdProcessor()
-	api := ld.NewJsonLdApi()
 	opts := ld.NewJsonLdOptions("")
 	opts.DocumentLoader = db.Opts.DocumentLoader
 	opts.Algorithm = types.Algorithm
@@ -108,27 +105,29 @@ func (db *DB) IngestJSONLd(ctx context.Context, doc interface{}) error {
 		return err
 	}
 
-	normalized, err := api.Normalize(d.(*ld.RDFDataset), opts)
-	dataset, _ := normalized.(*ld.RDFDataset)
-
-	s := &ld.NQuadRDFSerializer{}
-	buf := bytes.NewBuffer(nil)
-	err = s.SerializeTo(buf, dataset)
+	opts.Format = types.Format
+	na := ld.NewNormalisationAlgorithm(opts.Algorithm)
+	na.Normalize(d.(*ld.RDFDataset))
+	nquads, err := na.Format(opts)
 	if err != nil {
 		return err
 	}
 
-	resolved, err := db.FS.Add(
+	reader := strings.NewReader(nquads.(string))
+
+	resolved, err := fs.Add(
 		ctx,
-		files.NewReaderFile(buf),
+		files.NewReaderFile(reader),
+		options.Unixfs.Pin(false),
 		options.Unixfs.CidVersion(1),
 		options.Unixfs.RawLeaves(true),
 	)
+
 	if err != nil {
 		return err
 	}
 
-	return db.Insert(resolved.Cid(), dataset)
+	return db.Insert(resolved.Cid(), na.Quads())
 }
 
 // Query satisfies the Styx interface
@@ -153,63 +152,8 @@ func (db *DB) Query(pattern []*ld.Quad, domain []*ld.BlankNode, index []ld.Node)
 	return g, err
 }
 
-// Query the database!
-// func (db *DB) Query2(
-// 	quads []*ld.Quad,
-// 	graph []int,
-// 	domain []string,
-// 	cursor []ld.Node,
-// 	extent int,
-// 	variables chan []string,
-// 	data chan []ld.Node,
-// 	prov chan query.Prov,
-// ) (err error) {
-// 	defer close(variables)
-// 	defer close(data)
-// 	defer close(prov)
-
-// 	if extent == 0 {
-// 		return nil
-// 	}
-
-// 	return db.Badger.View(func(txn *badger.Txn) (err error) {
-// 		var g *query.CursorGraph
-// 		g, err = query.MakeConstraintGraph(quads, graph, domain, cursor, db.uri, txn)
-// 		defer g.Close()
-// 		if err != nil {
-// 			return
-// 		}
-
-// 		variables <- g.Domain
-
-// 		values := types.NewValueCache()
-// 		for i := 0; i < extent; i++ {
-// 			tail, p, err := g.Next(txn)
-// 			if err != nil {
-// 				return err
-// 			} else if tail == nil {
-// 				break
-// 			}
-// 			d := make([]ld.Node, len(tail))
-// 			for j, t := range tail {
-// 				if t != nil {
-// 					id := binary.BigEndian.Uint64(t)
-// 					value, err := values.Get(id, txn)
-// 					if err != nil {
-// 						return err
-// 					}
-// 					d[j] = types.ValueToNode(value, values, db.uri, txn)
-// 				}
-// 			}
-// 			data <- d
-// 			prov <- p
-// 		}
-// 		return
-// 	})
-// }
-
 // Delete removes a dataset from the database
-func (db *DB) Delete(c cid.Cid, dataset *ld.RDFDataset) (err error) {
+func (db *DB) Delete(c cid.Cid, dataset []*ld.Quad) (err error) {
 	return
 }
 

@@ -10,7 +10,7 @@ import (
 	badger "github.com/dgraph-io/badger/v2"
 	proto "github.com/golang/protobuf/proto"
 	cid "github.com/ipfs/go-cid"
-	ld "github.com/piprate/json-gold/ld"
+	ld "github.com/underlay/json-gold/ld"
 )
 
 // A Term is an RDF term serialized as a string, as defined by the N-Quads spec.

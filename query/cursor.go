@@ -5,7 +5,8 @@ import (
 	"fmt"
 
 	badger "github.com/dgraph-io/badger/v2"
-	ld "github.com/piprate/json-gold/ld"
+	ld "github.com/underlay/json-gold/ld"
+	
 	types "github.com/underlay/styx/types"
 )
 

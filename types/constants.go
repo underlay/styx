@@ -1,6 +1,6 @@
 package types
 
-import ld "github.com/piprate/json-gold/ld"
+import ld "github.com/underlay/json-gold/ld"
 
 // Permutation is a permutation of a triple
 type Permutation uint8

@@ -8,80 +8,55 @@ import (
 	badger "github.com/dgraph-io/badger/v2"
 	proto "github.com/golang/protobuf/proto"
 	cid "github.com/ipfs/go-cid"
-	ld "github.com/piprate/json-gold/ld"
+	ld "github.com/underlay/json-gold/ld"
 
 	types "github.com/underlay/styx/types"
 )
 
 // Insert is the entrypoint to inserting stuff
-func (db *DB) Insert(c cid.Cid, dataset *ld.RDFDataset) error {
+func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
+	// First we canonize and serialize the dataset
+
+	txn := db.Badger.NewTransaction(true)
+	defer txn.Discard()
+
 	datasetKey := types.AssembleKey(types.DatasetPrefix, c.Bytes(), nil, nil)
-	return db.Badger.Update(func(txn *badger.Txn) (err error) {
-		// Check to see if this document is already in the database
-		_, err = txn.Get(datasetKey)
-		if err != badger.ErrKeyNotFound {
-			if err == nil {
-				log.Println("Dataset already inserted")
-			}
-			return
+
+	// Check to see if this document is already in the database
+	_, err = txn.Get(datasetKey)
+	if err != badger.ErrKeyNotFound {
+		if err == nil {
+			log.Println("Dataset already inserted")
 		}
+		return
+	}
 
-		var origin uint64
-		origin, err = db.Sequence.Next()
-		if err != nil {
-			return
-		}
+	var origin uint64
+	origin, err = db.Sequence.Next()
+	if err != nil {
+		return
+	}
 
-		values := types.NewValueCache()
-		indices := types.NewIndexCache()
+	values := types.NewValueCache()
+	indices := types.NewIndexCache()
 
-		values.Set(origin, types.Cid(c))
+	values.Set(origin, types.Cid(c))
 
-		var val []byte
-		val, err = proto.Marshal(&types.Dataset{Id: origin})
-		if err != nil {
-			return
-		}
+	var val []byte
+	val, err = proto.Marshal(&types.Dataset{Id: origin})
+	if err != nil {
+		return
+	}
 
-		err = txn.Set(datasetKey, val)
-		if err != nil {
-			return
-		}
+	err = txn.Set(datasetKey, val)
+	if err != nil {
+		return
+	}
 
-		for _, graph := range dataset.Graphs {
-			err = db.insertGraph(c, origin, graph, indices, values, txn)
-			if err != nil {
-				return err
-			}
-		}
-
-		err = indices.Commit(txn)
-		if err != nil {
-			return err
-		}
-
-		err = values.Commit(txn)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-}
-
-func (db *DB) insertGraph(
-	c cid.Cid, origin uint64, quads []*ld.Quad,
-	indices types.IndexCache, values types.ValueCache,
-	txn *badger.Txn,
-) (err error) {
-	for index, quad := range quads {
+	for index, quad := range dataset {
 		var g string
 		if quad.Graph != nil {
 			g = quad.Graph.GetValue()
-		}
-
-		if g == "@default" {
-			g = ""
 		}
 
 		source := &types.Statement{
@@ -182,7 +157,17 @@ func (db *DB) insertGraph(
 		}
 	}
 
-	return
+	err = indices.Commit(txn)
+	if err != nil {
+		return err
+	}
+
+	err = values.Commit(txn)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (db *DB) getID(
