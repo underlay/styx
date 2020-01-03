@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/ipfs/go-cid"
 	ipfs "github.com/ipfs/go-ipfs-http-client"
 	ld "github.com/underlay/json-gold/ld"
 
@@ -86,6 +87,42 @@ func TestIngest(t *testing.T) {
 	}
 
 	db.Log()
+}
+
+func TestList(t *testing.T) {
+	// Remove old db
+	fmt.Println("removing path", styx.DefaultPath)
+	err := os.RemoveAll(styx.DefaultPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	db, err := styx.OpenDB(styx.DefaultPath, nil)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer db.Close()
+
+	if err = styx.IngestJSONLd(db, httpAPI, sampleData); err != nil {
+		t.Error(err)
+		return
+	}
+
+	if err = styx.IngestJSONLd(db, httpAPI, sampleData2); err != nil {
+		t.Error(err)
+		return
+	}
+
+	db.Log()
+	index, _ := cid.Decode("bafkreif6ehnr3py3pl6avjgjuhomtnjgpcx5dfmtw3izifooafat2mfwaq")
+	list := db.List(index)
+	for ; list.Valid(); list.Next() {
+		c := list.Cid()
+		log.Println("OK", c != cid.Undef, c.String())
+	}
+	list.Close()
 }
 
 func testQuery(query string, data ...interface{}) (db types.Styx, pattern []*ld.Quad, err error) {

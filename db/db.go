@@ -147,55 +147,62 @@ func (db *DB) Delete(c cid.Cid, dataset []*ld.Quad) (err error) {
 	return
 }
 
-// Ls lists the datasets in the database
-func (db *DB) Ls(index cid.Cid, extent int, datasets chan string) error {
-	var prefix = make([]byte, 1)
-	prefix[0] = types.DatasetPrefix
+var prefetchSize = 100
 
-	if extent > 100 {
-		extent = 100
+type list struct {
+	txn  *badger.Txn
+	iter *badger.Iterator
+}
+
+func (l *list) Cid() cid.Cid {
+	if l.iter.Valid() {
+		key := l.iter.Item().KeyCopy(nil)
+		c, err := cid.Cast(key[1:])
+		if err == nil {
+			return c
+		}
 	}
+	return cid.Undef
+}
 
+func (l *list) Valid() bool {
+	return l.iter.Valid()
+}
+
+func (l *list) Close() {
+	l.iter.Close()
+	l.txn.Discard()
+}
+
+func (l *list) Next() {
+	l.iter.Next()
+}
+
+// List lists the datasets in the database
+func (db *DB) List(c cid.Cid) types.List {
 	iteratorOptions := badger.IteratorOptions{
 		PrefetchValues: true,
-		PrefetchSize:   extent,
+		PrefetchSize:   prefetchSize,
 		Reverse:        false,
 		AllVersions:    false,
-		Prefix:         prefix,
+		Prefix:         []byte{types.DatasetPrefix},
 	}
 
-	return db.Badger.View(func(txn *badger.Txn) (err error) {
-		iter := txn.NewIterator(iteratorOptions)
-		defer iter.Close()
-		defer close(datasets)
+	txn := db.Badger.NewTransaction(false)
+	iter := txn.NewIterator(iteratorOptions)
 
-		var seek []byte
-		if index != cid.Undef {
-			b := index.Bytes()
-			seek = make([]byte, len(b)+1)
-			copy(seek[1:], b)
-		} else {
-			seek = make([]byte, 1)
-		}
+	var seek []byte
+	if c != cid.Undef {
+		b := c.Bytes()
+		seek = make([]byte, len(b)+1)
+		copy(seek[1:], b)
+	} else {
+		seek = make([]byte, 1)
+	}
 
-		seek[0] = types.DatasetPrefix
-
-		i := 0
-		for iter.Seek(seek); iter.Valid() && i < extent; iter.Next() {
-			item := iter.Item()
-
-			// Get the key
-			c, err := cid.Cast(item.KeyCopy(nil)[1:])
-			if err != nil {
-				return err
-			}
-
-			datasets <- db.uri.String(c, "")
-			i++
-		}
-
-		return
-	})
+	seek[0] = types.DatasetPrefix
+	iter.Seek(seek)
+	return &list{txn, iter}
 }
 
 // Log will print the *entire database contents* to log

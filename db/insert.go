@@ -119,9 +119,9 @@ func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
 		for i := uint8(0); i < 3; i++ {
 			a, b, c := types.Permute(i, types.MajorMatrix, ids)
 			key := types.AssembleKey(types.TriplePrefixes[i], a, b, c)
-			// sources := &types.SourceList{}
 			var val []byte
-			if item, err = txn.Get(key); err == badger.ErrKeyNotFound {
+			item, err = txn.Get(key)
+			if err == badger.ErrKeyNotFound {
 				if i == 0 {
 					// Create a new SourceList container with the source
 					sources := &types.SourceList{Sources: []*types.Statement{source}}
@@ -167,7 +167,7 @@ func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
 		return err
 	}
 
-	return nil
+	return txn.Commit()
 }
 
 func (db *DB) getID(
