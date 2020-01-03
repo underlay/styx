@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -73,14 +72,7 @@ func TestIngest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx := context.Background()
-
-	key, err := httpAPI.Key().Self(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	db, err := styx.OpenDB(styx.DefaultPath, key.ID().String(), httpAPI)
+	db, err := styx.OpenDB(styx.DefaultPath, nil)
 	if err != nil {
 		t.Error(err)
 		return
@@ -88,17 +80,15 @@ func TestIngest(t *testing.T) {
 
 	defer db.Close()
 
-	if err = db.IngestJSONLd(ctx, httpAPI.Unixfs(), sampleData); err != nil {
+	if err = styx.IngestJSONLd(db, httpAPI, sampleData); err != nil {
 		t.Error(err)
 		return
 	}
 
-	if err = db.Log(); err != nil {
-		t.Error(err)
-	}
+	db.Log()
 }
 
-func testQuery(query string, data ...interface{}) (db *styx.DB, pattern []*ld.Quad, err error) {
+func testQuery(query string, data ...interface{}) (db types.Styx, pattern []*ld.Quad, err error) {
 	// Remove old db
 	fmt.Println("removing path", styx.DefaultPath)
 	err = os.RemoveAll(styx.DefaultPath)
@@ -106,22 +96,13 @@ func testQuery(query string, data ...interface{}) (db *styx.DB, pattern []*ld.Qu
 		return
 	}
 
-	ctx := context.Background()
-
-	key, err := httpAPI.Key().Self(ctx)
-	if err != nil {
-		return
-	}
-
-	id := key.ID().String()
-
-	db, err = styx.OpenDB(styx.DefaultPath, id, httpAPI)
+	db, err = styx.OpenDB(styx.DefaultPath, nil)
 	if err != nil {
 		return
 	}
 
 	for _, d := range data {
-		err = db.IngestJSONLd(ctx, httpAPI.Unixfs(), d)
+		err = styx.IngestJSONLd(db, httpAPI, d)
 		if err != nil {
 			return
 		}
@@ -137,9 +118,8 @@ func testQuery(query string, data ...interface{}) (db *styx.DB, pattern []*ld.Qu
 
 	proc := ld.NewJsonLdProcessor()
 	opts := ld.NewJsonLdOptions("")
-	opts.DocumentLoader = db.Opts.DocumentLoader
+	opts.DocumentLoader = ld.NewDwebDocumentLoader(httpAPI)
 	opts.ProduceGeneralizedRdf = true
-	opts.Algorithm = types.Algorithm
 
 	dataset, err := proc.ToRDF(queryData, opts)
 	if err != nil {
@@ -164,13 +144,14 @@ func TestSPO(t *testing.T) {
 	}
 
 	cursor, err := db.Query(pattern, nil, nil)
-	defer cursor.Close()
+
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
 	if cursor != nil {
+		defer cursor.Close()
 		for d := cursor.Domain(); d != nil; d, err = cursor.Next(nil) {
 			for _, b := range d {
 				fmt.Printf("%s: %s\n", b.Attribute, cursor.Get(b).GetValue())
@@ -192,13 +173,12 @@ func TestOPS(t *testing.T) {
 	}
 
 	cursor, err := db.Query(pattern, nil, nil)
-	defer cursor.Close()
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
 	if cursor != nil {
+		defer cursor.Close()
+		if err != nil {
+			t.Error(err)
+			return
+		}
 		for d := cursor.Domain(); d != nil; d, err = cursor.Next(nil) {
 			for _, b := range d {
 				fmt.Printf("%s: %s\n", b.Attribute, cursor.Get(b).GetValue())
@@ -221,13 +201,13 @@ func TestSimpleQuery(t *testing.T) {
 	}
 
 	cursor, err := db.Query(pattern, nil, nil)
-	defer cursor.Close()
-	if err != nil {
-		t.Error(err)
-		return
-	}
 
 	if cursor != nil {
+		defer cursor.Close()
+		if err != nil {
+			t.Error(err)
+			return
+		}
 		for d := cursor.Domain(); d != nil; d, err = cursor.Next(nil) {
 			for _, b := range d {
 				fmt.Printf("%s: %s\n", b.Attribute, cursor.Get(b).GetValue())

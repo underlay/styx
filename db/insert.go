@@ -177,7 +177,7 @@ func (db *DB) getID(
 	values types.ValueCache,
 	txn *badger.Txn,
 ) ([]byte, error) {
-	ID := make([]byte, 8)
+	id := make([]byte, 8)
 	node := types.GetNode(quad, place)
 	term := types.NodeToTerm(node, c, db.uri)
 	index, err := indices.Get(term, txn)
@@ -191,8 +191,8 @@ func (db *DB) getID(
 		return nil, err
 	}
 	index.Increment(place)
-	binary.BigEndian.PutUint64(ID, index.Id)
-	return ID, nil
+	binary.BigEndian.PutUint64(id, index.Id)
+	return id, nil
 }
 
 // incrementCount handles both major and minor keys, writing the initial counter

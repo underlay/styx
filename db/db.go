@@ -28,12 +28,10 @@ const SequenceBandwidth = 512
 // DB is the general styx database wrapper
 type DB struct {
 	Path     string
-	ID       string
 	uri      types.URI
 	FS       core.UnixfsAPI
 	Badger   *badger.DB
 	Sequence *badger.Sequence
-	Opts     *ld.JsonLdOptions
 }
 
 var _ types.Styx = (*DB)(nil)
@@ -59,9 +57,13 @@ func (db *DB) Close() (err error) {
 }
 
 // OpenDB opens a styx database
-func OpenDB(path string, id string, api core.CoreAPI) (*DB, error) {
+func OpenDB(path string, uri types.URI) (types.Styx, error) {
 	if path == "" {
 		path = DefaultPath
+	}
+
+	if uri == nil {
+		uri = types.UnderlayURI
 	}
 
 	log.Println("Opening badger database at", path)
@@ -72,21 +74,10 @@ func OpenDB(path string, id string, api core.CoreAPI) (*DB, error) {
 		return nil, err
 	} else {
 		return &DB{
-			uri:      types.UnderlayURI,
+			uri:      uri,
 			Path:     path,
-			ID:       id,
 			Badger:   db,
 			Sequence: seq,
-			Opts: &ld.JsonLdOptions{
-				Base:                  "",
-				CompactArrays:         true,
-				ProcessingMode:        ld.JsonLd_1_1,
-				DocumentLoader:        ld.NewDwebDocumentLoader(api),
-				ProduceGeneralizedRdf: true,
-				Format:                types.Format,
-				Algorithm:             types.Algorithm,
-				UseNativeTypes:        true,
-			},
 		}, nil
 	}
 }
@@ -94,10 +85,10 @@ func OpenDB(path string, id string, api core.CoreAPI) (*DB, error) {
 // IngestJSONLd takes a JSON-LD document and ingests it.
 // This is mostly a convenience method for testing;
 // actual messages should get handled at HandleMessage.
-func (db *DB) IngestJSONLd(ctx context.Context, fs core.UnixfsAPI, doc interface{}) error {
+func IngestJSONLd(db types.Styx, api core.CoreAPI, doc interface{}) error {
 	proc := ld.NewJsonLdProcessor()
 	opts := ld.NewJsonLdOptions("")
-	opts.DocumentLoader = db.Opts.DocumentLoader
+	opts.DocumentLoader = ld.NewDwebDocumentLoader(api)
 	opts.Algorithm = types.Algorithm
 	d, err := proc.ToRDF(doc, opts)
 	if err != nil {
@@ -114,8 +105,8 @@ func (db *DB) IngestJSONLd(ctx context.Context, fs core.UnixfsAPI, doc interface
 
 	reader := strings.NewReader(nquads.(string))
 
-	resolved, err := fs.Add(
-		ctx,
+	resolved, err := api.Unixfs().Add(
+		context.Background(),
 		files.NewReaderFile(reader),
 		options.Unixfs.Pin(false),
 		options.Unixfs.CidVersion(1),
@@ -208,76 +199,83 @@ func (db *DB) Ls(index cid.Cid, extent int, datasets chan string) error {
 }
 
 // Log will print the *entire database contents* to log
-func (db *DB) Log() error {
-	return db.Badger.View(func(txn *badger.Txn) error {
-		values := types.NewValueCache()
-		iter := txn.NewIterator(badger.DefaultIteratorOptions)
-		defer iter.Close()
-		var i int
-		for iter.Seek(nil); iter.Valid(); iter.Next() {
-			item := iter.Item()
-			key := item.KeyCopy(nil)
-			val, err := item.ValueCopy(nil)
-			if err != nil {
-				return err
-			}
+func (db *DB) Log() {
+	values := types.NewValueCache()
 
-			prefix := key[0]
-			if bytes.Equal(key, types.SequenceKey) {
-				// Counter!
-				log.Printf("Sequence: %02d\n", binary.BigEndian.Uint64(val))
-			} else if prefix == types.IndexPrefix {
-				// Index key
-				index := &types.Index{}
-				if err = proto.Unmarshal(val, index); err != nil {
-					return err
-				}
-				log.Printf("Index:\n  %s\n  %s\n", string(key[1:]), index.String())
-			} else if prefix == types.ValuePrefix {
-				// Value key
-				value, err := types.GetValue(item)
-				if err != nil {
-					return err
-				}
-				id := binary.BigEndian.Uint64(key[1:])
-				log.Printf("Value: %02d %s\n", id, value.GetTerm(values, db.uri, txn))
-			} else if _, has := types.TriplePrefixMap[prefix]; has {
-				// Value key
-				sourceList := &types.SourceList{}
-				proto.Unmarshal(val, sourceList)
-				log.Printf("Triple entry: %s %02d | %02d | %02d :: %s\n",
-					string(key[0]),
-					binary.BigEndian.Uint64(key[1:9]),
-					binary.BigEndian.Uint64(key[9:17]),
-					binary.BigEndian.Uint64(key[17:25]),
-					types.PrintSources(sourceList.GetSources(), values, db.uri, txn),
-				)
-			} else if _, has := types.MinorPrefixMap[prefix]; has {
-				// Minor key
-				log.Printf("Minor entry: %s %02d | %02d :: %02d\n",
-					string(key[0]),
-					binary.BigEndian.Uint64(key[1:9]),
-					binary.BigEndian.Uint64(key[9:17]),
-					binary.BigEndian.Uint64(val),
-				)
-			} else if _, has := types.MajorPrefixMap[prefix]; has {
-				// Major key
-				log.Printf("Major entry: %s %02d | %02d :: %02d\n",
-					string(key[0]),
-					binary.BigEndian.Uint64(key[1:9]),
-					binary.BigEndian.Uint64(key[9:17]),
-					binary.BigEndian.Uint64(val),
-				)
-			} else if prefix == types.DatasetPrefix {
-				c, err := cid.Cast(key[1:])
-				if err != nil {
-					return err
-				}
-				log.Printf("Dataset entry: <%s>\n", db.uri.String(c, ""))
-			}
-			i++
+	txn := db.Badger.NewTransaction(false)
+	defer txn.Discard()
+
+	iter := txn.NewIterator(badger.DefaultIteratorOptions)
+	defer iter.Close()
+
+	var i int
+	for iter.Seek(nil); iter.Valid(); iter.Next() {
+		item := iter.Item()
+		key := item.KeyCopy(nil)
+		val, err := item.ValueCopy(nil)
+		if err != nil {
+			log.Println(err)
+			return
 		}
-		log.Printf("Printed %02d database entries\n", i)
-		return nil
-	})
+
+		prefix := key[0]
+		if bytes.Equal(key, types.SequenceKey) {
+			// Counter!
+			log.Printf("Sequence: %02d\n", binary.BigEndian.Uint64(val))
+		} else if prefix == types.IndexPrefix {
+			// Index key
+			index := &types.Index{}
+			if err = proto.Unmarshal(val, index); err != nil {
+				log.Println(err)
+				return
+			}
+			log.Printf("Index:\n  %s\n  %s\n", string(key[1:]), index.String())
+		} else if prefix == types.ValuePrefix {
+			// Value key
+			value, err := types.GetValue(item)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			id := binary.BigEndian.Uint64(key[1:])
+			log.Printf("Value: %02d %s\n", id, value.GetTerm(values, db.uri, txn))
+		} else if _, has := types.TriplePrefixMap[prefix]; has {
+			// Value key
+			sourceList := &types.SourceList{}
+			proto.Unmarshal(val, sourceList)
+			log.Printf("Triple entry: %s %02d | %02d | %02d :: %s\n",
+				string(key[0]),
+				binary.BigEndian.Uint64(key[1:9]),
+				binary.BigEndian.Uint64(key[9:17]),
+				binary.BigEndian.Uint64(key[17:25]),
+				types.PrintSources(sourceList.GetSources(), values, db.uri, txn),
+			)
+		} else if _, has := types.MinorPrefixMap[prefix]; has {
+			// Minor key
+			log.Printf("Minor entry: %s %02d | %02d :: %02d\n",
+				string(key[0]),
+				binary.BigEndian.Uint64(key[1:9]),
+				binary.BigEndian.Uint64(key[9:17]),
+				binary.BigEndian.Uint64(val),
+			)
+		} else if _, has := types.MajorPrefixMap[prefix]; has {
+			// Major key
+			log.Printf("Major entry: %s %02d | %02d :: %02d\n",
+				string(key[0]),
+				binary.BigEndian.Uint64(key[1:9]),
+				binary.BigEndian.Uint64(key[9:17]),
+				binary.BigEndian.Uint64(val),
+			)
+		} else if prefix == types.DatasetPrefix {
+			c, err := cid.Cast(key[1:])
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			log.Printf("Dataset entry: <%s>\n", db.uri.String(c, ""))
+		}
+		i++
+	}
+	log.Printf("Printed %02d database entries\n", i)
+	return
 }
