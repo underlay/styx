@@ -245,7 +245,7 @@ func (db *DB) Log() {
 				return
 			}
 			id := binary.BigEndian.Uint64(key[1:])
-			log.Printf("Value: %02d %s\n", id, value.GetTerm(values, db.uri, txn))
+			log.Printf("Value: %02d %s\n", id, value.Term(values, db.uri, txn))
 		} else if _, has := types.TriplePrefixMap[prefix]; has {
 			// Value key
 			sourceList := &types.SourceList{}

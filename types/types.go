@@ -39,32 +39,32 @@ const (
 
 // Value is something that has a JSON-LD and N-Quads representation
 type Value interface {
-	ToJSON(values valueCache, uri URI, txn *badger.Txn) interface{}
-	GetTerm(values ValueCache, uri URI, txn *badger.Txn) Term
+	JSON(values valueCache, uri URI, txn *badger.Txn) interface{}
+	Term(values ValueCache, uri URI, txn *badger.Txn) Term
 }
 
-// ToJSON returns a JSON-LD value for the iri, satisfying the Value interface
-func (iri Iri) ToJSON(values valueCache, uri URI, txn *badger.Txn) interface{} {
+// JSON returns a JSON-LD value for the iri, satisfying the Value interface
+func (iri Iri) JSON(values valueCache, uri URI, txn *badger.Txn) interface{} {
 	return map[string]interface{}{"@id": string(iri)}
 }
 
-// GetTerm returns the n-quads term for the iri, satisfying the Value interface
-func (iri Iri) GetTerm(values ValueCache, uri URI, txn *badger.Txn) Term {
+// Term returns the n-quads term for the iri, satisfying the Value interface
+func (iri Iri) Term(values ValueCache, uri URI, txn *badger.Txn) Term {
 	return Term(fmt.Sprintf("<%s>", iri))
 }
 
-// ToJSON returns a JSON-LD value for the dataset, satisfying the Value interface
-func (d Cid) ToJSON(values valueCache, uri URI, txn *badger.Txn) interface{} {
+// JSON returns a JSON-LD value for the dataset, satisfying the Value interface
+func (d Cid) JSON(values valueCache, uri URI, txn *badger.Txn) interface{} {
 	return map[string]interface{}{"@id": uri.String(cid.Cid(d), "")}
 }
 
-// GetTerm returns the n-quads term for the dataset, satisfying the Value interface
-func (d Cid) GetTerm(values ValueCache, uri URI, txn *badger.Txn) Term {
+// Term returns the n-quads term for the dataset, satisfying the Value interface
+func (d Cid) Term(values ValueCache, uri URI, txn *badger.Txn) Term {
 	return Term(fmt.Sprintf("<%s>", uri.String(cid.Cid(d), "")))
 }
 
-// ToJSON returns a JSON-LD value for the blank node, satisfying the Value interface
-func (blank *Blank) ToJSON(values valueCache, uri URI, txn *badger.Txn) (r interface{}) {
+// JSON returns a JSON-LD value for the blank node, satisfying the Value interface
+func (blank *Blank) JSON(values valueCache, uri URI, txn *badger.Txn) (r interface{}) {
 	if v, err := values.Get(blank.Origin, txn); err == nil {
 		if d, is := v.(Cid); is {
 			fragment := fmt.Sprintf("#%s", blank.Id)
@@ -76,8 +76,8 @@ func (blank *Blank) ToJSON(values valueCache, uri URI, txn *badger.Txn) (r inter
 	return
 }
 
-// GetTerm returns the n-quads term for the blank node, satisfying the Value interface
-func (blank *Blank) GetTerm(values ValueCache, uri URI, txn *badger.Txn) Term {
+// Term returns the n-quads term for the blank node, satisfying the Value interface
+func (blank *Blank) Term(values ValueCache, uri URI, txn *badger.Txn) Term {
 	if v, err := values.Get(blank.Origin, txn); err == nil {
 		if d, is := v.(Cid); is {
 			c := cid.Cid(d)
@@ -88,8 +88,8 @@ func (blank *Blank) GetTerm(values ValueCache, uri URI, txn *badger.Txn) Term {
 	return ""
 }
 
-// ToJSON returns a JSON-LD value for the literal, satisfying the Value interface
-func (literal *Literal) ToJSON(values valueCache, uri URI, txn *badger.Txn) (r interface{}) {
+// JSON returns a JSON-LD value for the literal, satisfying the Value interface
+func (literal *Literal) JSON(values valueCache, uri URI, txn *badger.Txn) (r interface{}) {
 	v, d, l := literal.Value, literal.Datatype, literal.Language
 	if d == ld.RDFLangString {
 		r = map[string]interface{}{"@value": v, "@language": l}
@@ -113,8 +113,8 @@ func (literal *Literal) ToJSON(values valueCache, uri URI, txn *badger.Txn) (r i
 	return
 }
 
-// GetTerm returns the n-quads term for the literal, satisfying the Value interface
-func (literal *Literal) GetTerm(values ValueCache, uri URI, txn *badger.Txn) Term {
+// Term returns the n-quads term for the literal, satisfying the Value interface
+func (literal *Literal) Term(values ValueCache, uri URI, txn *badger.Txn) Term {
 	escaped := escape(literal.Value)
 	if literal.Datatype == ld.RDFLangString {
 		return Term(fmt.Sprintf("\"%s\"@%s", escaped, literal.Language))
