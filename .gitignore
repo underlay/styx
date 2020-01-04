@@ -1,4 +1,14 @@
 styx
+
+lubm/data
+lubm/src
+lubm/classes
+lubm/log.txt
+lubm/readme.txt
+lubm/uba1.7.zip
+lubm/Generator.java
+lubm/GeneratorLinuxFix.zip
+
 .vscode
 node_modules
 

@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ipfs/go-cid"
+	cid "github.com/ipfs/go-cid"
 	ipfs "github.com/ipfs/go-ipfs-http-client"
 	ld "github.com/underlay/json-gold/ld"
 

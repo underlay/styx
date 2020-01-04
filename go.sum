@@ -746,8 +746,8 @@ github.com/syndtr/goleveldb v1.0.0 h1:fBdIW9lB4Iz0n9khmH8w27SJ3QEJ7+IgjPEwGSZiFd
 github.com/syndtr/goleveldb v1.0.0/go.mod h1:ZVVdQEZoIme9iO1Ch2Jdy24qqXrMMOU6lpPAyBWyWuQ=
 github.com/texttheater/golang-levenshtein v0.0.0-20180516184445-d188e65d659e/go.mod h1:XDKHRm5ThF8YJjx001LtgelzsoaEcvnA7lVWz9EeX3g=
 github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8/go.mod h1:VFNgLljTbGfSG7qAOspJ7OScBnGdDN/yBr0sguwnwf0=
-github.com/underlay/json-gold v0.2.1-0.20200103184611-51ef8ee831e1 h1:A9rWH4Qm7mZWIZPUBtD2qAr5UjqOz0XGwR4KSV+sLHE=
-github.com/underlay/json-gold v0.2.1-0.20200103184611-51ef8ee831e1/go.mod h1:O58hO1XUTsQBPiROMMephLN9ruHSJ3JFA5awecf6M74=
+github.com/underlay/json-gold v0.2.1-0.20200104011050-f4fa128bea08 h1:nvcW42Nvtm0FXGxwUpsICW+S5b6ulclyKZbv6EmMxUo=
+github.com/underlay/json-gold v0.2.1-0.20200104011050-f4fa128bea08/go.mod h1:O58hO1XUTsQBPiROMMephLN9ruHSJ3JFA5awecf6M74=
 github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijbERA=
 github.com/warpfork/go-wish v0.0.0-20180510122957-5ad1f5abf436 h1:qOpVTI+BrstcjTZLm2Yz/3sOnqkzj3FQoh0g+E5s3Gc=
 github.com/warpfork/go-wish v0.0.0-20180510122957-5ad1f5abf436/go.mod h1:x6AKhvSSexNrVSrViXSHUEbICjmGXhtgABaHIySUSGw=

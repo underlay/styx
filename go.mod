@@ -20,6 +20,6 @@ require (
 	github.com/libp2p/go-libp2p v0.5.0 // indirect
 	github.com/libp2p/go-libp2p-record v0.1.2 // indirect
 	github.com/multiformats/go-multibase v0.0.1
-	github.com/underlay/json-gold v0.2.1-0.20200103184611-51ef8ee831e1
+	github.com/underlay/json-gold v0.2.1-0.20200104011050-f4fa128bea08
 	golang.org/x/sys v0.0.0-20190926180325-855e68c8590b // indirect
 )

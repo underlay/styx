@@ -48,7 +48,7 @@ func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
 		return
 	}
 
-	err = txn.Set(datasetKey, val)
+	txn, err = db.set(datasetKey, val, txn)
 	if err != nil {
 		return
 	}
@@ -82,7 +82,7 @@ func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
 			// Major Key
 			majorA, majorB, _ := types.Permute(i, types.MajorMatrix, ids)
 			key = types.AssembleKey(types.MajorPrefixes[i], majorA, majorB, nil)
-			major[i], err = incrementCount(key, txn)
+			major[i], txn, err = db.increment(key, txn)
 			if err != nil {
 				return
 			}
@@ -90,7 +90,7 @@ func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
 			// Minor Key
 			minorA, minorB, _ := types.Permute(i, types.MinorMatrix, ids)
 			key = types.AssembleKey(types.MinorPrefixes[i], minorA, minorB, nil)
-			minor[i], err = incrementCount(key, txn)
+			minor[i], txn, err = db.increment(key, txn)
 			if err != nil {
 				return
 			}
@@ -130,7 +130,7 @@ func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
 						return
 					}
 				}
-				err = txn.Set(key, val)
+				txn, err = db.set(key, val, txn)
 				if err != nil {
 					return
 				}
@@ -149,7 +149,7 @@ func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
 				if err != nil {
 					return
 				}
-				err = txn.Set(key, val)
+				txn, err = db.set(key, val, txn)
 				if err != nil {
 					return
 				}
@@ -157,12 +157,12 @@ func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
 		}
 	}
 
-	err = indices.Commit(txn)
+	txn, err = indices.Commit(db.Badger, txn)
 	if err != nil {
 		return err
 	}
 
-	err = values.Commit(txn)
+	txn, err = values.Commit(db.Badger, txn)
 	if err != nil {
 		return err
 	}
@@ -197,7 +197,7 @@ func (db *DB) getID(
 
 // incrementCount handles both major and minor keys, writing the initial counter
 // for nonexistent keys and incrementing existing ones
-func incrementCount(key []byte, txn *badger.Txn) (count uint64, err error) {
+func (db *DB) increment(key []byte, txn *badger.Txn) (count uint64, t *badger.Txn, err error) {
 	val := make([]byte, 8)
 	item, err := txn.Get(key)
 	if err == badger.ErrKeyNotFound {
@@ -215,6 +215,19 @@ func incrementCount(key []byte, txn *badger.Txn) (count uint64, err error) {
 	}
 
 	binary.BigEndian.PutUint64(val, count)
-	err = txn.Set(key, val)
+	t, err = db.set(key, val, txn)
 	return
+}
+
+func (db *DB) set(key, val []byte, txn *badger.Txn) (*badger.Txn, error) {
+	err := txn.Set(key, val)
+	if err == badger.ErrTxnTooBig {
+		err = txn.Commit()
+		if err != nil {
+			return nil, err
+		}
+		txn = db.Badger.NewTransaction(true)
+		err = txn.Set(key, val)
+	}
+	return txn, err
 }

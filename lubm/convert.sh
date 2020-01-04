@@ -1,2 +1,3 @@
 rapper -i rdfxml -o nquads -q $1 > $1.nt
-curl --data-binary @$1.nt -H 'Content-Type: application/n-quads' localhost:8086/
+./canonize $1.nt > data/$1.c.nt
+rm $1 $1.nt
