@@ -1,8 +1,3 @@
-styx
-
-.vscode
-node_modules
-
 *.vlog
 LOCK
 MANIFEST
