@@ -30,6 +30,15 @@ const Algorithm = "URDNA2015"
 // Format has to be application/n-quads
 const Format = "application/n-quads"
 
+// DatasetCountKey stores the total number of datasets in the database
+var DatasetCountKey = []byte(":")
+
+// ValueCountKey stores the total number of unique ids in the database
+var ValueCountKey = []byte("#")
+
+// TripleCountKey stores the total number of triples in the database
+var TripleCountKey = []byte("/")
+
 // SequenceKey to store the id counter
 var SequenceKey = []byte(">")
 

@@ -227,29 +227,19 @@ func (indices indexCache) Set(value Term, index *Index) {
 }
 
 // Commit writes the contents of the index map to badger
-func (indices indexCache) Commit(db *badger.DB, txn *badger.Txn) (t *badger.Txn, err error) {
-	t = txn
-	var val []byte
+func (indices indexCache) Commit(db *badger.DB, txn *badger.Txn) (*badger.Txn, error) {
 	for v, index := range indices {
 		key := AssembleKey(IndexPrefix, []byte(v), nil, nil)
-		val, err = proto.Marshal(index)
+		val, err := proto.Marshal(index)
 		if err != nil {
-			return
+			return nil, err
 		}
-		err = t.Set(key, val)
-		if err == badger.ErrTxnTooBig {
-			err = t.Commit()
-			if err != nil {
-				return nil, err
-			}
-			t = db.NewTransaction(true)
-			err = t.Set(key, val)
-		}
+		txn, err = SetSafe(key, val, txn, db)
 		if err != nil {
-			return
+			return nil, err
 		}
 	}
-	return
+	return txn, nil
 }
 
 // Get memoizes database lookup for RDF nodes.
@@ -393,6 +383,10 @@ func (values valueCache) Commit(db *badger.DB, txn *badger.Txn) (t *badger.Txn, 
 			return
 		}
 	}
+
+	// Okay now that we've written all the values, we increment the
+	// Value counter by len(values)
+	txn, err = Increment(ValueCountKey, uint64(len(values)), txn, db)
 	return
 }
 
@@ -483,4 +477,36 @@ func PrintSources(statements []*Statement, values ValueCache, uri URI, txn *badg
 		}
 	}
 	return s + " ]"
+}
+
+func SetSafe(key, val []byte, txn *badger.Txn, db *badger.DB) (*badger.Txn, error) {
+	err := txn.Set(key, val)
+	if err == badger.ErrTxnTooBig {
+		err = txn.Commit()
+		if err != nil {
+			return nil, err
+		}
+		txn = db.NewTransaction(true)
+		err = txn.Set(key, val)
+	}
+	return txn, err
+}
+
+func Increment(key []byte, delta uint64, txn *badger.Txn, db *badger.DB) (*badger.Txn, error) {
+	item, err := txn.Get(key)
+	val := make([]byte, 8)
+	if err == badger.ErrKeyNotFound {
+		binary.BigEndian.PutUint64(val, delta)
+		return SetSafe(key, val, txn, db)
+	} else if err != nil {
+		return nil, err
+	} else {
+		val, err = item.ValueCopy(val)
+		if err != nil {
+			return nil, err
+		}
+		sum := delta + binary.BigEndian.Uint64(val)
+		binary.BigEndian.PutUint64(val, sum)
+		return SetSafe(key, val, txn, db)
+	}
 }

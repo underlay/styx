@@ -48,7 +48,7 @@ func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
 		return
 	}
 
-	txn, err = db.set(datasetKey, val, txn)
+	txn, err = types.SetSafe(datasetKey, val, txn, db.Badger)
 	if err != nil {
 		return
 	}
@@ -130,7 +130,7 @@ func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
 						return
 					}
 				}
-				txn, err = db.set(key, val, txn)
+				txn, err = types.SetSafe(key, val, txn, db.Badger)
 				if err != nil {
 					return
 				}
@@ -149,12 +149,22 @@ func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
 				if err != nil {
 					return
 				}
-				txn, err = db.set(key, val, txn)
+				txn, err = types.SetSafe(key, val, txn, db.Badger)
 				if err != nil {
 					return
 				}
 			}
 		}
+	}
+
+	txn, err = types.Increment(types.DatasetCountKey, 1, txn, db.Badger)
+	if err != nil {
+		return
+	}
+
+	txn, err = types.Increment(types.TripleCountKey, uint64(len(dataset)), txn, db.Badger)
+	if err != nil {
+		return
 	}
 
 	txn, err = indices.Commit(db.Badger, txn)
@@ -195,7 +205,7 @@ func (db *DB) getID(
 	return id, nil
 }
 
-// incrementCount handles both major and minor keys, writing the initial counter
+// increment handles both major and minor keys, writing the initial counter
 // for nonexistent keys and incrementing existing ones
 func (db *DB) increment(key []byte, txn *badger.Txn) (count uint64, t *badger.Txn, err error) {
 	val := make([]byte, 8)
@@ -215,19 +225,6 @@ func (db *DB) increment(key []byte, txn *badger.Txn) (count uint64, t *badger.Tx
 	}
 
 	binary.BigEndian.PutUint64(val, count)
-	t, err = db.set(key, val, txn)
+	t, err = types.SetSafe(key, val, txn, db.Badger)
 	return
-}
-
-func (db *DB) set(key, val []byte, txn *badger.Txn) (*badger.Txn, error) {
-	err := txn.Set(key, val)
-	if err == badger.ErrTxnTooBig {
-		err = txn.Commit()
-		if err != nil {
-			return nil, err
-		}
-		txn = db.Badger.NewTransaction(true)
-		err = txn.Set(key, val)
-	}
-	return txn, err
 }

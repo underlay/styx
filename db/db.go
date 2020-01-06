@@ -226,7 +226,16 @@ func (db *DB) Log() {
 		}
 
 		prefix := key[0]
-		if bytes.Equal(key, types.SequenceKey) {
+		if bytes.Equal(key, types.DatasetCountKey) {
+			count := binary.BigEndian.Uint64(val)
+			log.Println("Dataset count", count)
+		} else if bytes.Equal(key, types.TripleCountKey) {
+			count := binary.BigEndian.Uint64(val)
+			log.Println("Triple count", count)
+		} else if bytes.Equal(key, types.ValueCountKey) {
+			count := binary.BigEndian.Uint64(val)
+			log.Println("Value count", count)
+		} else if bytes.Equal(key, types.SequenceKey) {
 			// Counter!
 			log.Printf("Sequence: %02d\n", binary.BigEndian.Uint64(val))
 		} else if prefix == types.IndexPrefix {
@@ -250,7 +259,7 @@ func (db *DB) Log() {
 			// Value key
 			sourceList := &types.SourceList{}
 			proto.Unmarshal(val, sourceList)
-			log.Printf("Triple entry: %s %02d | %02d | %02d :: %s\n",
+			log.Printf("Triple: %s %02d | %02d | %02d :: %s\n",
 				string(key[0]),
 				binary.BigEndian.Uint64(key[1:9]),
 				binary.BigEndian.Uint64(key[9:17]),
@@ -259,7 +268,7 @@ func (db *DB) Log() {
 			)
 		} else if _, has := types.MinorPrefixMap[prefix]; has {
 			// Minor key
-			log.Printf("Minor entry: %s %02d | %02d :: %02d\n",
+			log.Printf("Minor index: %s %02d | %02d :: %02d\n",
 				string(key[0]),
 				binary.BigEndian.Uint64(key[1:9]),
 				binary.BigEndian.Uint64(key[9:17]),
@@ -267,7 +276,7 @@ func (db *DB) Log() {
 			)
 		} else if _, has := types.MajorPrefixMap[prefix]; has {
 			// Major key
-			log.Printf("Major entry: %s %02d | %02d :: %02d\n",
+			log.Printf("Major index: %s %02d | %02d :: %02d\n",
 				string(key[0]),
 				binary.BigEndian.Uint64(key[1:9]),
 				binary.BigEndian.Uint64(key[9:17]),
@@ -279,7 +288,7 @@ func (db *DB) Log() {
 				log.Println(err)
 				return
 			}
-			log.Printf("Dataset entry: <%s>\n", db.uri.String(c, ""))
+			log.Printf("Dataset: <%s>\n", db.uri.String(c, ""))
 		}
 		i++
 	}
