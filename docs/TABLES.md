@@ -107,7 +107,7 @@ During insertion, only newly issued identifers for previously-unseen terms need 
 ### Querying
 
 ```golang
-type ValueMap map[uint64]*Value
+type ValueMap map[uint64]Value
 ```
 
 The variable assignments that the querying process returns are all uint64 identifiers, so they need to be converted into explicit RDF terms that can be returned to the user. The in-memory index map gets inverted to create an initial value map, which is used to cache the Value table lookups for every term in the solution graph.

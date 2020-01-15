@@ -69,24 +69,27 @@ var MinorPrefixes = [3]byte{'x', 'y', 'z'}
 // MinorPrefixMap inverts MinorPrefixes
 var MinorPrefixMap = map[byte]uint8{'x': 0, 'y': 1, 'z': 2}
 
-// MajorMatrix indexes the major permutations
-var MajorMatrix = [3][3]uint8{
+// Matrix is a type for 3x3 permutators
+type Matrix [3][3]uint8
+
+// Permute permutes the given ids by the specified permutation
+func (m Matrix) Permute(permutation uint8, ids [3][]byte) ([]byte, []byte, []byte) {
+	row := m[permutation]
+	return ids[row[0]], ids[row[1]], ids[row[2]]
+}
+
+// Major indexes the major permutations
+var Major = Matrix{
 	[3]uint8{0, 1, 2},
 	[3]uint8{1, 2, 0},
 	[3]uint8{2, 0, 1},
 }
 
-// MinorMatrix indexes the minor permutations
-var MinorMatrix = [3][3]uint8{
+// Minor indexes the minor permutations
+var Minor = Matrix{
 	[3]uint8{0, 2, 1},
 	[3]uint8{1, 0, 2},
 	[3]uint8{2, 1, 0},
-}
-
-// Permute indexes the given ids by the given permutation
-func Permute(permutation uint8, matrix [3][3]uint8, ids [3][]byte) ([]byte, []byte, []byte) {
-	row := matrix[permutation]
-	return ids[row[0]], ids[row[1]], ids[row[2]]
 }
 
 // GetNode just indexes the Permutation into the appropriate term of the quad

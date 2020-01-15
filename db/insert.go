@@ -80,7 +80,7 @@ func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
 		var key []byte
 		for i := uint8(0); i < 3; i++ {
 			// Major Key
-			majorA, majorB, _ := types.Permute(i, types.MajorMatrix, ids)
+			majorA, majorB, _ := types.Major.Permute(i, ids)
 			key = types.AssembleKey(types.MajorPrefixes[i], majorA, majorB, nil)
 			major[i], txn, err = db.increment(key, txn)
 			if err != nil {
@@ -88,7 +88,7 @@ func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
 			}
 
 			// Minor Key
-			minorA, minorB, _ := types.Permute(i, types.MinorMatrix, ids)
+			minorA, minorB, _ := types.Minor.Permute(i, ids)
 			key = types.AssembleKey(types.MinorPrefixes[i], minorA, minorB, nil)
 			minor[i], txn, err = db.increment(key, txn)
 			if err != nil {
@@ -117,7 +117,7 @@ func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
 		// Triple loop
 		var item *badger.Item
 		for i := uint8(0); i < 3; i++ {
-			a, b, c := types.Permute(i, types.MajorMatrix, ids)
+			a, b, c := types.Major.Permute(i, ids)
 			key := types.AssembleKey(types.TriplePrefixes[i], a, b, c)
 			var val []byte
 			item, err = txn.Get(key)

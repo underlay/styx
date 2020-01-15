@@ -144,6 +144,7 @@ func (db *DB) Query(pattern []*ld.Quad, domain []*ld.BlankNode, index []ld.Node)
 
 // Delete removes a dataset from the database
 func (db *DB) Delete(c cid.Cid, dataset []*ld.Quad) (err error) {
+	// TODO: implement...
 	return
 }
 
