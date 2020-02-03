@@ -6,7 +6,8 @@ import (
 
 	badger "github.com/dgraph-io/badger/v2"
 	ld "github.com/underlay/json-gold/ld"
-	
+	pkgs "github.com/underlay/pkgs/query"
+
 	types "github.com/underlay/styx/types"
 )
 
@@ -25,7 +26,7 @@ type cursorGraph struct {
 	txn       *badger.Txn
 }
 
-var _ types.Cursor = (*cursorGraph)(nil)
+var _ pkgs.Cursor = (*cursorGraph)(nil)
 
 func (g *cursorGraph) Graph() []*ld.Quad {
 	return nil

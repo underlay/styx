@@ -8,6 +8,7 @@ import (
 	badger "github.com/dgraph-io/badger/v2"
 	cid "github.com/ipfs/go-cid"
 	ld "github.com/underlay/json-gold/ld"
+	query "github.com/underlay/pkgs/query"
 
 	types "github.com/underlay/styx/types"
 )
@@ -18,7 +19,7 @@ func MakeConstraintGraph(
 	domain []*ld.BlankNode, index []ld.Node,
 	uri types.URI,
 	txn *badger.Txn,
-) (cursor types.Cursor, err error) {
+) (cursor query.Cursor, err error) {
 
 	g := &cursorGraph{
 		variables: make([]*variable, len(domain)),

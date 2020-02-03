@@ -14,6 +14,7 @@ import (
 	core "github.com/ipfs/interface-go-ipfs-core"
 	options "github.com/ipfs/interface-go-ipfs-core/options"
 	ld "github.com/underlay/json-gold/ld"
+	pkgs "github.com/underlay/pkgs/query"
 
 	query "github.com/underlay/styx/query"
 	types "github.com/underlay/styx/types"
@@ -121,7 +122,7 @@ func IngestJSONLd(db types.Styx, api core.CoreAPI, doc interface{}) error {
 }
 
 // Query satisfies the Styx interface
-func (db *DB) Query(pattern []*ld.Quad, domain []*ld.BlankNode, index []ld.Node) (types.Cursor, error) {
+func (db *DB) Query(pattern []*ld.Quad, domain []*ld.BlankNode, index []ld.Node) (pkgs.Cursor, error) {
 	txn := db.Badger.NewTransaction(false)
 	g, err := query.MakeConstraintGraph(pattern, domain, index, db.uri, txn)
 	if err != nil {
