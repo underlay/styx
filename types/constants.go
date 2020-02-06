@@ -73,7 +73,7 @@ var MinorPrefixMap = map[byte]uint8{'x': 0, 'y': 1, 'z': 2}
 type Matrix [3][3]uint8
 
 // Permute permutes the given ids by the specified permutation
-func (m Matrix) Permute(permutation uint8, ids [3][]byte) ([]byte, []byte, []byte) {
+func (m Matrix) Permute(permutation Permutation, ids [3][]byte) ([]byte, []byte, []byte) {
 	row := m[permutation]
 	return ids[row[0]], ids[row[1]], ids[row[2]]
 }

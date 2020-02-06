@@ -11,7 +11,7 @@ In this table, `l`, `m`, and `n` are all big-endian unsigned 64-bit integer iden
 | minor   | 3   | `l \| n`      | `uint64`           | `x`, `y`, `z` |
 | value   | 1   | `l`           | `types.Value`      | `p`           |
 | index   | 1   | `<term>`      | `types.Index`      | `q`           |
-| dataset | 1   | `<multihash>` | `types.Dataset`    | `<`           |
+| dataset | 1   | `<cid>`       | `types.Dataset`    | `<`           |
 | counter | 1   |               | `uint64`           | `>`           |
 
 - [Index table](#index-table)

@@ -67,9 +67,8 @@ func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
 
 		// Get the uint64 ids for the subject, predicate, and object
 		ids := [3][]byte{}
-		for i := range ids {
-			p := types.Permutation(i)
-			ids[p], err = db.getID(c, origin, quad, p, indices, values, txn)
+		for permutation := types.Permutation(0); permutation < 3; permutation++ {
+			ids[permutation], err = db.getID(c, origin, quad, permutation, indices, values, txn)
 			if err != nil {
 				return
 			}
@@ -78,19 +77,19 @@ func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
 		// Set counts
 		var major, minor [3]uint64
 		var key []byte
-		for i := uint8(0); i < 3; i++ {
+		for permutation := types.Permutation(0); permutation < 3; permutation++ {
 			// Major Key
-			majorA, majorB, _ := types.Major.Permute(i, ids)
-			key = types.AssembleKey(types.MajorPrefixes[i], majorA, majorB, nil)
-			major[i], txn, err = db.increment(key, txn)
+			majorA, majorB, _ := types.Major.Permute(permutation, ids)
+			key = types.AssembleKey(types.MajorPrefixes[permutation], majorA, majorB, nil)
+			major[permutation], txn, err = types.Increment(key, 1, txn, db.Badger)
 			if err != nil {
 				return
 			}
 
 			// Minor Key
-			minorA, minorB, _ := types.Minor.Permute(i, ids)
-			key = types.AssembleKey(types.MinorPrefixes[i], minorA, minorB, nil)
-			minor[i], txn, err = db.increment(key, txn)
+			minorA, minorB, _ := types.Minor.Permute(permutation, ids)
+			key = types.AssembleKey(types.MinorPrefixes[permutation], minorA, minorB, nil)
+			minor[permutation], txn, err = types.Increment(key, 1, txn, db.Badger)
 			if err != nil {
 				return
 			}
@@ -116,7 +115,7 @@ func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
 
 		// Triple loop
 		var item *badger.Item
-		for i := uint8(0); i < 3; i++ {
+		for i := types.Permutation(0); i < 3; i++ {
 			a, b, c := types.Major.Permute(i, ids)
 			key := types.AssembleKey(types.TriplePrefixes[i], a, b, c)
 			var val []byte
@@ -138,9 +137,7 @@ func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
 				return
 			} else if i == 0 {
 				sources := &types.SourceList{}
-				err = item.Value(func(val []byte) error {
-					return proto.Unmarshal(val, sources)
-				})
+				err = item.Value(func(val []byte) error { return proto.Unmarshal(val, sources) })
 				if err != nil {
 					return
 				}
@@ -157,12 +154,12 @@ func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
 		}
 	}
 
-	txn, err = types.Increment(types.DatasetCountKey, 1, txn, db.Badger)
+	_, txn, err = types.Increment(types.DatasetCountKey, 1, txn, db.Badger)
 	if err != nil {
 		return
 	}
 
-	txn, err = types.Increment(types.TripleCountKey, uint64(len(dataset)), txn, db.Badger)
+	_, txn, err = types.Increment(types.TripleCountKey, uint64(len(dataset)), txn, db.Badger)
 	if err != nil {
 		return
 	}
@@ -203,28 +200,4 @@ func (db *DB) getID(
 	index.Increment(place)
 	binary.BigEndian.PutUint64(id, index.Id)
 	return id, nil
-}
-
-// increment handles both major and minor keys, writing the initial counter
-// for nonexistent keys and incrementing existing ones
-func (db *DB) increment(key []byte, txn *badger.Txn) (count uint64, t *badger.Txn, err error) {
-	val := make([]byte, 8)
-	item, err := txn.Get(key)
-	if err == badger.ErrKeyNotFound {
-		count = initialCount
-	} else if err != nil {
-		return
-	} else {
-		err = item.Value(func(val []byte) error {
-			count = binary.BigEndian.Uint64(val) + 1
-			return nil
-		})
-		if err != nil {
-			return
-		}
-	}
-
-	binary.BigEndian.PutUint64(val, count)
-	t, err = types.SetSafe(key, val, txn, db.Badger)
-	return
 }

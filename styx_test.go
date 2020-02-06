@@ -81,7 +81,46 @@ func TestIngest(t *testing.T) {
 
 	defer db.Close()
 
-	if err = styx.IngestJSONLd(db, httpAPI, sampleData); err != nil {
+	if _, _, err = styx.IngestJSONLd(db, httpAPI, sampleData); err != nil {
+		t.Error(err)
+		return
+	}
+
+	db.Log()
+}
+
+func TestDelete(t *testing.T) {
+	// Remove old db
+	fmt.Println("removing path", styx.DefaultPath)
+	err := os.RemoveAll(styx.DefaultPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	db, err := styx.OpenDB(styx.DefaultPath, nil)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	defer db.Close()
+
+	_, _, err = styx.IngestJSONLd(db, httpAPI, sampleData2)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	db.Log()
+
+	c, quads, err := styx.IngestJSONLd(db, httpAPI, sampleData)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	err = db.Delete(c, quads)
+	if err != nil {
 		t.Error(err)
 		return
 	}
@@ -105,12 +144,12 @@ func TestList(t *testing.T) {
 
 	defer db.Close()
 
-	if err = styx.IngestJSONLd(db, httpAPI, sampleData); err != nil {
+	if _, _, err = styx.IngestJSONLd(db, httpAPI, sampleData); err != nil {
 		t.Error(err)
 		return
 	}
 
-	if err = styx.IngestJSONLd(db, httpAPI, sampleData2); err != nil {
+	if _, _, err = styx.IngestJSONLd(db, httpAPI, sampleData2); err != nil {
 		t.Error(err)
 		return
 	}
@@ -139,7 +178,7 @@ func testQuery(query string, data ...interface{}) (db types.Styx, pattern []*ld.
 	}
 
 	for _, d := range data {
-		err = styx.IngestJSONLd(db, httpAPI, d)
+		_, _, err = styx.IngestJSONLd(db, httpAPI, d)
 		if err != nil {
 			return
 		}

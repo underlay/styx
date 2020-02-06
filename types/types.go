@@ -190,7 +190,18 @@ func (index *Index) Increment(place Permutation) {
 	case O:
 		index.Object++
 	}
-	return
+}
+
+// Decrement the counter at the given position
+func (index *Index) Decrement(place Permutation) {
+	switch place {
+	case S:
+		index.Subject--
+	case P:
+		index.Predicate--
+	case O:
+		index.Object--
+	}
 }
 
 // Get the counter at the given position
@@ -255,9 +266,7 @@ func (indices indexCache) Get(term Term, txn *badger.Txn) (*Index, error) {
 	}
 
 	index := &Index{}
-	err = item.Value(func(val []byte) error {
-		return proto.Unmarshal(val, index)
-	})
+	err = item.Value(func(val []byte) error { return proto.Unmarshal(val, index) })
 	if err != nil {
 		return nil, err
 	}
@@ -276,9 +285,7 @@ func NodeToValue(node ld.Node, origin uint64, uri URI, txn *badger.Txn) Value {
 				item, err := txn.Get(key)
 				if err != nil {
 					dataset := &Dataset{}
-					err = item.Value(func(val []byte) error {
-						return proto.Unmarshal(val, dataset)
-					})
+					err = item.Value(func(val []byte) error { return proto.Unmarshal(val, dataset) })
 					if err != nil {
 						return &Blank{Origin: dataset.GetId(), Id: fragment}
 					}
@@ -386,7 +393,7 @@ func (values valueCache) Commit(db *badger.DB, txn *badger.Txn) (t *badger.Txn, 
 
 	// Okay now that we've written all the values, we increment the
 	// Value counter by len(values)
-	txn, err = Increment(ValueCountKey, uint64(len(values)), txn, db)
+	_, txn, err = Increment(ValueCountKey, uint64(len(values)), txn, db)
 	return
 }
 
@@ -492,21 +499,61 @@ func SetSafe(key, val []byte, txn *badger.Txn, db *badger.DB) (*badger.Txn, erro
 	return txn, err
 }
 
-func Increment(key []byte, delta uint64, txn *badger.Txn, db *badger.DB) (*badger.Txn, error) {
+func Increment(key []byte, delta uint64, txn *badger.Txn, db *badger.DB) (uint64, *badger.Txn, error) {
 	item, err := txn.Get(key)
 	val := make([]byte, 8)
 	if err == badger.ErrKeyNotFound {
 		binary.BigEndian.PutUint64(val, delta)
-		return SetSafe(key, val, txn, db)
+		t, err := SetSafe(key, val, txn, db)
+		return delta, t, err
 	} else if err != nil {
-		return nil, err
+		return 0, nil, err
 	} else {
 		val, err = item.ValueCopy(val)
 		if err != nil {
-			return nil, err
+			return 0, nil, err
 		}
 		sum := delta + binary.BigEndian.Uint64(val)
 		binary.BigEndian.PutUint64(val, sum)
-		return SetSafe(key, val, txn, db)
+		t, err := SetSafe(key, val, txn, db)
+		return sum, t, err
 	}
+}
+
+func Decrement(key []byte, delta uint64, txn *badger.Txn, db *badger.DB) (count uint64, t *badger.Txn, err error) {
+	var item *badger.Item
+	item, err = txn.Get(key)
+	if err != nil {
+		return
+	}
+
+	err = item.Value(func(val []byte) error {
+		count = binary.BigEndian.Uint64(val) - delta
+		return nil
+	})
+	if err != nil {
+		return
+	}
+
+	if count > 0 {
+		val := make([]byte, 8)
+		binary.BigEndian.PutUint64(val, count)
+		t, err = SetSafe(key, val, txn, db)
+	} else {
+		count = 0
+		err = txn.Delete(key)
+		if err == badger.ErrTxnTooBig {
+			err = txn.Commit()
+			if err != nil {
+				return
+			}
+			t = db.NewTransaction(true)
+			err = t.Delete(key)
+		} else if err != nil {
+		} else {
+			t = txn
+		}
+	}
+
+	return
 }

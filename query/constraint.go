@@ -80,9 +80,7 @@ func (c *constraint) Sources(value I, txn *badger.Txn) (statements []*types.Stat
 	}
 
 	sources := &types.SourceList{}
-	err = item.Value(func(val []byte) error {
-		return proto.Unmarshal(val, sources)
-	})
+	err = item.Value(func(val []byte) error { return proto.Unmarshal(val, sources) })
 	if err != nil {
 		return
 	}
