@@ -17,7 +17,7 @@ type URI interface {
 
 type underlayURI struct{}
 
-var testUlURI = regexp.MustCompile("^ul:([a-zA-Z0-9]{59})(#(?:_:c14n\\d+)?)?$")
+var testUlURI = regexp.MustCompile("^ul:([a-z2-7]{59})(#(?:_:c14n\\d+)?)?$")
 
 func (*underlayURI) Parse(uri string) (c cid.Cid, fragment string) {
 	if match := testUlURI.FindStringSubmatch(uri); match != nil {
@@ -28,6 +28,9 @@ func (*underlayURI) Parse(uri string) (c cid.Cid, fragment string) {
 }
 
 func (*underlayURI) String(c cid.Cid, fragment string) (uri string) {
+	if c == cid.Undef {
+		return fragment
+	}
 	s, _ := c.StringOfBase(multibase.Base32)
 	return "ul:" + s + fragment
 }
@@ -41,7 +44,7 @@ var UnderlayURI URI = (*underlayURI)(nil)
 
 type dwebURI struct{}
 
-var testDwebURI = regexp.MustCompile("^dweb:\\/ipfs\\/([a-zA-Z0-9]{59})$")
+var testDwebURI = regexp.MustCompile("^dweb:\\/ipfs\\/([a-z2-7]{59})$")
 
 func (*dwebURI) Parse(uri string) (c cid.Cid, fragment string) {
 	if match := testDwebURI.FindStringSubmatch(uri); match != nil {
@@ -51,6 +54,9 @@ func (*dwebURI) Parse(uri string) (c cid.Cid, fragment string) {
 }
 
 func (*dwebURI) String(c cid.Cid, fragment string) (uri string) {
+	if c == cid.Undef {
+		return fragment
+	}
 	s, _ := c.StringOfBase(multibase.Base32)
 	return fmt.Sprintf("dweb:/ipfs/%s%s", s, fragment)
 }

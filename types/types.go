@@ -369,7 +369,12 @@ func (values valueCache) Commit(db *badger.DB, txn *badger.Txn) (t *badger.Txn, 
 			}
 		case Cid:
 			meta = DatasetType
-			val = cid.Cid(v).Bytes()
+			c := cid.Cid(v)
+			if c == cid.Undef {
+				val = make([]byte, 0)
+			} else {
+				val = c.Bytes()
+			}
 		}
 
 		key := make([]byte, 9)

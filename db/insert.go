@@ -20,7 +20,11 @@ func (db *DB) Insert(c cid.Cid, dataset []*ld.Quad) (err error) {
 	txn := db.Badger.NewTransaction(true)
 	defer txn.Discard()
 
-	datasetKey := types.AssembleKey(types.DatasetPrefix, c.Bytes(), nil, nil)
+	var datasetBytes []byte
+	if c != cid.Undef {
+		datasetBytes = c.Bytes()
+	}
+	datasetKey := types.AssembleKey(types.DatasetPrefix, datasetBytes, nil, nil)
 
 	// Check to see if this document is already in the database
 	_, err = txn.Get(datasetKey)
