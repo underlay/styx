@@ -16,7 +16,7 @@ This leaves exactly two cases for each triple: either it references one blank no
 - 2nd Degree triples reference two distinct blank nodes, like `_:a <schema:knows> _:b .`
 - Z-Degree triples reference the same blank node twice, like `_:a <schema:funder> _:a .`
 
-Note that even though two variables might be distinct in a query, they may resolve to the same value. This is why the popular term ["subgraph isomorphism"](https://en.wikipedia.org/wiki/Subgraph_isomorphism_problem) is avoided here: strictly speaking, subgraph matching that allows this surjectivity is subgraph _epimorphism_.
+Note that even though two variables might be distinct in a query, they may resolve to the same value. This is why the popular term ["subgraph isomorphism"](https://en.wikipedia.org/wiki/Subgraph_isomorphism_problem) is avoided here: strictly speaking, subgraph matching is only subgraph _homomorphism_.
 
 Given this categorization, notice that every degree (and therefore every triple) avails the following operations:
 
