@@ -1,32 +1,41 @@
-package query
+package styx
 
 import (
-	"encoding/binary"
 	"fmt"
 
 	badger "github.com/dgraph-io/badger/v2"
-	ld "github.com/underlay/json-gold/ld"
-	pkgs "github.com/underlay/pkgs/query"
-
-	types "github.com/underlay/styx/types"
+	ld "github.com/piprate/json-gold/ld"
 )
 
+// A Cursor is an interactive query interface
+type Cursor interface {
+	Len() int
+	Graph() []*ld.Quad
+	Get(node *ld.BlankNode) ld.Node
+	Domain() []*ld.BlankNode
+	Index() []ld.Node
+	Next(node *ld.BlankNode) ([]*ld.BlankNode, error)
+	Seek(index []ld.Node) error
+	Close()
+}
+
 type cursorGraph struct {
+	constants []*constraint
 	variables []*variable
 	domain    []*ld.BlankNode
 	pivot     int
-	ids       map[string]int
+	ids       map[variableNode]int
 	cache     []*V
 	blacklist []bool
 	in        [][]int
 	out       [][]int
-	indices   types.IndexCache
-	values    types.ValueCache
-	uri       types.URI
+	values    valueCache
+	binary    binaryCache
+	unary     unaryCache
 	txn       *badger.Txn
 }
 
-var _ pkgs.Cursor = (*cursorGraph)(nil)
+var _ Cursor = (*cursorGraph)(nil)
 
 func (g *cursorGraph) Graph() []*ld.Quad {
 	return nil
@@ -37,23 +46,18 @@ func (g *cursorGraph) Get(node *ld.BlankNode) (n ld.Node) {
 		return
 	}
 
-	i, has := g.ids[node.Attribute]
+	i, has := g.ids[variableNode(node.Attribute)]
 	if !has {
 		return
 	}
 
 	v := g.variables[i]
-	if v.value == nil || len(v.value) != 8 {
+	if v.value == "" {
 		return
 	}
 
-	id := binary.BigEndian.Uint64(v.value)
-	value, err := g.values.Get(id, g.txn)
-	if err != nil {
-		return
-	}
-
-	return types.ValueToNode(value, g.values, g.uri, g.txn)
+	value, _ := readValue([]byte(v.value))
+	return value.Node("", g.values, g.txn)
 }
 
 func (g *cursorGraph) Domain() []*ld.BlankNode {
@@ -63,11 +67,8 @@ func (g *cursorGraph) Domain() []*ld.BlankNode {
 func (g *cursorGraph) Index() []ld.Node {
 	index := make([]ld.Node, g.Len())
 	for i, v := range g.variables {
-		id := binary.BigEndian.Uint64(v.value)
-		value, err := g.values.Get(id, g.txn)
-		if err == nil {
-			index[i] = types.ValueToNode(value, g.values, g.uri, g.txn)
-		}
+		value, _ := readValue([]byte(v.value))
+		index[i] = value.Node("", g.values, g.txn)
 	}
 	return index
 }
@@ -75,14 +76,19 @@ func (g *cursorGraph) Index() []ld.Node {
 func (g *cursorGraph) Next(node *ld.BlankNode) ([]*ld.BlankNode, error) {
 	i := g.Len() - 1
 	if node != nil {
-		i = g.ids[node.Attribute]
+		i = g.ids[variableNode(node.Attribute)]
 	}
 	tail, err := g.next(i)
+	if err == badger.ErrKeyNotFound {
+		err = ErrEndOfSolutions
+	}
+
 	if err != nil {
 		return nil, err
 	}
+
 	if tail == g.Len() {
-		return nil, nil
+		return nil, ErrEndOfSolutions
 	}
 	return g.domain[tail:], nil
 }
@@ -103,15 +109,6 @@ func (g *cursorGraph) Close() {
 		}
 	}
 }
-
-// // Close just calls Close on its child constraints
-// func (g *CursorGraph) Close() {
-// 	if g != nil && g.variables != nil {
-// 		for _, u := range g.variables {
-// 			u.Close()
-// 		}
-// 	}
-// }
 
 func (g *cursorGraph) String() string {
 	s := "----- Constraint Graph -----\n"
@@ -144,13 +141,13 @@ func (g *cursorGraph) Less(a, b int) bool {
 	return (float32(A.norm) / float32(A.size)) < (float32(B.norm) / float32(B.size))
 }
 
-// variable retrieves a Variable or creates one if it doesn't exist.
+// getVariable retrieves a variable or creates one if it doesn't exist.
 func (g *cursorGraph) getVariable(node *ld.BlankNode) (v *variable, i int) {
-	if index, has := g.ids[node.Attribute]; has {
+	if index, has := g.ids[variableNode(node.Attribute)]; has {
 		v, i = g.variables[index], index
 	} else {
 		v, i = &variable{}, len(g.domain)
-		g.ids[node.Attribute] = i
+		g.ids[variableNode(node.Attribute)] = i
 		g.domain = append(g.domain, node)
 		g.variables = append(g.variables, v)
 	}
@@ -158,28 +155,22 @@ func (g *cursorGraph) getVariable(node *ld.BlankNode) (v *variable, i int) {
 }
 
 func (g *cursorGraph) insertDZ(u *ld.BlankNode, c *constraint, txn *badger.Txn) (err error) {
-	// For z-degree constraints we get the *count* with an index key
-	// and set the *prefix* to a major key (although we could also use a minor key)
-
 	variable, _ := g.getVariable(u)
-	// if variable.DZ == nil {
-	// 	variable.DZ = ConstraintSet{c}
-	// } else {
-	// 	variable.DZ = append(variable.DZ, c)
-	// }
 	if variable.cs == nil {
 		variable.cs = constraintSet{c}
 	} else {
 		variable.cs = append(variable.cs, c)
 	}
 
-	place := (c.place + 2) % 3
-
-	c.prefix = types.AssembleKey(types.MajorPrefixes[place], c.nID, nil, nil)
-
-	if c.count = c.n.(*types.Index).Get(place); c.count == 0 {
-		return ErrInitialCountZero
+	c.count, err = c.getCount(g.unary, g.binary, txn)
+	if err != nil {
+		return
+	} else if c.count == 0 {
+		return ErrEndOfSolutions
 	}
+
+	p := (c.place + 2) % 3
+	c.prefix = assembleKey(BinaryPrefixes[p], true, c.values[p])
 
 	// Create a new badger.Iterator for the constraint
 	c.iterator = txn.NewIterator(badger.IteratorOptions{
@@ -191,30 +182,23 @@ func (g *cursorGraph) insertDZ(u *ld.BlankNode, c *constraint, txn *badger.Txn) 
 }
 
 func (g *cursorGraph) insertD1(u *ld.BlankNode, c *constraint, txn *badger.Txn) (err error) {
-	// For first-degree constraints we get the *count* with a major key
-	// and set the *prefix* to a triple key
-
 	variable, _ := g.getVariable(u)
-	// if variable.D1 == nil {
-	// 	variable.D1 = ConstraintSet{c}
-	// } else {
-	// 	variable.D1 = append(variable.D1, c)
-	// }
 	if variable.cs == nil {
 		variable.cs = constraintSet{c}
 	} else {
 		variable.cs = append(variable.cs, c)
 	}
 
-	// We rotate forward to get a major key, or backward to get a minor key.
-	place := (c.place + 1) % 3
-	c.prefix = types.AssembleKey(types.TriplePrefixes[place], c.mID, c.nID, nil)
-
-	if c.count, err = c.getCount(txn); err != nil {
+	c.count, err = c.getCount(g.unary, g.binary, txn)
+	if err != nil {
 		return
 	} else if c.count == 0 {
-		return ErrInitialCountZero
+		return ErrEndOfSolutions
 	}
+
+	p := (c.place + 1) % 3
+	v, w := c.values[p], c.values[(p+1)%3]
+	c.prefix = assembleKey(TernaryPrefixes[p], true, v, w)
 
 	// Create a new badger.Iterator for the constraint
 	c.iterator = txn.NewIterator(badger.IteratorOptions{
@@ -230,15 +214,15 @@ func (g *cursorGraph) insertD2(u, v *ld.BlankNode, c *constraint, txn *badger.Tx
 	// and set the *prefix* to either a major or minor key
 
 	variable, _ := g.getVariable(u)
-	if variable.d2 == nil {
-		variable.d2 = constraintMap{}
+	if variable.edges == nil {
+		variable.edges = constraintMap{}
 	}
 
 	_, j := g.getVariable(v)
-	if cs, has := variable.d2[j]; has {
-		variable.d2[j] = append(cs, c)
+	if cs, has := variable.edges[j]; has {
+		variable.edges[j] = append(cs, c)
 	} else {
-		variable.d2[j] = constraintSet{c}
+		variable.edges[j] = constraintSet{c}
 	}
 
 	if variable.cs == nil {
@@ -247,19 +231,21 @@ func (g *cursorGraph) insertD2(u, v *ld.BlankNode, c *constraint, txn *badger.Tx
 		variable.cs = append(variable.cs, c)
 	}
 
-	if index, is := c.m.(*types.Index); is {
-		place := (c.place + 1) % 3
-		c.count = index.Get(place)
-		c.prefix = types.AssembleKey(types.MinorPrefixes[place], c.mID, nil, nil)
-	} else if index, is := c.n.(*types.Index); is {
-		place := (c.place + 2) % 3
-		c.count = index.Get(place)
-		c.prefix = types.AssembleKey(types.MajorPrefixes[place], c.nID, nil, nil)
+	c.count, err = c.getCount(g.unary, g.binary, txn)
+	if err != nil {
+		return
+	} else if c.count == 0 {
+		return ErrEndOfSolutions
 	}
 
-	if c.count == 0 {
-		return ErrInitialCountZero
+	var p Permutation
+	if c.values[(c.place+1)%3] == "" {
+		p = (c.place + 2) % 3
+	} else if c.values[(c.place+2)%3] == "" {
+		p = ((c.place + 1) % 3) + 3
 	}
+
+	c.prefix = assembleKey(BinaryPrefixes[p], true, c.values[p%3])
 
 	// Create a new badger.Iterator for the constraint
 	c.iterator = txn.NewIterator(badger.IteratorOptions{

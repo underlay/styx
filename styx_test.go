@@ -1,20 +1,17 @@
-package main
+package styx
 
 import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"testing"
 
-	cid "github.com/ipfs/go-cid"
-	ipfs "github.com/ipfs/go-ipfs-http-client"
-	ld "github.com/underlay/json-gold/ld"
-
-	styx "github.com/underlay/styx/db"
-	types "github.com/underlay/styx/types"
+	ld "github.com/piprate/json-gold/ld"
 )
+
+var d1 = "http://example.com/d1"
+var d2 = "http://example.com/d2"
 
 var sampleDataBytes = []byte(`{
 	"@context": {
@@ -53,13 +50,12 @@ var sampleDataBytes2 = []byte(`{
 
 var sampleData, sampleData2 map[string]interface{}
 
-var httpAPI *ipfs.HttpApi
+var tag = NewPrefixTagScheme("http://example.com/")
 
 func init() {
 	var err error
 	_ = json.Unmarshal(sampleDataBytes, &sampleData)
 	_ = json.Unmarshal(sampleDataBytes2, &sampleData2)
-	httpAPI, err = ipfs.NewURLApiWithClient("http://localhost:5001", http.DefaultClient)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -67,13 +63,13 @@ func init() {
 
 func TestIngest(t *testing.T) {
 	// Remove old db
-	fmt.Println("removing path", styx.DefaultPath)
-	err := os.RemoveAll(styx.DefaultPath)
+	fmt.Println("removing path", DefaultPath)
+	err := os.RemoveAll(DefaultPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	db, err := styx.OpenDB(styx.DefaultPath, nil)
+	db, err := OpenDB(DefaultPath, tag)
 	if err != nil {
 		t.Error(err)
 		return
@@ -81,7 +77,8 @@ func TestIngest(t *testing.T) {
 
 	defer db.Close()
 
-	if _, _, err = styx.IngestJSONLd(db, httpAPI, sampleData); err != nil {
+	_, err = IngestJSONLd(db, d1, sampleData, false)
+	if err != nil {
 		t.Error(err)
 		return
 	}
@@ -91,13 +88,13 @@ func TestIngest(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	// Remove old db
-	fmt.Println("removing path", styx.DefaultPath)
-	err := os.RemoveAll(styx.DefaultPath)
+	fmt.Println("removing path", DefaultPath)
+	err := os.RemoveAll(DefaultPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	db, err := styx.OpenDB(styx.DefaultPath, nil)
+	db, err := OpenDB(DefaultPath, tag)
 	if err != nil {
 		t.Error(err)
 		return
@@ -105,21 +102,21 @@ func TestDelete(t *testing.T) {
 
 	defer db.Close()
 
-	_, _, err = styx.IngestJSONLd(db, httpAPI, sampleData2)
+	_, err = IngestJSONLd(db, d1, sampleData, false)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
 	db.Log()
-
-	c, quads, err := styx.IngestJSONLd(db, httpAPI, sampleData)
+	_, err = IngestJSONLd(db, d2, sampleData2, false)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	err = db.Delete(c, quads)
+	err = db.Delete(d1)
+	err = db.Delete(d2)
 	if err != nil {
 		t.Error(err)
 		return
@@ -130,13 +127,13 @@ func TestDelete(t *testing.T) {
 
 func TestList(t *testing.T) {
 	// Remove old db
-	fmt.Println("removing path", styx.DefaultPath)
-	err := os.RemoveAll(styx.DefaultPath)
+	fmt.Println("removing path", DefaultPath)
+	err := os.RemoveAll(DefaultPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	db, err := styx.OpenDB(styx.DefaultPath, nil)
+	db, err := OpenDB(DefaultPath, tag)
 	if err != nil {
 		t.Error(err)
 		return
@@ -144,41 +141,41 @@ func TestList(t *testing.T) {
 
 	defer db.Close()
 
-	if _, _, err = styx.IngestJSONLd(db, httpAPI, sampleData); err != nil {
+	if _, err = IngestJSONLd(db, d1, sampleData, false); err != nil {
 		t.Error(err)
 		return
 	}
 
-	if _, _, err = styx.IngestJSONLd(db, httpAPI, sampleData2); err != nil {
+	if _, err = IngestJSONLd(db, d2, sampleData2, false); err != nil {
 		t.Error(err)
 		return
 	}
 
 	db.Log()
-	index, _ := cid.Decode("bafkreif6ehnr3py3pl6avjgjuhomtnjgpcx5dfmtw3izifooafat2mfwaq")
-	list := db.List(index)
+
+	list := db.List(d2)
+	defer list.Close()
+
 	for ; list.Valid(); list.Next() {
-		c := list.Cid()
-		log.Println("OK", c != cid.Undef, c.String())
+		log.Println(list.URI())
 	}
-	list.Close()
 }
 
-func testQuery(query string, data ...interface{}) (db types.Styx, pattern []*ld.Quad, err error) {
+func testQuery(query string, data map[string]interface{}) (db *styx, pattern []*ld.Quad, err error) {
 	// Remove old db
-	fmt.Println("removing path", styx.DefaultPath)
-	err = os.RemoveAll(styx.DefaultPath)
+	fmt.Println("removing path", DefaultPath)
+	err = os.RemoveAll(DefaultPath)
 	if err != nil {
 		return
 	}
 
-	db, err = styx.OpenDB(styx.DefaultPath, nil)
+	db, err = OpenDB(DefaultPath, tag)
 	if err != nil {
 		return
 	}
 
-	for _, d := range data {
-		_, _, err = styx.IngestJSONLd(db, httpAPI, d)
+	for uri, d := range data {
+		_, err = IngestJSONLd(db, uri, d, false)
 		if err != nil {
 			return
 		}
@@ -194,7 +191,6 @@ func testQuery(query string, data ...interface{}) (db types.Styx, pattern []*ld.
 
 	proc := ld.NewJsonLdProcessor()
 	opts := ld.NewJsonLdOptions("")
-	opts.DocumentLoader = ld.NewDwebDocumentLoader(httpAPI)
 	opts.ProduceGeneralizedRdf = true
 
 	dataset, err := proc.ToRDF(queryData, opts)
@@ -212,7 +208,7 @@ func TestSPO(t *testing.T) {
 	"@context": { "@vocab": "http://schema.org/" },
 	"@id": "http://people.com/jane",
 	"name": { }
-}`, sampleData)
+}`, map[string]interface{}{d1: sampleData})
 	defer db.Close()
 	if err != nil {
 		t.Error(err)
@@ -226,14 +222,12 @@ func TestSPO(t *testing.T) {
 		return
 	}
 
-	if cursor != nil {
-		defer cursor.Close()
-		for d := cursor.Domain(); d != nil; d, err = cursor.Next(nil) {
-			for _, b := range d {
-				fmt.Printf("%s: %s\n", b.Attribute, cursor.Get(b).GetValue())
-			}
-			fmt.Println("---")
+	defer cursor.Close()
+	for d := cursor.Domain(); err == nil; d, err = cursor.Next(nil) {
+		for _, b := range d {
+			fmt.Printf("%s: %s\n", b.Attribute, cursor.Get(b).GetValue())
 		}
+		fmt.Println("---")
 	}
 }
 
@@ -241,7 +235,7 @@ func TestOPS(t *testing.T) {
 	db, pattern, err := testQuery(`{
 	"@context": { "@vocab": "http://schema.org/" },
 	"name": "Jane Doe"
-}`, sampleData)
+}`, map[string]interface{}{d1: sampleData})
 	defer db.Close()
 	if err != nil {
 		t.Error(err)
@@ -249,18 +243,17 @@ func TestOPS(t *testing.T) {
 	}
 
 	cursor, err := db.Query(pattern, nil, nil)
-	if cursor != nil {
-		defer cursor.Close()
-		if err != nil {
-			t.Error(err)
-			return
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer cursor.Close()
+
+	for d := cursor.Domain(); err == nil; d, err = cursor.Next(nil) {
+		for _, b := range d {
+			fmt.Printf("%s: %s\n", b.Attribute, cursor.Get(b).GetValue())
 		}
-		for d := cursor.Domain(); d != nil; d, err = cursor.Next(nil) {
-			for _, b := range d {
-				fmt.Printf("%s: %s\n", b.Attribute, cursor.Get(b).GetValue())
-			}
-			fmt.Println("---")
-		}
+		fmt.Println("---")
 	}
 }
 
@@ -269,7 +262,7 @@ func TestSimpleQuery(t *testing.T) {
 	"@context": { "@vocab": "http://schema.org/" },
 	"@type": "Person",
 	"birthDate": { }
-}`, sampleData)
+}`, map[string]interface{}{d1: sampleData})
 	defer db.Close()
 	if err != nil {
 		t.Error(err)
@@ -277,19 +270,16 @@ func TestSimpleQuery(t *testing.T) {
 	}
 
 	cursor, err := db.Query(pattern, nil, nil)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
-	if cursor != nil {
-		defer cursor.Close()
-		if err != nil {
-			t.Error(err)
-			return
+	for d := cursor.Domain(); err == nil; d, err = cursor.Next(nil) {
+		for _, b := range d {
+			fmt.Printf("%s: %s\n", b.Attribute, cursor.Get(b).GetValue())
 		}
-		for d := cursor.Domain(); d != nil; d, err = cursor.Next(nil) {
-			for _, b := range d {
-				fmt.Printf("%s: %s\n", b.Attribute, cursor.Get(b).GetValue())
-			}
-			fmt.Println("---")
-		}
+		fmt.Println("---")
 	}
 }
 
@@ -300,7 +290,7 @@ func TestSimpleQuery2(t *testing.T) {
 	"knows": {
 		"name": "Jane Doe"
 	}
-}`, sampleData)
+}`, map[string]interface{}{d1: sampleData})
 	defer db.Close()
 	if err != nil {
 		t.Error(err)
@@ -308,18 +298,17 @@ func TestSimpleQuery2(t *testing.T) {
 	}
 
 	cursor, err := db.Query(pattern, nil, nil)
-	if cursor != nil {
-		defer cursor.Close()
-		if err != nil {
-			t.Error(err)
-			return
+	defer cursor.Close()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	for d := cursor.Domain(); err == nil; d, err = cursor.Next(nil) {
+		for _, b := range d {
+			fmt.Printf("%s: %s\n", b.Attribute, cursor.Get(b).GetValue())
 		}
-		for d := cursor.Domain(); d != nil; d, err = cursor.Next(nil) {
-			for _, b := range d {
-				fmt.Printf("%s: %s\n", b.Attribute, cursor.Get(b).GetValue())
-			}
-			fmt.Println("---")
-		}
+		fmt.Println("---")
 	}
 }
 
@@ -328,7 +317,7 @@ func TestDomainQuery(t *testing.T) {
 	"@context": { "@vocab": "http://schema.org/" },
 	"@id": "_:b0",
 	"name": { "@id": "_:b1" }
-}`, sampleData, sampleData2)
+}`, map[string]interface{}{d1: sampleData, d2: sampleData2})
 	defer db.Close()
 	if err != nil {
 		t.Error(err)
@@ -344,7 +333,7 @@ func TestDomainQuery(t *testing.T) {
 			t.Error(err)
 			return
 		}
-		for d := cursor.Domain(); d != nil; d, err = cursor.Next(node) {
+		for d := cursor.Domain(); err == nil; d, err = cursor.Next(node) {
 			for _, b := range d {
 				fmt.Printf("%s: %s\n", b.Attribute, cursor.Get(b).GetValue())
 			}
@@ -358,7 +347,7 @@ func TestIndexQuery(t *testing.T) {
 		"@context": { "@vocab": "http://schema.org/" },
 		"@id": "_:b0",
 		"name": { "@id": "_:b1" }
-	}`, sampleData, sampleData2)
+	}`, map[string]interface{}{d1: sampleData, d2: sampleData2})
 	defer db.Close()
 	if err != nil {
 		t.Error(err)
@@ -370,17 +359,18 @@ func TestIndexQuery(t *testing.T) {
 		ld.NewBlankNode("_:b1"),
 	}
 	index := []ld.Node{
-		ld.NewIRI("u:bafkreichbq6iklce3y64lntglbcw6grdmote5ptsxph4c5vm3j77br5coa#_:c14n1"),
+		ld.NewIRI("http://example.com/d1#_:b1"),
 		ld.NewLiteral("Johnny Doe", "", ""),
 	}
 	cursor, err := db.Query(pattern, domain, index)
-	if cursor != nil {
+	if err == ErrEndOfSolutions {
+		log.Println("No solutions")
+	} else if err != nil {
+		t.Error(err)
+		return
+	} else {
 		defer cursor.Close()
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		for d := cursor.Domain(); d != nil; d, err = cursor.Next(nil) {
+		for d := cursor.Domain(); err == nil; d, err = cursor.Next(nil) {
 			for _, b := range d {
 				fmt.Printf("%s: %s\n", b.Attribute, cursor.Get(b).GetValue())
 			}

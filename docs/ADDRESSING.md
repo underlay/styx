@@ -51,7 +51,7 @@ http://example.com/.well-known/genid/d26a2d0e98334696f4ad70a677abc1f6
 
 This strategy is unsatisfying because it assumes that the user has ownership and authority over a domain name. This is a huge assumption and it betrays
 
-`ul:/ipfs/QmejzQJERtrqf8mEgZh1xMKVqx7seJn6xCgPT9bDxtFLGV#_:b0`
+`ul:bafybeihtwwo4oxd5wu7qlrsn5orm7juonw3xmk6sprkl4o5ewx3s7feg5y#_:c14n0`
 
 Styx is intented to be a store of arbitrary RDF data: you should be able to toss any valid RDF dataset into it and usefully retrieve its contents.
 

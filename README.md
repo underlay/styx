@@ -6,7 +6,7 @@ Styx is like a key/value store for graph data. It takes RDF datasets in, and the
 
 ## Usage
 
-The main module you want to import is `github.com/underlay/styx/db`, but the interfaces you care about are defined in `github.com/underlay/styx/types`. Here they are:
+The main module you want to import is `github.com/underlay/styx/styx`, but the interfaces you care about are defined in `github.com/underlay/styx/types`. Here they are:
 
 ```golang
 type Styx interface {
@@ -83,11 +83,3 @@ func main() {
   - This will be how we implement provenance-based filtering (independent of Datlog or rules)
 - Pinning
   - How to actually manage a styx node? What sorts of control mechanisms?
-
-## Development
-
-Regenerate the protobuf type definitions with:
-
-```
-protoc --go_out=. types/types.proto
-```

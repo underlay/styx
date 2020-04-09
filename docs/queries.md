@@ -51,7 +51,7 @@ _:c14n3 <http://schema.org/smokingAllowed> _:c14n0 _:c14n2 .
 _:c14n3 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://schema.org/Volcano> _:c14n2 .
 ```
 
-... with CID `QmPhqpDoDMCkQayAUFw2g1dtW8CxqYB8xVj4mRW8EUkcMf`, so we'll call it `ul:/ipfs/...EUkcMf` for short.
+... with CID `bafybeiaujfyny6f3fv3olxagtdohnesamofjigo7uwogp4au46mzlduxmi`, so we'll call it `ul:...lduxmi` for short.
 
 The message that Styx will respond with might look like:
 
@@ -61,9 +61,9 @@ The message that Styx will respond with might look like:
 		"@vocab": "http://schema.org/",
 		"u": "http://underlay.mit.edu/ns#"
 	},
-	"u:instanceOf": { "@id": "ul:/ipfs/...EUkcMf#_:c14n2" },
+	"u:instanceOf": { "@id": "ul:...lduxmi#_:c14n2" },
 	"@graph": {
-		"@id": "ul:/ipfs/...vHC3rQ#_:c14n0",
+		"@id": "ul:...lduxmi#_:c14n0",
 		"@type": "Volcano",
 		"name": "Mount Fuji",
 		"smokingAllowed": true
@@ -109,9 +109,9 @@ _:c14n5 <http://schema.org/smokingAllowed> _:c14n0 _:c14n1 .
 _:c14n5 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://schema.org/Volcano> _:c14n1 .
 ```
 
-... with CID `QmWSeN7y5wSYkMBUMJPpDg5BwRASk7ZWqvrccnHasWffFp`, which we'll call `ul:/ipfs/...sWffFp` for short.
+... with CID `bafybeidym2ltjfu3f5yey3dxnrni73o45pwrkd2s6r5odfym3m4mum3b6m`, which we'll call `ul:...um3b6m` for short.
 
-Here, the value of `u:satisfies` is a separate named graph, which is interpreted as a query graph (although it's important that it is not explicitly given an `rdf:type` of `u:Query`). But the value of `u:satisfies` could just have well have been `{ "@id": "ul:/ipfs/...EUkcMf#_:c14n2" }` - a reference to the query graph of the previous message, so long as `...EUkcMf` is resolvable over IPFS.
+Here, the value of `u:satisfies` is a separate named graph, which is interpreted as a query graph (although it's important that it is not explicitly given an `rdf:type` of `u:Query`). But the value of `u:satisfies` could just have well have been `{ "@id": "ul:...lduxmi#_:c14n2" }` - a reference to the query graph of the previous message, so long as `...lduxmi` is resolvable over IPFS.
 
 This time, Styx will respond with something like:
 

@@ -1,4 +1,4 @@
-package query
+package styx
 
 import (
 	"encoding/binary"
@@ -9,17 +9,20 @@ import (
 // u, v, w... are *Variable pointers
 // x, y... are dependency slice indices, where e.g. g.In[p][x] == i
 
-func (g *cursorGraph) initial() (err error) {
+func (g *cursorGraph) initial(indexValues []Term) (err error) {
 	l := g.Len()
 
 	var ok bool
 
 	for i, u := range g.variables {
-		if u.value == nil {
-			for u.value = u.Seek(u.root); u.value == nil; u.value = u.Seek(u.root) {
-				if ok, err = g.tick(i, 0, g.cache); err != nil {
-					return
-				} else if !ok {
+		if u.value == "" {
+			root := u.root
+			if i < len(indexValues) {
+				root = indexValues[i]
+			}
+			for u.value = u.Seek(root); u.value == ""; u.value = u.Seek(root) {
+				ok, err = g.tick(i, 0, g.cache)
+				if err != nil || !ok {
 					return
 				}
 			}
@@ -49,7 +52,7 @@ func (g *cursorGraph) next(i int) (tail int, err error) {
 		self := u.value
 		// Try naively getting another value from u
 		u.value = u.Next()
-		if u.value == nil {
+		if u.value == "" {
 			// It didn't work :-/
 			// This means we reset u, decrement i, and continue
 			u.value = u.Seek(self)
@@ -87,7 +90,7 @@ func (g *cursorGraph) next(i int) (tail int, err error) {
 			// value, then we have to use g.tick() on j to tick j's dependencies into their
 			// next valid state (passing the fresh cache in). That will either irrecovably
 			// fail or give us a new state to try v.Seek(v.root) again on.
-			for v.value = v.Seek(v.root); v.value == nil; v.value = v.Seek(v.root) {
+			for v.value = v.Seek(v.root); v.value == ""; v.value = v.Seek(v.root) {
 				ok, err = g.tick(j, i, d)
 				if err != nil {
 					return
@@ -97,7 +100,7 @@ func (g *cursorGraph) next(i int) (tail int, err error) {
 			}
 
 			// Cool! Either v.value == nil and there are no more solutions to the query...
-			if v.value == nil {
+			if v.value == "" {
 				cursor = j
 				break
 			}
@@ -197,10 +200,10 @@ func (g *cursorGraph) tick(i, min int, delta []*V) (ok bool, err error) {
 
 		self := v.save()
 
-		if v.value = v.Next(); v.value == nil {
+		if v.value = v.Next(); v.value == "" {
 			// That sucks. Now we need to restore the value
 			// that was changed and decrement x.
-			v.value = self.I
+			v.value = self.Term
 			v.Seek(v.value)
 			x--
 		} else {
@@ -233,7 +236,7 @@ func (g *cursorGraph) tick(i, min int, delta []*V) (ok bool, err error) {
 				d := make([]*V, k)
 
 				// Here we keep seeking and ticking until we have a real value.
-				for w.value = w.Seek(w.root); w.value == nil; w.value = w.Seek(w.root) {
+				for w.value = w.Seek(w.root); w.value == ""; w.value = w.Seek(w.root) {
 					if ok, err = g.tick(k, min, d); err != nil {
 						return
 					} else if ok {
@@ -245,7 +248,7 @@ func (g *cursorGraph) tick(i, min int, delta []*V) (ok bool, err error) {
 					}
 				}
 
-				if w.value == nil {
+				if w.value == "" {
 					// We were unable to complete the crawl.
 					// We've already reset our state.
 					// This is how far we got:
@@ -311,7 +314,8 @@ func (g *cursorGraph) restore(cache []*V, max int) (err error) {
 		// then reset it to its previous state.
 		if saved != nil {
 			u := g.variables[i]
-			u.load(saved)
+			g.load(u, saved)
+			// u.load(saved)
 			// Push the restored state through the max
 			if err = g.pushTo(u, i, max); err != nil {
 				return
@@ -322,33 +326,59 @@ func (g *cursorGraph) restore(cache []*V, max int) (err error) {
 }
 
 func (g *cursorGraph) pushTo(u *variable, min, max int) (err error) {
-	for j, cs := range u.d2 {
+	for j, cs := range u.edges {
 		if j >= min && j < max {
-			w := g.variables[j]
-
-			// Update the incoming D2 constraints by using .Dual to find them
+			// Update the incoming D2 constraints by using .dual to find them
 			for _, c := range cs {
-				// Since v has a value, all of its constraints are in consensus.
+				// Since u has a value, all of its constraints are in consensus.
 				// That means we can freely access their iterators!
-				// In this case, all the iterators for the outgoing v.D2s have
-				// values that are the counts (uint64) of them *and their dual*.
+				// In this case, all the iterators for the outgoing u.d2s have
+				// values that are the counts (uint32) of them *and their dual*.
 				// This is insanely elegant...
+
+				i := c.place
+
+				node := variableNode(g.domain[j].Attribute)
+				m, n := (i+1)%3, (i+2)%3
+
+				place := i
+				if node == c.nodes[m] {
+					place = m
+				} else if node == c.nodes[n] {
+					place = n
+				}
+
+				neighbor := c.neighbors[place]
+				neighbor.values[i] = u.value
+
 				item := c.iterator.Item()
-				var count uint64
-				err = item.Value(func(val []byte) error {
-					count = binary.BigEndian.Uint64(val)
-					return nil
-				})
+				meta := item.UserMeta()
+				if meta == UnaryPrefix {
+					var p Permutation = i
+					if place == m {
+						p = place
+					} else if place == n {
+						p = place + 3
+					}
+					neighbor.prefix = assembleKey(BinaryPrefixes[p], true, u.value)
+					neighbor.count, err = g.unary.Get(p, u.value, g.txn)
+				} else {
+					A, B := (neighbor.place+1)%3, (neighbor.place+2)%3
+					neighbor.prefix = assembleKey(TernaryPrefixes[A], true, neighbor.values[A], neighbor.values[B])
+					err = item.Value(func(val []byte) error {
+						neighbor.count = binary.BigEndian.Uint32(val)
+						return nil
+					})
+				}
 
 				if err != nil {
 					return
 				}
-
-				c.dual.Set(u.value, count)
 			}
 
-			// Set the value to nil, like I promised you earlier.
-			w.value = nil
+			// Clear the value, like I promised you earlier.
+			w := g.variables[j]
+			w.value = ""
 			w.Sort()
 		}
 	}
