@@ -8,7 +8,7 @@ Styx is like a key/value store for graph data. It takes RDF datasets in, and the
 
 ```golang
 type Styx interface {
-	Query(query []*ld.Quad, domain []*ld.BlankNode, index []ld.Node) (Cursor, error)
+	Query(query []*ld.Quad, domain []*ld.BlankNode, index []ld.Node) (Iterator, error)
 	Set(uri string, dataset []*ld.Quad) error
 	Get(uri string) ([]*ld.Quad, error)
 	Delete(uri string) error
