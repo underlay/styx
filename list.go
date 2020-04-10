@@ -50,7 +50,7 @@ func (db *Styx) List(uri string) List {
 		Prefix:         []byte{DatasetPrefix},
 	}
 
-	txn := db.badger.NewTransaction(false)
+	txn := db.Badger.NewTransaction(false)
 	iter := txn.NewIterator(iteratorOptions)
 
 	var seek []byte

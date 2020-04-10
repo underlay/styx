@@ -17,7 +17,7 @@ type Styx interface {
 	Log()
 }
 
-type Cursor interface {
+type Iterator interface {
 	Len() int
 	Graph() []*ld.Quad
 	Get(node *ld.BlankNode) ld.Node

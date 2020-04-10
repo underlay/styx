@@ -7,7 +7,7 @@ import (
 
 // Get a dataset from the database
 func (db *Styx) Get(uri string) ([]*ld.Quad, error) {
-	txn := db.badger.NewTransaction(true)
+	txn := db.Badger.NewTransaction(true)
 	defer func() { txn.Discard() }()
 
 	key := make([]byte, 1+len(uri))

@@ -45,9 +45,9 @@ func (pts prefixTagScheme) Parse(uri string) (tag, fragment string) {
 
 // A Styx database instance
 type Styx struct {
-	tag      TagScheme
-	badger   *badger.DB
-	sequence *badger.Sequence
+	Tag      TagScheme
+	Badger   *badger.DB
+	Sequence *badger.Sequence
 }
 
 // Close the database
@@ -55,14 +55,14 @@ func (db *Styx) Close() (err error) {
 	if db == nil {
 		return
 	}
-	if db.sequence != nil {
-		err = db.sequence.Release()
+	if db.Sequence != nil {
+		err = db.Sequence.Release()
 		if err != nil {
 			return
 		}
 	}
-	if db.badger != nil {
-		err = db.badger.Close()
+	if db.Badger != nil {
+		err = db.Badger.Close()
 		if err != nil {
 			return
 		}
@@ -110,9 +110,9 @@ func NewStyx(path string, tag TagScheme) (*Styx, error) {
 	}
 
 	return &Styx{
-		tag:      tag,
-		badger:   db,
-		sequence: seq,
+		Tag:      tag,
+		Badger:   db,
+		Sequence: seq,
 	}, nil
 }
 
@@ -129,8 +129,8 @@ func (db *Styx) QueryJSONLD(query interface{}) (*Iterator, error) {
 
 // Query satisfies the Styx interface
 func (db *Styx) Query(pattern []*ld.Quad, domain []*ld.BlankNode, index []ld.Node) (*Iterator, error) {
-	txn := db.badger.NewTransaction(false)
-	g, err := MakeConstraintGraph(pattern, domain, index, db.tag, txn)
+	txn := db.Badger.NewTransaction(false)
+	g, err := MakeConstraintGraph(pattern, domain, index, db.Tag, txn)
 	if err != nil {
 		g.Close()
 	}
@@ -144,7 +144,7 @@ func (db *Styx) Query(pattern []*ld.Quad, domain []*ld.BlankNode, index []ld.Nod
 
 // Log will print the *entire database contents* to log
 func (db *Styx) Log() {
-	txn := db.badger.NewTransaction(false)
+	txn := db.Badger.NewTransaction(false)
 	defer txn.Discard()
 
 	iter := txn.NewIterator(badger.DefaultIteratorOptions)

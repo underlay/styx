@@ -35,11 +35,11 @@ func (db *Styx) SetDataset(uri string, dataset *ld.RDFDataset, canonize bool) er
 
 // Set is the entrypoint to inserting stuff
 func (db *Styx) Set(uri string, dataset []*ld.Quad) (err error) {
-	if !(strings.Index(uri, "#") == -1 && db.tag.Test(uri+"#")) {
+	if !(strings.Index(uri, "#") == -1 && db.Tag.Test(uri+"#")) {
 		return ErrTagScheme
 	}
 
-	txn := db.badger.NewTransaction(true)
+	txn := db.Badger.NewTransaction(true)
 	defer func() { txn.Discard() }()
 
 	values := newValueCache()
@@ -60,7 +60,7 @@ func (db *Styx) Set(uri string, dataset []*ld.Quad) (err error) {
 	}
 
 	var origin iri
-	origin, txn, err = getIRI(uri, values, txn, db.sequence, db.badger)
+	origin, txn, err = getIRI(uri, values, txn, db.Sequence, db.Badger)
 
 	quads := make([]byte, 0)
 	for i, quad := range dataset {
@@ -73,7 +73,7 @@ func (db *Styx) Set(uri string, dataset []*ld.Quad) (err error) {
 		for j := Permutation(0); j < 4; j++ {
 			node := getNode(quad, j)
 			var t Value
-			t, txn, err = nodeToValue(node, origin, values, db.tag, txn, db.sequence, db.badger)
+			t, txn, err = nodeToValue(node, origin, values, db.Tag, txn, db.Sequence, db.Badger)
 			if err != nil {
 				return
 			}
@@ -112,7 +112,7 @@ func (db *Styx) Set(uri string, dataset []*ld.Quad) (err error) {
 				if permutation == 0 {
 					val = []byte(source.Marshal(values, txn))
 				}
-				txn, err = setSafe(key, val, txn, db.badger)
+				txn, err = setSafe(key, val, txn, db.Badger)
 				if err != nil {
 					return
 				}
@@ -124,7 +124,7 @@ func (db *Styx) Set(uri string, dataset []*ld.Quad) (err error) {
 					return
 				}
 				val = append(val, source.Marshal(values, txn)...)
-				txn, err = setSafe(key, val, txn, db.badger)
+				txn, err = setSafe(key, val, txn, db.Badger)
 				if err != nil {
 					return
 				}
@@ -132,17 +132,17 @@ func (db *Styx) Set(uri string, dataset []*ld.Quad) (err error) {
 		}
 	}
 
-	txn, err = setSafe(datasetKey, quads, txn, db.badger)
+	txn, err = setSafe(datasetKey, quads, txn, db.Badger)
 	if err != nil {
 		return
 	}
 
-	txn, err = bc.Commit(db.badger, txn)
+	txn, err = bc.Commit(db.Badger, txn)
 	if err != nil {
 		return
 	}
 
-	txn, err = uc.Commit(db.badger, txn)
+	txn, err = uc.Commit(db.Badger, txn)
 	if err != nil {
 		return
 	}

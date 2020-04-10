@@ -5,7 +5,7 @@ import (
 )
 
 func (db *Styx) Delete(uri string) (err error) {
-	txn := db.badger.NewTransaction(true)
+	txn := db.Badger.NewTransaction(true)
 	defer func() { txn.Discard() }()
 	values := newValueCache()
 	key := make([]byte, len(uri)+1)
@@ -75,7 +75,7 @@ func (db *Styx) delete(uri string, item *badger.Item, values valueCache, t *badg
 			}
 		}
 		if len(val) > 0 {
-			txn, err = setSafe(key, val, txn, db.badger)
+			txn, err = setSafe(key, val, txn, db.Badger)
 			if err != nil {
 				return
 			}
@@ -90,7 +90,7 @@ func (db *Styx) delete(uri string, item *badger.Item, values valueCache, t *badg
 				return
 			}
 
-			txn, err = deleteSafe(key, txn, db.badger)
+			txn, err = deleteSafe(key, txn, db.Badger)
 			if err != nil {
 				return
 			}
@@ -108,7 +108,7 @@ func (db *Styx) delete(uri string, item *badger.Item, values valueCache, t *badg
 				}
 
 				key := assembleKey(TernaryPrefixes[p], false, a, b, c)
-				txn, err = deleteSafe(key, txn, db.badger)
+				txn, err = deleteSafe(key, txn, db.Badger)
 				if err == badger.ErrKeyNotFound {
 					// ???
 					// This is more concerning...
@@ -119,12 +119,12 @@ func (db *Styx) delete(uri string, item *badger.Item, values valueCache, t *badg
 		}
 	}
 
-	txn, err = bc.Commit(db.badger, txn)
+	txn, err = bc.Commit(db.Badger, txn)
 	if err != nil {
 		return
 	}
 
-	txn, err = uc.Commit(db.badger, txn)
+	txn, err = uc.Commit(db.Badger, txn)
 	if err != nil {
 		return
 	}
