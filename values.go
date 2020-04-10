@@ -12,20 +12,10 @@ import (
 // Term is the shorthand type for values (terms of any kind)
 type Term string
 
-// term is either a variable reference, or an absolute value
-type term interface {
-	term(g *cursorGraph) Term
-}
-
-type TagScheme interface {
-	Test(uri string) bool
-	Parse(uri string) (tag string, fragment string)
-}
-
 type Statement struct {
 	Origin iri
 	Index  uint64
-	Graph  Term
+	Graph  Value
 }
 
 func (statement *Statement) URI(values valueCache, txn *badger.Txn) (uri string) {
@@ -38,7 +28,7 @@ func (statement *Statement) URI(values valueCache, txn *badger.Txn) (uri string)
 
 func (statement *Statement) Marshal(values valueCache, txn *badger.Txn) string {
 	i := strconv.FormatUint(statement.Index, 32)
-	return fmt.Sprintf("%s\t%s\t%s\n", statement.Origin, i, statement.Graph)
+	return fmt.Sprintf("%s\t%s\t%s\n", statement.Origin, i, statement.Graph.Term())
 }
 
 var statementPattern = regexp.MustCompile("([a-zA-Z0-9+/]+)\t([a-z0-9]+)\t([a-zA-Z0-9+/]+)(?:#([a-zA-Z0-9-_]+))?")
@@ -62,7 +52,7 @@ func getStatements(val []byte) ([]*Statement, error) {
 		statements[i] = &Statement{
 			Origin: iri(w[1]),
 			Index:  index,
-			Graph:  graph.term(nil),
+			Graph:  graph,
 		}
 	}
 	return statements, nil
@@ -70,7 +60,7 @@ func getStatements(val []byte) ([]*Statement, error) {
 
 // A Value is an RDF term
 type Value interface {
-	term(g *cursorGraph) Term
+	Term() Term
 	Node(origin iri, values valueCache, txn *badger.Txn) ld.Node
 
 	// We don't actually use JSON or NQuads but they might be nice to have in the future
@@ -78,7 +68,7 @@ type Value interface {
 	NQuads(origin iri, values valueCache, txn *badger.Txn) string
 }
 
-func (i iri) term(g *cursorGraph) Term {
+func (i iri) Term() Term {
 	return Term(i)
 }
 
@@ -116,7 +106,7 @@ type blank struct {
 	id     string
 }
 
-func (b *blank) term(g *cursorGraph) Term {
+func (b *blank) Term() Term {
 	return Term(fmt.Sprintf("%s#%s", b.origin, b.id))
 }
 
@@ -163,7 +153,7 @@ type literal struct {
 	d iri
 }
 
-func (l *literal) term(g *cursorGraph) Term {
+func (l *literal) Term() Term {
 	escaped := []byte(escape(l.v))
 	if l.d == RDFLangString {
 		return Term(fmt.Sprintf("\"%s\"@%s", escaped, l.l))
@@ -225,29 +215,6 @@ func (l *literal) Node(origin iri, cache valueCache, txn *badger.Txn) ld.Node {
 	return nil
 }
 
-type variableNode string
-
-func (v variableNode) term(g *cursorGraph) Term {
-	i := g.ids[v]
-	return g.variables[i].value
-}
-
-// JSON returns a JSON-LD value for the literal, satisfying the Value interface
-func (v variableNode) JSON(origin iri, cache valueCache, txn *badger.Txn) (r interface{}) {
-
-	return
-}
-
-// NQuads returns the n-quads term for the literal, satisfying the Value interface
-func (v variableNode) NQuads(origin iri, cache valueCache, txn *badger.Txn) string {
-
-	return ""
-}
-
-func (v variableNode) Node(origin iri, cache valueCache, txn *badger.Txn) ld.Node {
-	return nil
-}
-
 func nodeToValue(
 	node ld.Node,
 	origin iri,
@@ -256,7 +223,7 @@ func nodeToValue(
 	t *badger.Txn,
 	sequence *badger.Sequence,
 	db *badger.DB,
-) (value term, txn *badger.Txn, err error) {
+) (value Value, txn *badger.Txn, err error) {
 	if node == nil {
 		return &blank{origin: origin}, t, nil
 	}

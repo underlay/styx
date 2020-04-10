@@ -9,7 +9,7 @@ import (
 // u, v, w... are *Variable pointers
 // x, y... are dependency slice indices, where e.g. g.In[p][x] == i
 
-func (g *cursorGraph) initial(indexValues []Term) (err error) {
+func (g *Iterator) initial(indexValues []Term) (err error) {
 	l := g.Len()
 
 	var ok bool
@@ -43,7 +43,7 @@ func (g *cursorGraph) initial(indexValues []Term) (err error) {
 	return
 }
 
-func (g *cursorGraph) next(i int) (tail int, err error) {
+func (g *Iterator) next(i int) (tail int, err error) {
 	var ok bool
 	tail = g.Len()
 	// Okay so we start at the index given to us
@@ -181,7 +181,7 @@ func clear(delta []*V) {
 // it will return ok = true, the variables rest in a new consensus state, every changed
 // variable's initial state is added to delta if it doesn't already exist, and no
 // non-nil element of delta is overwritten.
-func (g *cursorGraph) tick(i, min int, delta []*V) (ok bool, err error) {
+func (g *Iterator) tick(i, min int, delta []*V) (ok bool, err error) {
 	next := make([]*V, i)
 
 	// The biggest outer loop is walking backwards over g.In[i]
@@ -307,7 +307,7 @@ func (g *cursorGraph) tick(i, min int, delta []*V) (ok bool, err error) {
 	return
 }
 
-func (g *cursorGraph) restore(cache []*V, max int) (err error) {
+func (g *Iterator) restore(cache []*V, max int) (err error) {
 	for i, saved := range cache {
 		// If the variable at k has been modified by the
 		// (potentially) multiple recursive calls to tick,
@@ -325,7 +325,7 @@ func (g *cursorGraph) restore(cache []*V, max int) (err error) {
 	return
 }
 
-func (g *cursorGraph) pushTo(u *variable, min, max int) (err error) {
+func (g *Iterator) pushTo(u *variable, min, max int) (err error) {
 	for j, cs := range u.edges {
 		if j >= min && j < max {
 			// Update the incoming D2 constraints by using .dual to find them
@@ -338,18 +338,18 @@ func (g *cursorGraph) pushTo(u *variable, min, max int) (err error) {
 
 				i := c.place
 
-				node := variableNode(g.domain[j].Attribute)
+				node := g.variables[j]
 				m, n := (i+1)%3, (i+2)%3
 
 				place := i
-				if node == c.nodes[m] {
+				if node == c.values[m] {
 					place = m
-				} else if node == c.nodes[n] {
+				} else if node == c.values[n] {
 					place = n
 				}
 
 				neighbor := c.neighbors[place]
-				neighbor.values[i] = u.value
+				neighbor.terms[i] = u.value
 
 				item := c.iterator.Item()
 				meta := item.UserMeta()
@@ -364,7 +364,7 @@ func (g *cursorGraph) pushTo(u *variable, min, max int) (err error) {
 					neighbor.count, err = g.unary.Get(p, u.value, g.txn)
 				} else {
 					A, B := (neighbor.place+1)%3, (neighbor.place+2)%3
-					neighbor.prefix = assembleKey(TernaryPrefixes[A], true, neighbor.values[A], neighbor.values[B])
+					neighbor.prefix = assembleKey(TernaryPrefixes[A], true, neighbor.terms[A], neighbor.terms[B])
 					err = item.Value(func(val []byte) error {
 						neighbor.count = binary.BigEndian.Uint32(val)
 						return nil

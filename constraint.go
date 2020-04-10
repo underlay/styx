@@ -15,9 +15,9 @@ type constraint struct {
 	count     uint32      // The number of unique triples that satisfy the constraint
 	prefix    []byte
 	iterator  *badger.Iterator
-	nodes     *[3]term
-	values    [3]Term
-	neighbors [3]*constraint
+	values    []Value
+	terms     [3]Term
+	neighbors []*constraint
 }
 
 // cache is a struct for holding cached value states
@@ -32,14 +32,14 @@ func (c *constraint) save(i, j int) cache {
 }
 
 func (c *constraint) print(p Permutation) (s string) {
-	switch node := c.nodes[p].(type) {
-	case variableNode:
-		s = string(node)
-		if node != "" {
-			s += fmt.Sprintf(" = %s", c.values[p])
+	switch node := c.values[p].(type) {
+	case *variable:
+		// s = string(node)
+		if node != nil {
+			s += fmt.Sprintf(" = %s", c.terms[p])
 		}
 	default:
-		s = string(node.term(nil))
+		s = string(node.Term())
 	}
 	return
 }
@@ -52,7 +52,7 @@ func (c *constraint) Sources(value Term, txn *badger.Txn) (statements []*Stateme
 	if c.place == 0 {
 		item = c.iterator.Item()
 	} else {
-		s, p, o := c.values[0], c.values[1], c.values[2]
+		s, p, o := c.terms[0], c.terms[1], c.terms[2]
 		key := assembleKey(TernaryPrefixes[0], false, s, p, o)
 		item, err = txn.Get(key)
 		if err != nil {
@@ -93,7 +93,7 @@ func (c *constraint) String() string {
 	}
 }
 
-// Close the constraint's cursor's iterator, if it exists
+// Close the constraint's iterator, if it exists
 func (c *constraint) Close() {
 	if c.iterator != nil {
 		c.iterator.Close()
@@ -121,7 +121,7 @@ func (c *constraint) Next() Term {
 	return c.value()
 }
 
-// Seek advances the cursor to the first value equal to
+// Seek advances the iterator to the first value equal to
 // or greater than given byte slice.
 func (c *constraint) Seek(v Term) Term {
 	key := make([]byte, len(c.prefix)+len(v))
@@ -135,7 +135,7 @@ func (c *constraint) Seek(v Term) Term {
 
 func (c *constraint) getCount(uc unaryCache, bc binaryCache, txn *badger.Txn) (uint32, error) {
 	j, k := (c.place+1)%3, (c.place+2)%3
-	v, w := c.values[j], c.values[k]
+	v, w := c.terms[j], c.terms[k]
 	if v == "" && w == "" {
 		// AAAA return the total number of variables??
 		return 48329, nil
@@ -195,7 +195,7 @@ func (cs constraintSet) Seek(v Term) Term {
 	return v
 }
 
-// Next value (could be improved to not double-check cursor[0])
+// Next value (could be improved to not double-check the first constraint)
 func (cs constraintSet) Next() (next Term) {
 	c := cs[0]
 	c.iterator.Next()

@@ -25,6 +25,12 @@ const (
 	OPS
 )
 
+// ErrInvalidInput indicates that a given dataset was invalid
+var ErrInvalidInput = errors.New("Invalid dataset")
+
+// ErrTagScheme indicates that a given URI did not validate the database's tag scheme
+var ErrTagScheme = errors.New("Error during Set: URI did not validate the tag scheme")
+
 // ErrEndOfSolutions is a generic out-of-reuslts signal
 var ErrEndOfSolutions = errors.New("No more solutions")
 

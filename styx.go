@@ -17,8 +17,15 @@ const DefaultPath = "/tmp/styx"
 // SequenceBandwidth sets the lease block size of the ID counter
 const SequenceBandwidth = 512
 
+// A TagScheme is an interface for testing whether a given URI is a dataset URI or not
+type TagScheme interface {
+	Test(uri string) bool
+	Parse(uri string) (tag string, fragment string)
+}
+
 type prefixTagScheme string
 
+// NewPrefixTagScheme creates a tag scheme that tests for the given prefix
 func NewPrefixTagScheme(prefix string) TagScheme {
 	return prefixTagScheme(prefix)
 }
@@ -36,26 +43,15 @@ func (pts prefixTagScheme) Parse(uri string) (tag, fragment string) {
 	return
 }
 
-// Styx is a stupid interface
-type Styx interface {
-	Query(query []*ld.Quad, domain []*ld.BlankNode, index []ld.Node) (Cursor, error)
-	Set(uri string, dataset []*ld.Quad) error
-	Get(uri string) ([]*ld.Quad, error)
-	Delete(uri string) error
-	List(uri string) List
-	Close() error
-	Log()
-}
-
-// Styx is the general styx database wrapper
-type styx struct {
+// A Styx database instance
+type Styx struct {
 	tag      TagScheme
 	badger   *badger.DB
 	sequence *badger.Sequence
 }
 
 // Close the database
-func (db *styx) Close() (err error) {
+func (db *Styx) Close() (err error) {
 	if db == nil {
 		return
 	}
@@ -74,8 +70,8 @@ func (db *styx) Close() (err error) {
 	return
 }
 
-// OpenDB opens a styx database
-func OpenDB(path string, tag TagScheme) (*styx, error) {
+// NewStyx opens a styx database
+func NewStyx(path string, tag TagScheme) (*Styx, error) {
 	opts := badger.DefaultOptions(path)
 	if path == "" {
 		opts = opts.WithInMemory(path == "")
@@ -90,7 +86,6 @@ func OpenDB(path string, tag TagScheme) (*styx, error) {
 	}
 
 	txn := db.NewTransaction(true)
-	defer txn.Discard()
 	_, err = txn.Get(SequenceKey)
 	if err == badger.ErrKeyNotFound {
 		// Yay! Now we have to write an initial one
@@ -98,13 +93,14 @@ func OpenDB(path string, tag TagScheme) (*styx, error) {
 		binary.BigEndian.PutUint64(val, 128)
 		err = txn.Set(SequenceKey, val)
 		if err != nil {
+			txn.Discard()
 			return nil, err
 		}
 		err = txn.Commit()
-	}
-
-	txn.Discard() // ??
-	if err != nil {
+		if err != nil {
+			return nil, err
+		}
+	} else if err != nil {
 		return nil, err
 	}
 
@@ -113,45 +109,26 @@ func OpenDB(path string, tag TagScheme) (*styx, error) {
 		return nil, err
 	}
 
-	return &styx{
+	return &Styx{
 		tag:      tag,
 		badger:   db,
 		sequence: seq,
 	}, nil
 }
 
-// IngestJSONLd takes a JSON-LD document and ingests it.
-// This is mostly a convenience method for testing;
-// actual messages should get handled at HandleMessage.
-func IngestJSONLd(db *styx, uri string, doc interface{}, canonize bool) ([]*ld.Quad, error) {
-	proc := ld.NewJsonLdProcessor()
+// QueryJSONLD exposes a JSON-LD query interface
+func (db *Styx) QueryJSONLD(query interface{}) (*Iterator, error) {
 	opts := ld.NewJsonLdOptions("")
-	opts.Algorithm = Algorithm
-	d, err := proc.ToRDF(doc, opts)
+	opts.ProduceGeneralizedRdf = true
+	dataset, err := getDataset(query, opts)
 	if err != nil {
 		return nil, err
 	}
-
-	dataset := d.(*ld.RDFDataset)
-	var quads []*ld.Quad
-
-	if canonize {
-		opts.Format = Format
-		na := ld.NewNormalisationAlgorithm(opts.Algorithm)
-		na.Normalize(dataset)
-		quads = na.Quads()
-	} else {
-		quads = make([]*ld.Quad, 0)
-		for _, graph := range dataset.Graphs {
-			quads = append(quads, graph...)
-		}
-	}
-
-	return quads, db.Set(uri, quads)
+	return db.Query(dataset.Graphs["@default"], nil, nil)
 }
 
 // Query satisfies the Styx interface
-func (db *styx) Query(pattern []*ld.Quad, domain []*ld.BlankNode, index []ld.Node) (Cursor, error) {
+func (db *Styx) Query(pattern []*ld.Quad, domain []*ld.BlankNode, index []ld.Node) (*Iterator, error) {
 	txn := db.badger.NewTransaction(false)
 	g, err := MakeConstraintGraph(pattern, domain, index, db.tag, txn)
 	if err != nil {
@@ -166,7 +143,7 @@ func (db *styx) Query(pattern []*ld.Quad, domain []*ld.BlankNode, index []ld.Nod
 }
 
 // Log will print the *entire database contents* to log
-func (db *styx) Log() {
+func (db *Styx) Log() {
 	txn := db.badger.NewTransaction(false)
 	defer txn.Discard()
 

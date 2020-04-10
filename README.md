@@ -4,21 +4,21 @@
 
 Styx is like a key/value store for graph data. It takes RDF datasets in, and then you get data out with WHERE clauses where the pattern and result are expressed as RDF graphs.
 
-## Usage
-
-The main module you want to import is `github.com/underlay/styx/styx`, but the interfaces you care about are defined in `github.com/underlay/styx/types`. Here they are:
+## Interfaces
 
 ```golang
 type Styx interface {
 	Query(query []*ld.Quad, domain []*ld.BlankNode, index []ld.Node) (Cursor, error)
-	Insert(c cid.Cid, dataset []*ld.Quad) error
-	Delete(c cid.Cid, dataset []*ld.Quad) error
-	List(c cid.Cid) List
-	Log()
+	Set(uri string, dataset []*ld.Quad) error
+	Get(uri string) ([]*ld.Quad, error)
+	Delete(uri string) error
+	List(uri string) List
 	Close() error
+	Log()
 }
 
 type Cursor interface {
+	Len() int
 	Graph() []*ld.Quad
 	Get(node *ld.BlankNode) ld.Node
 	Domain() []*ld.BlankNode
@@ -29,12 +29,14 @@ type Cursor interface {
 }
 
 type List interface {
-	Cid() cid.Cid
+	URI() string
 	Next()
 	Valid() bool
 	Close()
 }
 ```
+
+## Usage
 
 Typical usage will look something like this:
 
@@ -42,44 +44,45 @@ Typical usage will look something like this:
 package main
 
 import (
-	ipfs "github.com/ipfs/go-ipfs-http-client"
-	styx "github.com/underlay/styx/db"
+	styx "github.com/underlay/styx"
+	ld "github.com/piprate/json-gold/ld"
 )
 
-func main() {
-	// You probably want a core.CoreAPI instance, either:
-	// - an HTTP API from github.com/ipfs/go-ipfs-http-client
-	// - a native CoreAPI from a IPFS daemon plugin
-	httpAPI, _ := ipfs.NewURLApiWithClient("http://localhost:5001", http.DefaultClient)
+var sampleData = []byte(`{
+	"@context": { "@vocab": "http://schema.org/" },
+	"@type": "Person",
+	"name": "Johnanthan Appleseed",
+	"knows": {
+		"@id": "http://people.com/jane-doe"
+	}
+}`)
 
-	// Open a database at a path with a given URI scheme
-	// passing nil will default to types.UnderlayURI, which formats URIs like
-	// u:bafkreichbq6iklce3y64lntglbcw6grdmote5ptsxph4c5vm3j77br5coa#_:c14n0
-	db, _ := styx.OpenDB("/tmp/styx", nil)
+var sampleQuery = []byte(`{
+	"@context": { "@vocab": "http://schema.org/" },
+	"name": "Johnanthan Appleseed",
+	"knows": { }
+}`)
+
+
+func main() {
+	// Open a database at a path with a given URI scheme.
+	// Passing an empty string for the path will open an in-memory instance
+	tagScheme := styx.NewPrefixTagScheme("http://example.com/")
+	db, _ := styx.OpenDB("/tmp/styx", tagScheme)
 	defer db.Close()
 
-	cursor, _ := db.Query()
-	if cursor != nil {
-		defer cursor.Close()
-		for d := cursor.Domain(); d != nil; d, err = cursor.Next(nil) {
-			for _, b := range d {
-				fmt.Printf("%s: %s\n", b.Attribute, cursor.Get(b).GetValue())
-			}
-			fmt.Println("---")
+	_ = db.SetJSONLD("http://example.com/d1", sampleData, false)
+
+	iterator, err := db.Query()
+	if err == styx.ErrEndOfSolutions {
+		return
+	}
+	defer iterator.Close()
+	for d := iterator.Domain(); err == nil; d, err = iterator.Next(nil) {
+		for _, b := range d {
+			fmt.Printf("%s: %s\n", b.Attribute, iterator.Get(b).GetValue())
 		}
+		fmt.Println("---")
 	}
 }
 ```
-
----
-
-## Roadmap
-
-- Rules! We plan on implementing a variant of Datalog.
-  - Linear Datalog with semi-naive evaluation would be simplest to implement
-  - Handling of arithmetic / custom "evaluated" functions will be tricky
-  - Datalog queries will need more elaborate provenance
-- Reification
-  - This will be how we implement provenance-based filtering (independent of Datlog or rules)
-- Pinning
-  - How to actually manage a styx node? What sorts of control mechanisms?

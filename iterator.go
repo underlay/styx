@@ -2,29 +2,20 @@ package styx
 
 import (
 	"fmt"
+	"log"
+	"strings"
 
 	badger "github.com/dgraph-io/badger/v2"
 	ld "github.com/piprate/json-gold/ld"
 )
 
-// A Cursor is an interactive query interface
-type Cursor interface {
-	Len() int
-	Graph() []*ld.Quad
-	Get(node *ld.BlankNode) ld.Node
-	Domain() []*ld.BlankNode
-	Index() []ld.Node
-	Next(node *ld.BlankNode) ([]*ld.BlankNode, error)
-	Seek(index []ld.Node) error
-	Close()
-}
-
-type cursorGraph struct {
+// An Iterator exposes Next and Seek operations
+type Iterator struct {
 	constants []*constraint
 	variables []*variable
 	domain    []*ld.BlankNode
 	pivot     int
-	ids       map[variableNode]int
+	ids       map[string]int
 	cache     []*V
 	blacklist []bool
 	in        [][]int
@@ -35,18 +26,46 @@ type cursorGraph struct {
 	txn       *badger.Txn
 }
 
-var _ Cursor = (*cursorGraph)(nil)
+func (g *Iterator) Collect() [][]ld.Node {
+	result := [][]ld.Node{}
+	var err error
+	for d := g.domain; err == nil; d, err = g.Next(nil) {
+		index := make([]ld.Node, len(d))
+		for i, b := range d {
+			index[i] = g.Get(b)
+		}
+		result = append(result, index)
+	}
+	return result
+}
 
-func (g *cursorGraph) Graph() []*ld.Quad {
+func (g *Iterator) Log() {
+	domain := g.Domain()
+	attributes := make([]string, len(domain))
+	for i, node := range domain {
+		attributes[i] = node.Attribute
+	}
+	log.Println(strings.Join(attributes, "\t"))
+	for _, path := range g.Collect() {
+		values := make([]string, len(domain))
+		start := len(domain) - len(path)
+		for i, node := range path {
+			values[start+i] = node.GetValue()
+		}
+		log.Println(strings.Join(values, "\t"))
+	}
+}
+
+func (g *Iterator) Graph() []*ld.Quad {
 	return nil
 }
 
-func (g *cursorGraph) Get(node *ld.BlankNode) (n ld.Node) {
+func (g *Iterator) Get(node *ld.BlankNode) (n ld.Node) {
 	if node == nil {
 		return
 	}
 
-	i, has := g.ids[variableNode(node.Attribute)]
+	i, has := g.ids[node.Attribute]
 	if !has {
 		return
 	}
@@ -60,12 +79,14 @@ func (g *cursorGraph) Get(node *ld.BlankNode) (n ld.Node) {
 	return value.Node("", g.values, g.txn)
 }
 
-func (g *cursorGraph) Domain() []*ld.BlankNode {
-	return g.domain
+func (g *Iterator) Domain() []*ld.BlankNode {
+	domain := make([]*ld.BlankNode, len(g.domain))
+	copy(domain, g.domain)
+	return domain
 }
 
-func (g *cursorGraph) Index() []ld.Node {
-	index := make([]ld.Node, g.Len())
+func (g *Iterator) Index() []ld.Node {
+	index := make([]ld.Node, len(g.variables))
 	for i, v := range g.variables {
 		value, _ := readValue([]byte(v.value))
 		index[i] = value.Node("", g.values, g.txn)
@@ -73,10 +94,10 @@ func (g *cursorGraph) Index() []ld.Node {
 	return index
 }
 
-func (g *cursorGraph) Next(node *ld.BlankNode) ([]*ld.BlankNode, error) {
+func (g *Iterator) Next(node *ld.BlankNode) ([]*ld.BlankNode, error) {
 	i := g.Len() - 1
 	if node != nil {
-		i = g.ids[variableNode(node.Attribute)]
+		i = g.ids[node.Attribute]
 	}
 	tail, err := g.next(i)
 	if err == badger.ErrKeyNotFound {
@@ -93,11 +114,11 @@ func (g *cursorGraph) Next(node *ld.BlankNode) ([]*ld.BlankNode, error) {
 	return g.domain[tail:], nil
 }
 
-func (g *cursorGraph) Seek(index []ld.Node) error {
+func (g *Iterator) Seek(index []ld.Node) error {
 	return nil
 }
 
-func (g *cursorGraph) Close() {
+func (g *Iterator) Close() {
 	if g != nil {
 		if g.variables != nil {
 			for _, u := range g.variables {
@@ -110,7 +131,7 @@ func (g *cursorGraph) Close() {
 	}
 }
 
-func (g *cursorGraph) String() string {
+func (g *Iterator) String() string {
 	s := "----- Constraint Graph -----\n"
 	for i, id := range g.domain {
 		s += fmt.Sprintf("---- %s ----\n%s\n", id, g.variables[i].String())
@@ -120,8 +141,8 @@ func (g *cursorGraph) String() string {
 }
 
 // Sort interface functions
-func (g *cursorGraph) Len() int { return len(g.domain) }
-func (g *cursorGraph) Swap(a, b int) {
+func (g *Iterator) Len() int { return len(g.domain) }
+func (g *Iterator) Swap(a, b int) {
 	// Swap is very important in assembling the graph.
 	// The things it _does_ mutate are .variables and .domain.
 	// It does NOT mutate .ids or the constraints, which is how we
@@ -136,30 +157,16 @@ func (g *cursorGraph) Swap(a, b int) {
 // Right now the variables are sorted their norm: in
 // increasing order of their length-normalized sum of
 // the squares of the counts of all their constraints (of any degree).
-func (g *cursorGraph) Less(a, b int) bool {
+func (g *Iterator) Less(a, b int) bool {
 	A, B := g.variables[a], g.variables[b]
 	return (float32(A.norm) / float32(A.size)) < (float32(B.norm) / float32(B.size))
 }
 
-// getVariable retrieves a variable or creates one if it doesn't exist.
-func (g *cursorGraph) getVariable(node *ld.BlankNode) (v *variable, i int) {
-	if index, has := g.ids[variableNode(node.Attribute)]; has {
-		v, i = g.variables[index], index
+func (g *Iterator) insertDZ(u *variable, c *constraint, txn *badger.Txn) (err error) {
+	if u.cs == nil {
+		u.cs = constraintSet{c}
 	} else {
-		v, i = &variable{}, len(g.domain)
-		g.ids[variableNode(node.Attribute)] = i
-		g.domain = append(g.domain, node)
-		g.variables = append(g.variables, v)
-	}
-	return
-}
-
-func (g *cursorGraph) insertDZ(u *ld.BlankNode, c *constraint, txn *badger.Txn) (err error) {
-	variable, _ := g.getVariable(u)
-	if variable.cs == nil {
-		variable.cs = constraintSet{c}
-	} else {
-		variable.cs = append(variable.cs, c)
+		u.cs = append(u.cs, c)
 	}
 
 	c.count, err = c.getCount(g.unary, g.binary, txn)
@@ -170,7 +177,7 @@ func (g *cursorGraph) insertDZ(u *ld.BlankNode, c *constraint, txn *badger.Txn) 
 	}
 
 	p := (c.place + 2) % 3
-	c.prefix = assembleKey(BinaryPrefixes[p], true, c.values[p])
+	c.prefix = assembleKey(BinaryPrefixes[p], true, c.terms[p])
 
 	// Create a new badger.Iterator for the constraint
 	c.iterator = txn.NewIterator(badger.IteratorOptions{
@@ -181,12 +188,11 @@ func (g *cursorGraph) insertDZ(u *ld.BlankNode, c *constraint, txn *badger.Txn) 
 	return
 }
 
-func (g *cursorGraph) insertD1(u *ld.BlankNode, c *constraint, txn *badger.Txn) (err error) {
-	variable, _ := g.getVariable(u)
-	if variable.cs == nil {
-		variable.cs = constraintSet{c}
+func (g *Iterator) insertD1(u *variable, c *constraint, txn *badger.Txn) (err error) {
+	if u.cs == nil {
+		u.cs = constraintSet{c}
 	} else {
-		variable.cs = append(variable.cs, c)
+		u.cs = append(u.cs, c)
 	}
 
 	c.count, err = c.getCount(g.unary, g.binary, txn)
@@ -197,7 +203,7 @@ func (g *cursorGraph) insertD1(u *ld.BlankNode, c *constraint, txn *badger.Txn) 
 	}
 
 	p := (c.place + 1) % 3
-	v, w := c.values[p], c.values[(p+1)%3]
+	v, w := c.terms[p], c.terms[(p+1)%3]
 	c.prefix = assembleKey(TernaryPrefixes[p], true, v, w)
 
 	// Create a new badger.Iterator for the constraint
@@ -209,26 +215,35 @@ func (g *cursorGraph) insertD1(u *ld.BlankNode, c *constraint, txn *badger.Txn) 
 	return
 }
 
-func (g *cursorGraph) insertD2(u, v *ld.BlankNode, c *constraint, txn *badger.Txn) (err error) {
+func (g *Iterator) getIndex(u *variable) int {
+	for i, v := range g.variables {
+		if u == v {
+			return i
+		}
+	}
+	log.Fatalln("Invalid variable index")
+	return -1
+}
+
+func (g *Iterator) insertD2(u, v *variable, c *constraint, txn *badger.Txn) (err error) {
 	// For second-degree constraints we get the *count* with an index key
 	// and set the *prefix* to either a major or minor key
 
-	variable, _ := g.getVariable(u)
-	if variable.edges == nil {
-		variable.edges = constraintMap{}
+	if u.edges == nil {
+		u.edges = constraintMap{}
 	}
 
-	_, j := g.getVariable(v)
-	if cs, has := variable.edges[j]; has {
-		variable.edges[j] = append(cs, c)
+	j := g.getIndex(v)
+	if cs, has := u.edges[j]; has {
+		u.edges[j] = append(cs, c)
 	} else {
-		variable.edges[j] = constraintSet{c}
+		u.edges[j] = constraintSet{c}
 	}
 
-	if variable.cs == nil {
-		variable.cs = constraintSet{c}
+	if u.cs == nil {
+		u.cs = constraintSet{c}
 	} else {
-		variable.cs = append(variable.cs, c)
+		u.cs = append(u.cs, c)
 	}
 
 	c.count, err = c.getCount(g.unary, g.binary, txn)
@@ -239,13 +254,13 @@ func (g *cursorGraph) insertD2(u, v *ld.BlankNode, c *constraint, txn *badger.Tx
 	}
 
 	var p Permutation
-	if c.values[(c.place+1)%3] == "" {
+	if c.terms[(c.place+1)%3] == "" {
 		p = (c.place + 2) % 3
-	} else if c.values[(c.place+2)%3] == "" {
+	} else if c.terms[(c.place+2)%3] == "" {
 		p = ((c.place + 1) % 3) + 3
 	}
 
-	c.prefix = assembleKey(BinaryPrefixes[p], true, c.values[p%3])
+	c.prefix = assembleKey(BinaryPrefixes[p], true, c.terms[p%3])
 
 	// Create a new badger.Iterator for the constraint
 	c.iterator = txn.NewIterator(badger.IteratorOptions{

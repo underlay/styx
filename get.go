@@ -6,7 +6,7 @@ import (
 )
 
 // Get a dataset from the database
-func (db *styx) Get(uri string) ([]*ld.Quad, error) {
+func (db *Styx) Get(uri string) ([]*ld.Quad, error) {
 	txn := db.badger.NewTransaction(true)
 	defer func() { txn.Discard() }()
 
@@ -39,7 +39,7 @@ func (db *styx) Get(uri string) ([]*ld.Quad, error) {
 	return dataset, nil
 }
 
-func (db *styx) get(item *badger.Item) (quads [][4]Value, err error) {
+func (db *Styx) get(item *badger.Item) (quads [][4]Value, err error) {
 	quads = make([][4]Value, 0)
 	err = item.Value(func(val []byte) error {
 		for i := 0; i < len(val); {

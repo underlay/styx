@@ -3,6 +3,9 @@ package styx
 import (
 	"fmt"
 	"sort"
+
+	badger "github.com/dgraph-io/badger/v2"
+	ld "github.com/piprate/json-gold/ld"
 )
 
 // variable is a collection of constraints on a particular blank node.
@@ -13,6 +16,25 @@ type variable struct {
 	root  Term          // the first possible value for the variable, without joining on other variables
 	size  int           // The total number of constraints
 	norm  uint64        // The sum of squares of key counts of constraints
+}
+
+func (u *variable) Term() Term {
+	return u.value
+}
+
+// JSON returns a JSON-LD value for the literal, satisfying the Value interface
+func (u *variable) JSON(origin iri, cache valueCache, txn *badger.Txn) (r interface{}) {
+	return
+}
+
+// NQuads returns the n-quads term for the literal, satisfying the Value interface
+func (u *variable) NQuads(origin iri, cache valueCache, txn *badger.Txn) string {
+
+	return ""
+}
+
+func (u *variable) Node(origin iri, cache valueCache, txn *badger.Txn) ld.Node {
+	return nil
 }
 
 func (u *variable) String() (s string) {
@@ -74,25 +96,25 @@ func (u *variable) save() *V {
 	return &V{u.value, d}
 }
 
-func (g *cursorGraph) load(u *variable, v *V) {
+func (g *Iterator) load(u *variable, v *V) {
 	u.value = v.Term
 	for _, d := range v.caches {
 		c := u.edges[d.i][d.j]
 
-		node := variableNode(g.domain[d.i].Attribute)
+		node := g.variables[d.i]
 		m, n := (c.place+1)%3, (c.place+2)%3
 
 		p, other := c.place, c.place
-		if node == c.nodes[m] {
-			c.values[m], p, other = v.Term, m+3, n
-		} else if node == c.nodes[n] {
-			c.values[n], p, other = v.Term, n, m
+		if node == c.values[m] {
+			c.terms[m], p, other = v.Term, m+3, n
+		} else if node == c.values[n] {
+			c.terms[n], p, other = v.Term, n, m
 		}
 
-		if c.values[other] == "" {
+		if c.terms[other] == "" {
 			c.prefix = assembleKey(BinaryPrefixes[p], true, v.Term)
 		} else {
-			c.prefix = assembleKey(TernaryPrefixes[m], true, c.values[m], c.values[n])
+			c.prefix = assembleKey(TernaryPrefixes[m], true, c.terms[m], c.terms[n])
 		}
 
 		c.count = d.c

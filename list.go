@@ -4,6 +4,7 @@ import (
 	badger "github.com/dgraph-io/badger/v2"
 )
 
+// A List is an iterator over dataset URIs
 type List interface {
 	URI() string
 	Next()
@@ -40,7 +41,7 @@ func (l *list) Next() {
 }
 
 // List lists the datasets in the database
-func (db *styx) List(uri string) List {
+func (db *Styx) List(uri string) List {
 	iteratorOptions := badger.IteratorOptions{
 		PrefetchValues: false,
 		PrefetchSize:   prefetchSize,

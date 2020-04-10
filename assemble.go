@@ -14,13 +14,13 @@ func MakeConstraintGraph(
 	domain []*ld.BlankNode, index []ld.Node,
 	tag TagScheme,
 	txn *badger.Txn,
-) (cursor Cursor, err error) {
+) (iterator *Iterator, err error) {
 
-	g := &cursorGraph{
+	g := &Iterator{
 		constants: make([]*constraint, 0),
 		variables: make([]*variable, len(domain)),
 		domain:    make([]*ld.BlankNode, len(domain)),
-		ids:       make(map[variableNode]int, len(domain)),
+		ids:       make(map[string]int, len(domain)),
 		pivot:     len(domain),
 		values:    newValueCache(),
 		unary:     newUnaryCache(),
@@ -32,10 +32,10 @@ func MakeConstraintGraph(
 	for i, node := range domain {
 		g.variables[i] = &variable{}
 		g.domain[i] = node
-		g.ids[variableNode(node.Attribute)] = i
+		g.ids[node.Attribute] = i
 	}
 
-	cursor = g
+	iterator = g
 
 	// Check that the domian is valid
 	if len(domain) < len(index) {
@@ -44,57 +44,60 @@ func MakeConstraintGraph(
 	}
 
 	for i, quad := range pattern {
-		blanks := [3]*ld.BlankNode{}
-		nodes := &[3]term{}
-		blanks[0], nodes[0], err = parseNode(quad.Subject, g.values, tag, g.txn)
+		if quad.Graph != nil {
+			value := quad.Graph.GetValue()
+			if value != "" && value != "@default" {
+				continue
+			}
+		}
+
+		variables := [3]*variable{}
+		values := make([]Value, 3)
+		variables[0], values[0], err = g.parseNode(quad.Subject, tag)
 		if err != nil {
 			return
 		}
-		blanks[1], nodes[1], err = parseNode(quad.Predicate, g.values, tag, g.txn)
+		variables[1], values[1], err = g.parseNode(quad.Predicate, tag)
 		if err != nil {
 			return
 		}
-		blanks[2], nodes[2], err = parseNode(quad.Object, g.values, tag, g.txn)
+		variables[2], values[2], err = g.parseNode(quad.Object, tag)
 		if err != nil {
 			return
 		}
 
 		degree := 0
-		values := [3]Term{}
+		terms := [3]Term{}
 		for p := 0; p < 3; p++ {
-			switch node := nodes[p].(type) {
-			case variableNode:
+			switch node := values[p].(type) {
+			case *variable:
 				degree++
 			default:
-				values[p] = node.term(nil)
+				terms[p] = node.Term()
 			}
 		}
 
-		// s, S := quad.Subject.(*ld.BlankNode)
-		// p, P := quad.Predicate.(*ld.BlankNode)
-		// o, O := quad.Object.(*ld.BlankNode)
-
 		if degree == 0 {
 			g.constants = append(g.constants, &constraint{
-				index: i,
-				place: SPO,
-				nodes: nodes,
+				index:  i,
+				place:  SPO,
+				values: values,
 			})
 		} else if degree == 1 {
 			// Only one of the terms is a blank node, so this is a first-degree constraint.
 			c := &constraint{
 				index:  i,
-				nodes:  nodes,
 				values: values,
+				terms:  terms,
 			}
 
 			for ; c.place < 3; c.place++ {
-				if blanks[c.place] != nil {
+				if variables[c.place] != nil {
 					break
 				}
 			}
 
-			err = g.insertD1(blanks[c.place], c, txn)
+			err = g.insertD1(variables[c.place], c, txn)
 			if err != nil {
 				return
 			}
@@ -104,32 +107,33 @@ func MakeConstraintGraph(
 			// If they're different, we insert two second-degree constraints.
 			var p Permutation
 			for ; p < 3; p++ {
-				if blanks[p] == nil {
+				if variables[p] == nil {
 					break
 				}
 			}
 
 			q, r := (p+1)%3, (p+2)%3
-			if blanks[q].Attribute == blanks[r].Attribute {
+			if variables[q] == variables[r] {
 				c := &constraint{
 					index:  i,
 					place:  q,
-					nodes:  nodes,
 					values: values,
+					terms:  terms,
 				}
-				err = g.insertDZ(blanks[q], c, txn)
+				err = g.insertDZ(variables[q], c, txn)
 				if err != nil {
 					return
 				}
 			} else {
-				a := &constraint{index: i, place: q, nodes: nodes, values: values}
-				b := &constraint{index: i, place: r, nodes: nodes, values: values}
-				a.neighbors[r], b.neighbors[q] = b, a
-				err = g.insertD2(blanks[q], blanks[r], a, txn)
+				neighbors := make([]*constraint, 3)
+				a := &constraint{index: i, place: q, values: values, terms: terms, neighbors: neighbors}
+				b := &constraint{index: i, place: r, values: values, terms: terms, neighbors: neighbors}
+				neighbors[r], neighbors[q] = b, a
+				err = g.insertD2(variables[q], variables[r], a, txn)
 				if err != nil {
 					return
 				}
-				err = g.insertD2(blanks[r], blanks[q], b, txn)
+				err = g.insertD2(variables[r], variables[q], b, txn)
 				if err != nil {
 					return
 				}
@@ -157,12 +161,17 @@ func MakeConstraintGraph(
 	// Set the .root values from indices first
 	indexValues := make([]Term, len(index))
 	for i, node := range index {
-		var n term
-		_, n, err = parseNode(node, g.values, tag, g.txn)
-		if err != nil {
-			return
+		var n Value
+		switch node := node.(type) {
+		case *ld.BlankNode:
+			err = ErrInvalidIndex
+		default:
+			n, _, err = nodeToValue(node, "", g.values, tag, txn, nil, nil)
 		}
-		indexValues[i] = n.term(nil)
+		if err != nil {
+			return nil, err
+		}
+		indexValues[i] = n.Term()
 	}
 
 	// Score the variables
@@ -187,23 +196,17 @@ func MakeConstraintGraph(
 		u.value = u.root
 	}
 
-	// Reverse the domain (for REASONS)
-	// for l, r := 0, len(domain)-1; l < r; l, r = l+1, r-1 {
-	// 	domain[l], domain[r] = domain[r], domain[l]
-	// }
-
 	// Sorting g keeps variables at indices less than g.pivot in place
 	if len(domain) < len(g.domain)+1 {
 		sort.Stable(g)
 		// Now we're in a tricky spot. g.domain and g.variables
 		// have changed, but not g.ids or the variable constraint maps.
 		transformation := make([]int, len(g.domain))
-		sortedIds := make(map[variableNode]int, len(g.domain))
+		sortedIds := make(map[string]int, len(g.domain))
 		for i, p := range g.domain {
-			id := variableNode(p.Attribute)
-			j := g.ids[id]
+			j := g.ids[p.Attribute]
 			transformation[j] = i
-			sortedIds[id] = i
+			sortedIds[p.Attribute] = i
 		}
 
 		// set the new id map
@@ -291,15 +294,23 @@ func MakeConstraintGraph(
 	g.blacklist = make([]bool, l)
 
 	// Viola! We are returning a newly scored, sorted, and connected constraint graph.
-	return cursor, g.initial(indexValues)
+	return iterator, g.initial(indexValues)
 }
 
-func parseNode(node ld.Node, values valueCache, tag TagScheme, txn *badger.Txn) (*ld.BlankNode, term, error) {
+func (g *Iterator) parseNode(node ld.Node, tag TagScheme) (*variable, Value, error) {
 	switch node := node.(type) {
 	case *ld.BlankNode:
-		return node, variableNode(node.Attribute), nil
+		if i, has := g.ids[node.Attribute]; has {
+			u := g.variables[i]
+			return u, u, nil
+		}
+		v := &variable{}
+		g.ids[node.Attribute] = len(g.domain)
+		g.domain = append(g.domain, node)
+		g.variables = append(g.variables, v)
+		return v, v, nil
 	default:
-		n, _, err := nodeToValue(node, "", values, tag, txn, nil, nil)
+		n, _, err := nodeToValue(node, "", g.values, tag, g.txn, nil, nil)
 		return nil, n, err
 	}
 }

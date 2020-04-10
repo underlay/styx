@@ -4,7 +4,7 @@ import (
 	badger "github.com/dgraph-io/badger/v2"
 )
 
-func (db *styx) Delete(uri string) (err error) {
+func (db *Styx) Delete(uri string) (err error) {
 	txn := db.badger.NewTransaction(true)
 	defer func() { txn.Discard() }()
 	values := newValueCache()
@@ -31,7 +31,7 @@ func (db *styx) Delete(uri string) (err error) {
 }
 
 // Delete removes a dataset from the database
-func (db *styx) delete(uri string, item *badger.Item, values valueCache, t *badger.Txn) (txn *badger.Txn, err error) {
+func (db *Styx) delete(uri string, item *badger.Item, values valueCache, t *badger.Txn) (txn *badger.Txn, err error) {
 	txn = t
 	quads, err := db.get(item)
 	if err != nil {
@@ -47,7 +47,7 @@ func (db *styx) delete(uri string, item *badger.Item, values valueCache, t *badg
 	uc := newUnaryCache()
 
 	for _, quad := range quads {
-		terms := [3]Term{quad[0].term(nil), quad[1].term(nil), quad[2].term(nil)}
+		terms := [3]Term{quad[0].Term(), quad[1].Term(), quad[2].Term()}
 		var item *badger.Item
 		p := TernaryPrefixes[0]
 		key := assembleKey(p, false, terms[:]...)

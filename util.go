@@ -4,11 +4,16 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/json"
+	"io"
 	"regexp"
 	"strings"
 
 	badger "github.com/dgraph-io/badger/v2"
+	ld "github.com/piprate/json-gold/ld"
 )
+
+var proc = ld.NewJsonLdProcessor()
 
 var patternInteger = regexp.MustCompile("^[\\-+]?[0-9]+$")
 var patternDouble = regexp.MustCompile("^(\\+|-)?([0-9]+(\\.[0-9]*)?|\\.[0-9]+)([Ee](\\+|-)?[0-9]+)?$")
@@ -147,12 +152,6 @@ func (m matrix) permute(permutation Permutation, ids [3]Term) (Term, Term, Term)
 	return ids[row[0]], ids[row[1]], ids[row[2]]
 }
 
-// permuteNode permutes the given ids by the specified permutation
-func (m matrix) permuteNode(permutation Permutation, nodes [3]term) (term, term, term) {
-	row := m[permutation]
-	return nodes[row[0]], nodes[row[1]], nodes[row[2]]
-}
-
 // major indexes the major permutations
 var major = matrix{
 	[3]uint8{0, 1, 2},
@@ -165,4 +164,40 @@ var minor = matrix{
 	[3]uint8{0, 2, 1},
 	[3]uint8{1, 0, 2},
 	[3]uint8{2, 1, 0},
+}
+
+func getDataset(input interface{}, opts *ld.JsonLdOptions) (dataset *ld.RDFDataset, err error) {
+	var document interface{}
+	switch input := input.(type) {
+	case []byte:
+		err = json.Unmarshal(input, &document)
+	case string:
+		err = json.Unmarshal([]byte(input), &document)
+	case io.Reader:
+		err = json.NewDecoder(input).Decode(&document)
+	case map[string]interface{}:
+		document = input
+	case []interface{}:
+		document = input
+	default:
+		err = ErrInvalidInput
+	}
+	if err != nil {
+		return
+	}
+
+	var rdf interface{}
+	rdf, err = proc.ToRDF(document, opts)
+	if err != nil {
+		return
+	}
+
+	switch result := rdf.(type) {
+	case *ld.RDFDataset:
+		dataset = result
+	default:
+		err = ErrInvalidInput
+	}
+
+	return
 }

@@ -1,12 +1,44 @@
 package styx
 
 import (
+	"strings"
+
 	badger "github.com/dgraph-io/badger/v2"
 	ld "github.com/piprate/json-gold/ld"
 )
 
+// SetJSONLD sets a JSON-LD document
+func (db *Styx) SetJSONLD(uri string, input interface{}, canonize bool) error {
+	opts := ld.NewJsonLdOptions(uri)
+	dataset, err := getDataset(input, opts)
+	if err != nil {
+		return err
+	}
+	return db.SetDataset(uri, dataset, canonize)
+}
+
+// SetDataset sets a piprate/json-gold dataset struct
+func (db *Styx) SetDataset(uri string, dataset *ld.RDFDataset, canonize bool) error {
+	var quads []*ld.Quad
+	if canonize {
+		na := ld.NewNormalisationAlgorithm(Algorithm)
+		na.Normalize(dataset)
+		quads = na.Quads()
+	} else {
+		quads = make([]*ld.Quad, 0)
+		for _, graph := range dataset.Graphs {
+			quads = append(quads, graph...)
+		}
+	}
+	return db.Set(uri, quads)
+}
+
 // Set is the entrypoint to inserting stuff
-func (db *styx) Set(uri string, dataset []*ld.Quad) (err error) {
+func (db *Styx) Set(uri string, dataset []*ld.Quad) (err error) {
+	if !(strings.Index(uri, "#") == -1 && db.tag.Test(uri+"#")) {
+		return ErrTagScheme
+	}
+
 	txn := db.badger.NewTransaction(true)
 	defer func() { txn.Discard() }()
 
@@ -40,19 +72,19 @@ func (db *styx) Set(uri string, dataset []*ld.Quad) (err error) {
 		terms := [3]Term{}
 		for j := Permutation(0); j < 4; j++ {
 			node := getNode(quad, j)
-			var t term
+			var t Value
 			t, txn, err = nodeToValue(node, origin, values, db.tag, txn, db.sequence, db.badger)
 			if err != nil {
 				return
 			}
 
 			if j == 3 {
-				source.Graph = t.term(nil)
+				source.Graph = t
 			} else {
-				terms[j] = t.term(nil)
+				terms[j] = t.Term()
 			}
 
-			quads = append(quads, t.term(nil)...)
+			quads = append(quads, t.Term()...)
 			if j == 3 {
 				quads = append(quads, '\n')
 			} else {
