@@ -57,7 +57,7 @@ func open() *Store {
 	}
 
 	opts := &Options{Path: tmpPath, TagScheme: tag}
-	styx, err := NewDB(opts)
+	styx, err := NewStore(opts)
 	if err != nil {
 		log.Fatalln(err)
 	}
