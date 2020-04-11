@@ -7,7 +7,7 @@ Styx is like a key/value store for graph data. It takes RDF datasets in, and the
 ## Interfaces
 
 ```golang
-type Styx interface {
+type Store interface {
 	Query(query []*ld.Quad, domain []*ld.BlankNode, index []ld.Node) (Iterator, error)
 	Set(uri string, dataset []*ld.Quad) error
 	Get(uri string) ([]*ld.Quad, error)
@@ -48,27 +48,31 @@ import (
 	ld "github.com/piprate/json-gold/ld"
 )
 
-var sampleData = []byte(`{
+var sampleData = `{
 	"@context": { "@vocab": "http://schema.org/" },
 	"@type": "Person",
 	"name": "Johnanthan Appleseed",
 	"knows": {
 		"@id": "http://people.com/jane-doe"
 	}
-}`)
+}`
 
-var sampleQuery = []byte(`{
+var sampleQuery = `{
 	"@context": { "@vocab": "http://schema.org/" },
 	"name": "Johnanthan Appleseed",
 	"knows": { }
-}`)
+}`
 
 
 func main() {
 	// Open a database at a path with a given URI scheme.
 	// Passing an empty string for the path will open an in-memory instance
 	tagScheme := styx.NewPrefixTagScheme("http://example.com/")
-	db, _ := styx.OpenDB("/tmp/styx", tagScheme)
+	opts := &styx.Options{
+		Path: "/tmp/styx",
+		TagScheme: tagScheme,
+	}
+	db, _ := styx.NewStore(opts)
 	defer db.Close()
 
 	_ = db.SetJSONLD("http://example.com/d1", sampleData, false)
