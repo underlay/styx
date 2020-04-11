@@ -80,23 +80,23 @@ func (u *variable) Next() Term {
 // caches is a slice of C structs
 type caches []cache
 
-// V is a struct that caches a variable's total state
-type V struct {
+// vcache is a struct that caches a variable's total state
+type vcache struct {
 	Term
 	caches
 }
 
-func (u *variable) save() *V {
+func (u *variable) save() *vcache {
 	d := make(caches, 0, u.edges.Len())
 	for q, cs := range u.edges {
 		for i, c := range cs {
 			d = append(d, c.save(q, i))
 		}
 	}
-	return &V{u.value, d}
+	return &vcache{u.value, d}
 }
 
-func (g *Iterator) load(u *variable, v *V) {
+func (g *Iterator) load(u *variable, v *vcache) {
 	u.value = v.Term
 	for _, d := range v.caches {
 		c := u.edges[d.i][d.j]

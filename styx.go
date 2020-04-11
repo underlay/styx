@@ -155,7 +155,7 @@ func (s *Store) QueryJSONLD(query interface{}) (*Iterator, error) {
 // Query satisfies the Styx interface
 func (s *Store) Query(pattern []*ld.Quad, domain []*ld.BlankNode, index []ld.Node) (*Iterator, error) {
 	txn := s.Badger.NewTransaction(false)
-	g, err := MakeConstraintGraph(pattern, domain, index, s.Options.TagScheme, txn)
+	g, err := NewIterator(pattern, domain, index, s.Options.TagScheme, txn)
 	if err != nil {
 		g.Close()
 	}
