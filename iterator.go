@@ -123,12 +123,6 @@ func (g *Iterator) Next(node *ld.BlankNode) ([]*ld.BlankNode, error) {
 	return g.domain[tail:], nil
 }
 
-// Seek advances the iterator to the first result
-// greater than or equal to the given index path
-func (g *Iterator) Seek(index []ld.Node) error {
-	return nil
-}
-
 // Close the iterator
 func (g *Iterator) Close() {
 	if g != nil {

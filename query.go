@@ -9,40 +9,6 @@ import (
 // u, v, w... are *Variable pointers
 // x, y... are dependency slice indices, where e.g. g.In[p][x] == i
 
-func (g *Iterator) initial(indexValues []Term) (err error) {
-	l := g.Len()
-
-	var ok bool
-
-	for i, u := range g.variables {
-		if u.value == "" {
-			root := u.root
-			if i < len(indexValues) {
-				root = indexValues[i]
-			}
-			for u.value = u.Seek(root); u.value == ""; u.value = u.Seek(root) {
-				ok, err = g.tick(i, 0, g.cache)
-				if err != nil || !ok {
-					return
-				}
-			}
-		}
-
-		// We've got a non-nil value for u!
-		g.pushTo(u, i, l)
-		for j, saved := range g.cache[:i] {
-			if saved != nil {
-				g.cache[j] = nil
-				if i+1 < l {
-					g.pushTo(g.variables[j], i, l)
-				}
-			}
-		}
-	}
-
-	return
-}
-
 func (g *Iterator) next(i int) (tail int, err error) {
 	var ok bool
 	tail = g.Len()

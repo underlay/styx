@@ -295,7 +295,43 @@ func MakeConstraintGraph(
 	g.blacklist = make([]bool, l)
 
 	// Viola! We are returning a newly scored, sorted, and connected constraint graph.
-	return iterator, g.initial(indexValues)
+	return iterator, g.Seek(indexValues)
+}
+
+// Seek advances the iterator to the first result
+// greater than or equal to the given index path
+func (g *Iterator) Seek(index []Term) (err error) {
+	l := g.Len()
+
+	var ok bool
+
+	for i, u := range g.variables {
+		if u.value == "" {
+			root := u.root
+			if i < len(index) {
+				root = index[i]
+			}
+			for u.value = u.Seek(root); u.value == ""; u.value = u.Seek(root) {
+				ok, err = g.tick(i, 0, g.cache)
+				if err != nil || !ok {
+					return
+				}
+			}
+		}
+
+		// We've got a non-nil value for u!
+		g.pushTo(u, i, l)
+		for j, saved := range g.cache[:i] {
+			if saved != nil {
+				g.cache[j] = nil
+				if i+1 < l {
+					g.pushTo(g.variables[j], i, l)
+				}
+			}
+		}
+	}
+
+	return
 }
 
 func (g *Iterator) parseNode(node ld.Node, tag TagScheme) (*variable, Value, error) {
