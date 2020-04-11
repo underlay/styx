@@ -28,6 +28,13 @@ func MakeConstraintGraph(
 		txn:       txn,
 	}
 
+	// if origin != "" {
+	// 	g.origin, err = g.values.GetID(origin, txn)
+	// 	if err != nil {
+	// 		return
+	// 	}
+	// }
+
 	// Copy the initial domain
 	for i, node := range domain {
 		g.variables[i] = &variable{}
@@ -161,13 +168,7 @@ func MakeConstraintGraph(
 	// Set the .root values from indices first
 	indexValues := make([]Term, len(index))
 	for i, node := range index {
-		var n Value
-		switch node := node.(type) {
-		case *ld.BlankNode:
-			err = ErrInvalidIndex
-		default:
-			n, _, err = nodeToValue(node, "", g.values, tag, txn, nil, nil)
-		}
+		n, _, err := nodeToValue(node, "", g.values, tag, txn, nil, nil)
 		if err != nil {
 			return nil, err
 		}

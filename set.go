@@ -8,7 +8,7 @@ import (
 )
 
 // SetJSONLD sets a JSON-LD document
-func (db *Styx) SetJSONLD(uri string, input interface{}, canonize bool) error {
+func (db *Store) SetJSONLD(uri string, input interface{}, canonize bool) error {
 	opts := ld.NewJsonLdOptions(uri)
 	dataset, err := getDataset(input, opts)
 	if err != nil {
@@ -18,7 +18,7 @@ func (db *Styx) SetJSONLD(uri string, input interface{}, canonize bool) error {
 }
 
 // SetDataset sets a piprate/json-gold dataset struct
-func (db *Styx) SetDataset(uri string, dataset *ld.RDFDataset, canonize bool) error {
+func (db *Store) SetDataset(uri string, dataset *ld.RDFDataset, canonize bool) error {
 	var quads []*ld.Quad
 	if canonize {
 		na := ld.NewNormalisationAlgorithm(Algorithm)
@@ -34,8 +34,8 @@ func (db *Styx) SetDataset(uri string, dataset *ld.RDFDataset, canonize bool) er
 }
 
 // Set is the entrypoint to inserting stuff
-func (db *Styx) Set(uri string, dataset []*ld.Quad) (err error) {
-	if !(strings.Index(uri, "#") == -1 && db.Tag.Test(uri+"#")) {
+func (db *Store) Set(uri string, dataset []*ld.Quad) (err error) {
+	if uri != "" && !(strings.Index(uri, "#") == -1 && db.Options.TagScheme.Test(uri+"#")) {
 		return ErrTagScheme
 	}
 
@@ -73,7 +73,7 @@ func (db *Styx) Set(uri string, dataset []*ld.Quad) (err error) {
 		for j := Permutation(0); j < 4; j++ {
 			node := getNode(quad, j)
 			var t Value
-			t, txn, err = nodeToValue(node, origin, values, db.Tag, txn, db.Sequence, db.Badger)
+			t, txn, err = nodeToValue(node, origin, values, db.Options.TagScheme, txn, db.Sequence, db.Badger)
 			if err != nil {
 				return
 			}

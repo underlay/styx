@@ -12,12 +12,14 @@ import (
 // Term is the shorthand type for values (terms of any kind)
 type Term string
 
+// A Statement is a reference to a specific quad in a specific dataset
 type Statement struct {
 	Origin iri
 	Index  uint64
 	Graph  Value
 }
 
+// URI returns a URI representation of the quad using path notation
 func (statement *Statement) URI(values valueCache, txn *badger.Txn) (uri string) {
 	value, err := values.GetValue(statement.Origin, txn)
 	if err == nil {
@@ -26,12 +28,13 @@ func (statement *Statement) URI(values valueCache, txn *badger.Txn) (uri string)
 	return
 }
 
+// Marshal serializes the statement into bytes
 func (statement *Statement) Marshal(values valueCache, txn *badger.Txn) string {
 	i := strconv.FormatUint(statement.Index, 32)
 	return fmt.Sprintf("%s\t%s\t%s\n", statement.Origin, i, statement.Graph.Term())
 }
 
-var statementPattern = regexp.MustCompile("([a-zA-Z0-9+/]+)\t([a-z0-9]+)\t([a-zA-Z0-9+/]+)(?:#([a-zA-Z0-9-_]+))?")
+var statementPattern = regexp.MustCompile("([a-zA-Z0-9+/]*)\t([a-z0-9]+)\t([a-zA-Z0-9+/]*)(?:#([a-zA-Z0-9-_]*))?")
 
 func getStatements(val []byte) ([]*Statement, error) {
 	wahoo := statementPattern.FindAllSubmatch(val, -1)
@@ -155,9 +158,9 @@ type literal struct {
 
 func (l *literal) Term() Term {
 	escaped := []byte(escape(l.v))
-	if l.d == RDFLangString {
+	if l.d == vocabulary[ld.RDFLangString] {
 		return Term(fmt.Sprintf("\"%s\"@%s", escaped, l.l))
-	} else if l.d != "" && l.d != XSDString {
+	} else if l.d != "" && l.d != vocabulary[ld.XSDString] {
 		return Term(fmt.Sprintf("\"%s\":%s", escaped, l.d))
 	} else {
 		return Term(fmt.Sprintf("\"%s\"", escaped))
@@ -166,15 +169,15 @@ func (l *literal) Term() Term {
 
 // JSON returns a JSON-LD value for the literal, satisfying the Value interface
 func (l *literal) JSON(origin iri, cache valueCache, txn *badger.Txn) (r interface{}) {
-	if l.d == RDFLangString {
+	if l.d == vocabulary[ld.RDFLangString] {
 		r = map[string]interface{}{"@value": l.v, "@language": l.l}
-	} else if l.d == "" || l.d == XSDString {
+	} else if l.d == "" || l.d == vocabulary[ld.XSDString] {
 		r = l.v
-	} else if l.d == XSDBoolean && (l.v == "true" || l.v == "false") {
+	} else if l.d == vocabulary[ld.XSDBoolean] && (l.v == "true" || l.v == "false") {
 		r, _ = strconv.ParseBool(l.v)
-	} else if l.d == XSDInteger && patternInteger.MatchString(l.v) {
+	} else if l.d == vocabulary[ld.XSDInteger] && patternInteger.MatchString(l.v) {
 		r, _ = strconv.Atoi(l.v)
-	} else if l.d == XSDDouble && patternDouble.MatchString(l.v) {
+	} else if l.d == vocabulary[ld.XSDDouble] && patternDouble.MatchString(l.v) {
 		r, _ = strconv.ParseFloat(l.v, 64)
 	} else {
 		datatype, err := cache.GetValue(l.d, txn)
@@ -188,9 +191,9 @@ func (l *literal) JSON(origin iri, cache valueCache, txn *badger.Txn) (r interfa
 // NQuads returns the n-quads term for the literal, satisfying the Value interface
 func (l *literal) NQuads(origin iri, cache valueCache, txn *badger.Txn) string {
 	escaped := escape(l.v)
-	if l.d == RDFLangString {
+	if l.d == vocabulary[ld.RDFLangString] {
 		return fmt.Sprintf("\"%s\"@%s", escaped, l.l)
-	} else if l.d != "" && l.d != XSDString {
+	} else if l.d != "" && l.d != vocabulary[ld.XSDString] {
 		value, err := cache.GetValue(l.d, txn)
 		if err == nil {
 			return fmt.Sprintf("\"%s\"^^<%s>", escaped, value)
@@ -202,9 +205,9 @@ func (l *literal) NQuads(origin iri, cache valueCache, txn *badger.Txn) string {
 }
 
 func (l *literal) Node(origin iri, cache valueCache, txn *badger.Txn) ld.Node {
-	if l.d == RDFLangString {
+	if l.d == vocabulary[ld.RDFLangString] {
 		return ld.NewLiteral(l.v, ld.RDFLangString, l.l)
-	} else if l.d != "" && l.d != XSDString {
+	} else if l.d != "" && l.d != vocabulary[ld.XSDString] {
 		value, err := cache.GetValue(l.d, txn)
 		if err == nil {
 			return ld.NewLiteral(l.v, value, "")
@@ -244,7 +247,7 @@ func nodeToValue(
 	case *ld.Literal:
 		l := &literal{v: node.Value}
 		if node.Datatype == ld.RDFLangString {
-			l.d = RDFLangString
+			l.d = vocabulary[ld.RDFLangString]
 			l.l = node.Language
 		} else if node.Datatype != "" && node.Datatype != ld.XSDString {
 			l.d, txn, err = getIRI(node.Datatype, cache, txn, sequence, db)
@@ -256,13 +259,13 @@ func nodeToValue(
 
 func getIRI(
 	value string,
-	cache valueCache,
+	values valueCache,
 	t *badger.Txn,
 	sequence *badger.Sequence,
 	db *badger.DB,
 ) (id iri, txn *badger.Txn, err error) {
 	txn = t
-	id, err = cache.GetID(value, txn)
+	id, err = values.GetID(value, txn)
 	if err == badger.ErrKeyNotFound && sequence != nil && db != nil {
 		var next uint64
 		next, err = sequence.Next()
@@ -270,7 +273,7 @@ func getIRI(
 			return
 		}
 		id = fromUint64(next)
-		txn, err = cache.Commit(id, value, db, txn)
+		txn, err = values.Commit(id, value, db, txn)
 	}
 	return
 }

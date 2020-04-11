@@ -26,6 +26,8 @@ type Iterator struct {
 	txn       *badger.Txn
 }
 
+// Collect calls Next(nil) on the iterator until there are no more solutions,
+// and returns all the results in a slice.
 func (g *Iterator) Collect() [][]ld.Node {
 	result := [][]ld.Node{}
 	var err error
@@ -39,6 +41,7 @@ func (g *Iterator) Collect() [][]ld.Node {
 	return result
 }
 
+// Log pretty-prints the contents of the database
 func (g *Iterator) Log() {
 	domain := g.Domain()
 	attributes := make([]string, len(domain))
@@ -56,10 +59,12 @@ func (g *Iterator) Log() {
 	}
 }
 
+// Graph returns a []*ld.Quad representation of the iterator's current value
 func (g *Iterator) Graph() []*ld.Quad {
 	return nil
 }
 
+// Get the value for a particular blank node
 func (g *Iterator) Get(node *ld.BlankNode) (n ld.Node) {
 	if node == nil {
 		return
@@ -79,12 +84,14 @@ func (g *Iterator) Get(node *ld.BlankNode) (n ld.Node) {
 	return value.Node("", g.values, g.txn)
 }
 
+// Domain returns the total ordering of variables used by the iterator
 func (g *Iterator) Domain() []*ld.BlankNode {
 	domain := make([]*ld.BlankNode, len(g.domain))
 	copy(domain, g.domain)
 	return domain
 }
 
+// Index returns the iterator's current value as an ordered slice of ld.Nodes
 func (g *Iterator) Index() []ld.Node {
 	index := make([]ld.Node, len(g.variables))
 	for i, v := range g.variables {
@@ -94,6 +101,8 @@ func (g *Iterator) Index() []ld.Node {
 	return index
 }
 
+// Next advances the iterator to the next result that differs in the given node.
+// If nil is passed, the last node in the domain is used.
 func (g *Iterator) Next(node *ld.BlankNode) ([]*ld.BlankNode, error) {
 	i := g.Len() - 1
 	if node != nil {
@@ -114,10 +123,13 @@ func (g *Iterator) Next(node *ld.BlankNode) ([]*ld.BlankNode, error) {
 	return g.domain[tail:], nil
 }
 
+// Seek advances the iterator to the first result
+// greater than or equal to the given index path
 func (g *Iterator) Seek(index []ld.Node) error {
 	return nil
 }
 
+// Close the iterator
 func (g *Iterator) Close() {
 	if g != nil {
 		if g.variables != nil {

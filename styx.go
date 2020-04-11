@@ -12,7 +12,7 @@ import (
 )
 
 // DefaultPath is the default path for the Badger database
-const DefaultPath = "/tmp/styx"
+const tmpPath = "/tmp/styx"
 
 // SequenceBandwidth sets the lease block size of the ID counter
 const SequenceBandwidth = 512
@@ -43,26 +43,33 @@ func (pts prefixTagScheme) Parse(uri string) (tag, fragment string) {
 	return
 }
 
-// A Styx database instance
-type Styx struct {
-	Tag      TagScheme
+// A Store is a database instance
+type Store struct {
 	Badger   *badger.DB
 	Sequence *badger.Sequence
+	Options  *Options
+}
+
+// Options are the initialization options passed to Styx
+type Options struct {
+	Path      string
+	TagScheme TagScheme
+	Canonize  bool
 }
 
 // Close the database
-func (db *Styx) Close() (err error) {
-	if db == nil {
+func (s *Store) Close() (err error) {
+	if s == nil {
 		return
 	}
-	if db.Sequence != nil {
-		err = db.Sequence.Release()
+	if s.Sequence != nil {
+		err = s.Sequence.Release()
 		if err != nil {
 			return
 		}
 	}
-	if db.Badger != nil {
-		err = db.Badger.Close()
+	if s.Badger != nil {
+		err = s.Badger.Close()
 		if err != nil {
 			return
 		}
@@ -70,14 +77,18 @@ func (db *Styx) Close() (err error) {
 	return
 }
 
-// NewStyx opens a styx database
-func NewStyx(path string, tag TagScheme) (*Styx, error) {
-	opts := badger.DefaultOptions(path)
-	if path == "" {
-		opts = opts.WithInMemory(path == "")
+// NewStore opens a styx database
+func NewStore(options *Options) (*Store, error) {
+	if options == nil {
+		options = &Options{}
+	}
+
+	opts := badger.DefaultOptions(options.Path)
+	if options.Path == "" {
+		opts = opts.WithInMemory(true)
 		log.Println("Opening in-memory badger database")
 	} else {
-		log.Println("Opening badger database at", path)
+		log.Println("Opening badger database at", options.Path)
 	}
 
 	db, err := badger.Open(opts)
@@ -109,28 +120,28 @@ func NewStyx(path string, tag TagScheme) (*Styx, error) {
 		return nil, err
 	}
 
-	return &Styx{
-		Tag:      tag,
+	return &Store{
+		Options:  options,
 		Badger:   db,
 		Sequence: seq,
 	}, nil
 }
 
 // QueryJSONLD exposes a JSON-LD query interface
-func (db *Styx) QueryJSONLD(query interface{}) (*Iterator, error) {
+func (s *Store) QueryJSONLD(query interface{}) (*Iterator, error) {
 	opts := ld.NewJsonLdOptions("")
 	opts.ProduceGeneralizedRdf = true
 	dataset, err := getDataset(query, opts)
 	if err != nil {
 		return nil, err
 	}
-	return db.Query(dataset.Graphs["@default"], nil, nil)
+	return s.Query(dataset.Graphs["@default"], nil, nil)
 }
 
 // Query satisfies the Styx interface
-func (db *Styx) Query(pattern []*ld.Quad, domain []*ld.BlankNode, index []ld.Node) (*Iterator, error) {
-	txn := db.Badger.NewTransaction(false)
-	g, err := MakeConstraintGraph(pattern, domain, index, db.Tag, txn)
+func (s *Store) Query(pattern []*ld.Quad, domain []*ld.BlankNode, index []ld.Node) (*Iterator, error) {
+	txn := s.Badger.NewTransaction(false)
+	g, err := MakeConstraintGraph(pattern, domain, index, s.Options.TagScheme, txn)
 	if err != nil {
 		g.Close()
 	}
@@ -143,8 +154,8 @@ func (db *Styx) Query(pattern []*ld.Quad, domain []*ld.BlankNode, index []ld.Nod
 }
 
 // Log will print the *entire database contents* to log
-func (db *Styx) Log() {
-	txn := db.Badger.NewTransaction(false)
+func (s *Store) Log() {
+	txn := s.Badger.NewTransaction(false)
 	defer txn.Discard()
 
 	iter := txn.NewIterator(badger.DefaultIteratorOptions)

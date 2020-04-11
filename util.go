@@ -34,7 +34,7 @@ func readValue(val []byte) (Value, int) {
 		} else if val[li[1]] == '@' {
 			// Language
 			l.l = string(val[li[1]+1 : ti[0]])
-			l.d = RDFLangString
+			l.d = vocabulary[ld.RDFLangString]
 		} else {
 			return nil, -1
 		}
@@ -49,19 +49,21 @@ func readValue(val []byte) (Value, int) {
 	return &blank{origin: iri(val[:t]), id: string(val[t+1 : ti[0]])}, ti[1]
 }
 
-const maxValue uint64 = 16777215 // ////
+const max6Byte uint64 = 16777216
+const max8Byte uint64 = 281474976710656
 
 func fromUint64(id uint64) iri {
-	i := uint64(id)
 	var res []byte
-	if i <= maxValue {
+	if id < max6Byte {
 		res = make([]byte, 4)
-		binary.BigEndian.PutUint32(res, uint32(id))
-		base64.StdEncoding.Encode(res, res[1:])
-	} else {
+		tmp := make([]byte, 4)
+		binary.BigEndian.PutUint32(tmp, uint32(id))
+		base64.StdEncoding.Encode(res, tmp[1:])
+	} else if id < max8Byte {
 		res = make([]byte, 8)
-		binary.BigEndian.PutUint64(res, uint64(id))
-		base64.StdEncoding.Encode(res, res[2:])
+		tmp := make([]byte, 8)
+		binary.BigEndian.PutUint64(tmp, id)
+		base64.StdEncoding.Encode(res, tmp[2:])
 	}
 	l := len(res)
 	if res[l-2] == '=' {

@@ -2,34 +2,62 @@ package styx
 
 import (
 	"errors"
-)
 
-const (
-	XSDString     iri = "AA"
-	XSDBoolean    iri = "AB"
-	XSDInteger    iri = "AC"
-	XSDDouble     iri = "AD"
-	RDFType       iri = "AE"
-	RDFLangString iri = "AF"
+	ld "github.com/piprate/json-gold/ld"
 )
 
 // Permutation is a permutation of a triple
 type Permutation uint8
 
 const (
+	// SPO is the subject-predicate-object permutation
 	SPO Permutation = iota
+	// POS is the predicate-object-subject permutation
 	POS
+	// OSP is the object-subject-predicate permutation
 	OSP
+	// SOP is the subject-object-predicate permutation
 	SOP
+	// PSO is the predicate-subject-object permutation
 	PSO
+	// OPS is the object-predicate-subject permutation
 	OPS
 )
+
+// Do NOT modify the order of these! Only append to the slice.
+var constants = []string{
+	ld.XSDString,
+	ld.XSDBoolean,
+	ld.XSDInteger,
+	ld.XSDDouble,
+	ld.XSDFloat,
+	ld.XSDDecimal,
+	ld.RDFType,
+	ld.RDFFirst,
+	ld.RDFRest,
+	ld.RDFNil,
+	ld.RDFPlainLiteral,
+	ld.RDFXMLLiteral,
+	ld.RDFJSONLiteral,
+	ld.RDFObject,
+	ld.RDFLangString,
+	ld.RDFList,
+}
+
+var vocabulary map[string]iri = map[string]iri{}
+
+func init() {
+	for i, value := range constants {
+		id := fromUint64(uint64(i))
+		vocabulary[value] = id
+	}
+}
 
 // ErrInvalidInput indicates that a given dataset was invalid
 var ErrInvalidInput = errors.New("Invalid dataset")
 
 // ErrTagScheme indicates that a given URI did not validate the database's tag scheme
-var ErrTagScheme = errors.New("Error during Set: URI did not validate the tag scheme")
+var ErrTagScheme = errors.New("URI did not validate the tag scheme")
 
 // ErrEndOfSolutions is a generic out-of-reuslts signal
 var ErrEndOfSolutions = errors.New("No more solutions")

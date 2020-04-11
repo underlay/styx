@@ -49,14 +49,15 @@ var document2 = `{
 
 var tag = NewPrefixTagScheme("http://example.com/")
 
-func open() *Styx {
-	fmt.Println("removing path", DefaultPath)
-	err := os.RemoveAll(DefaultPath)
+func open() *Store {
+	fmt.Println("removing path", tmpPath)
+	err := os.RemoveAll(tmpPath)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	styx, err := NewStyx(DefaultPath, tag)
+	opts := &Options{Path: tmpPath, TagScheme: tag}
+	styx, err := NewDB(opts)
 	if err != nil {
 		log.Fatalln(err)
 	}

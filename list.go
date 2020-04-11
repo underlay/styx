@@ -41,7 +41,7 @@ func (l *list) Next() {
 }
 
 // List lists the datasets in the database
-func (db *Styx) List(uri string) List {
+func (db *Store) List(uri string) List {
 	iteratorOptions := badger.IteratorOptions{
 		PrefetchValues: false,
 		PrefetchSize:   prefetchSize,
