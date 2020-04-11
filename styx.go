@@ -23,6 +23,16 @@ type TagScheme interface {
 	Parse(uri string) (tag string, fragment string)
 }
 
+type nilTagScheme struct{}
+
+func (nts nilTagScheme) Test(uri string) bool {
+	return false
+}
+
+func (nts nilTagScheme) Parse(uri string) (tag, fragment string) {
+	return
+}
+
 type prefixTagScheme string
 
 // NewPrefixTagScheme creates a tag scheme that tests for the given prefix
@@ -81,6 +91,10 @@ func (s *Store) Close() (err error) {
 func NewStore(options *Options) (*Store, error) {
 	if options == nil {
 		options = &Options{}
+	}
+
+	if options.TagScheme == nil {
+		options.TagScheme = nilTagScheme{}
 	}
 
 	opts := badger.DefaultOptions(options.Path)
