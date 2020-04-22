@@ -88,11 +88,11 @@ func (s *Store) Set(node rdf.Term, dataset []*rdf.Quad) (err error) {
 
 			if j < 3 {
 				terms[j] = id
-			} else if t := quad[j].TermType(); t == rdf.BlankNodeType || t == rdf.DefaultGraphType {
-				source.Graph, err = dictionary.GetID(quad[j], rdf.Default)
-				if err != nil {
-					return
-				}
+				// } else if t := quad[j].TermType(); t == rdf.BlankNodeType || t == rdf.DefaultGraphType {
+				// 	source.Graph, err = dictionary.GetID(quad[j], rdf.Default)
+				// 	if err != nil {
+				// 		return
+				// 	}
 			} else {
 				source.Graph = id
 			}

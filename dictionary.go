@@ -56,9 +56,11 @@ func (s stringDictionary) GetID(term rdf.Term, origin rdf.Term) (ID, error) {
 	t := term.TermType()
 	if origin.TermType() == rdf.NamedNodeType {
 		if t == rdf.BlankNodeType {
-			return ID("<" + origin.Value() + "#_:" + term.Value() + ">"), nil
+			return ID("<" + origin.Value() + "#" + term.Value() + ">"), nil
 		} else if t == rdf.DefaultGraphType {
 			return ID("<" + origin.Value() + "#>"), nil
+		} else if t == rdf.VariableType {
+			return ID("<" + origin.Value() + "?" + term.Value() + ">"), nil
 		}
 	}
 	return ID(term.String()), nil
@@ -71,14 +73,13 @@ func (s stringDictionary) GetTerm(id ID, origin rdf.Term) (rdf.Term, error) {
 	}
 
 	if term.TermType() == rdf.NamedNodeType && origin.TermType() == rdf.NamedNodeType {
-		base := origin.Value() + "#"
-		value, l := term.Value(), len(base)
-		if value[:l] == base {
-			if len(value) == l {
-				return rdf.Default, nil
-			} else if value[l:l+len(blankNodePrefix)] == blankNodePrefix {
-				return rdf.NewBlankNode(value[l+2:]), nil
-			}
+		base, value := origin.Value(), term.Value()
+		if value == base+"#" {
+			return rdf.Default, nil
+		} else if strings.HasPrefix(value, base+"#") {
+			return rdf.NewBlankNode(value[len(base)+1:]), nil
+		} else if strings.HasPrefix(value, base+"?") && len(value) > len(base)+1 {
+			return rdf.NewVariable(value[len(base)+1:]), nil
 		}
 	}
 	return term, nil
@@ -101,7 +102,6 @@ type iriDictionary struct {
 // IriDictionary is a dictionary that compresses IRIs to
 // monotonically-issued base64 identifiers
 var IriDictionary DictionaryFactory = &iriDictionaryFactory{}
-var blankNodePrefix = "_:"
 
 func (factory *iriDictionaryFactory) Init(db *badger.DB, tags TagScheme) (err error) {
 	factory.db = db
@@ -225,8 +225,7 @@ func (d *iriDictionary) GetID(term rdf.Term, origin rdf.Term) (ID, error) {
 			if err != nil {
 				return NIL, err
 			}
-			label := strings.TrimPrefix(fragment, blankNodePrefix)
-			return ID(string(id) + "#" + label), nil
+			return ID(string(id) + "#" + fragment), nil
 		}
 		id, err := d.getIRI(value)
 		return ID(id), err
@@ -235,8 +234,7 @@ func (d *iriDictionary) GetID(term rdf.Term, origin rdf.Term) (ID, error) {
 		if err != nil {
 			return NIL, err
 		}
-		label := strings.TrimPrefix(value, blankNodePrefix)
-		return ID(string(id) + "#" + label), nil
+		return ID(string(id) + "#" + value), nil
 	case *rdf.Literal:
 		escaped := "\"" + escape(value) + "\""
 		datatype, language := term.Datatype(), term.Language()
@@ -254,6 +252,12 @@ func (d *iriDictionary) GetID(term rdf.Term, origin rdf.Term) (ID, error) {
 			return NIL, err
 		}
 		return ID(id + "#"), nil
+	case *rdf.Variable:
+		id, err := d.getIRI(base)
+		if err != nil {
+			return NIL, err
+		}
+		return ID(string(id) + "?" + value), nil
 	default:
 		return NIL, ErrInvalidTerm
 	}
@@ -316,15 +320,28 @@ func (d *iriDictionary) GetTerm(id ID, origin rdf.Term) (rdf.Term, error) {
 		}
 	}
 
-	i := strings.IndexByte(s, '#')
+	i, j := strings.IndexByte(s, '#'), strings.IndexByte(s, '?')
 
 	// IRI?
-	if i == -1 {
+	if i == -1 && j == -1 {
 		t, err := d.getValue(iri(s))
 		if err != nil {
 			return nil, err
 		}
 		return rdf.NewNamedNode(t), nil
+	}
+
+	// Variable?
+	if j != -1 {
+		t, err := d.getValue(iri(s[:j]))
+		if err != nil {
+			return nil, err
+		}
+		value := s[j+1:]
+		if t == base {
+			return rdf.NewVariable(value), nil
+		}
+		return rdf.NewNamedNode(t + "?" + value), nil
 	}
 
 	// Blank node or default graph!
@@ -333,18 +350,14 @@ func (d *iriDictionary) GetTerm(id ID, origin rdf.Term) (rdf.Term, error) {
 		return nil, err
 	}
 
-	label := s[i+1:]
+	value := s[i+1:]
 	if t == base {
-		if label == "" {
+		if value == "" {
 			return rdf.Default, nil
 		}
-		return rdf.NewBlankNode(blankNodePrefix + label), nil
+		return rdf.NewBlankNode(value), nil
 	}
-
-	if label == "" {
-		return rdf.NewNamedNode(t + "#"), nil
-	}
-	return rdf.NewNamedNode(t + "#" + blankNodePrefix + label), nil
+	return rdf.NewNamedNode(t + "#" + value), nil
 }
 
 func (d *iriDictionary) Commit() error {

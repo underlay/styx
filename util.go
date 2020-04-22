@@ -198,6 +198,8 @@ func fromLdQuad(quad *ld.Quad, base string) *rdf.Quad {
 	)
 }
 
+var blankNodePrefix = "_:"
+
 func fromLdNode(node ld.Node, base string) rdf.Term {
 	if node == nil {
 		return rdf.Default

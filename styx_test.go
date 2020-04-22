@@ -55,8 +55,8 @@ func open() *Store {
 	}
 
 	tags := NewPrefixTagScheme("http://example.com/")
-	// config := &Config{Path: tmpPath, TagScheme: tags, Dictionary: IriDictionary}
-	config := &Config{Path: tmpPath, TagScheme: tags, Dictionary: StringDictionary}
+	config := &Config{Path: tmpPath, TagScheme: tags, Dictionary: IriDictionary}
+	// config := &Config{Path: tmpPath, TagScheme: tags, Dictionary: StringDictionary}
 	styx, err := NewStore(config)
 	if err != nil {
 		log.Fatalln(err)
@@ -205,18 +205,18 @@ func TestSimpleQuery(t *testing.T) {
 		return
 	}
 
-	// 	iterator, err := styx.QueryJSONLD(`{
-	// 	"@context": { "@vocab": "http://schema.org/" },
-	// 	"@type": "Person",
-	// 	"birthDate": { "@id": "?:foo" },
-	// 	"name": { "@id": "?:bar" }
-	// }`)
 	iterator, err := styx.QueryJSONLD(`{
 	"@context": { "@vocab": "http://schema.org/" },
 	"@type": "Person",
 	"birthDate": { "@id": "?:foo" },
-	"name": {}
+	"name": { "@id": "?:bar" }
 }`)
+	// 	iterator, err := styx.QueryJSONLD(`{
+	// 	"@context": { "@vocab": "http://schema.org/" },
+	// 	"@type": "Person",
+	// 	"birthDate": { "@id": "?:foo" },
+	// 	"name": {}
+	// }`)
 	defer iterator.Close()
 	if err != nil {
 		t.Error(err)
@@ -299,8 +299,8 @@ func TestIndexQuery(t *testing.T) {
 	v0, b0 := rdf.NewVariable("v0"), rdf.NewBlankNode("b0")
 	quad := rdf.NewQuad(v0, rdf.NewNamedNode("http://schema.org/name"), b0, nil)
 	index := []rdf.Term{
-		// rdf.NewNamedNode("http://example.com/d2#_:b0"),
-		rdf.NewNamedNode("http://example.com/d1#_:b1"),
+		// rdf.NewNamedNode("http://example.com/d2#b0"),
+		rdf.NewNamedNode("http://example.com/d1#b1"),
 		rdf.NewLiteral("Johnny Doe", "", nil),
 	}
 	iterator, err := styx.Query([]*rdf.Quad{quad}, []rdf.Term{v0, b0}, index)
