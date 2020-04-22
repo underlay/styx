@@ -44,15 +44,6 @@ var constants = []string{
 	ld.RDFList,
 }
 
-var vocabulary map[string]iri = map[string]iri{}
-
-func init() {
-	for i, value := range constants {
-		id := fromUint64(uint64(i))
-		vocabulary[value] = id
-	}
-}
-
 // ErrInvalidInput indicates that a given dataset was invalid
 var ErrInvalidInput = errors.New("Invalid dataset")
 
@@ -61,6 +52,9 @@ var ErrTagScheme = errors.New("URI did not validate the tag scheme")
 
 // ErrEndOfSolutions is a generic out-of-reuslts signal
 var ErrEndOfSolutions = errors.New("No more solutions")
+
+// ErrEmptyInterset indicates that a constraint set had an empty join
+var ErrEmptyInterset = errors.New("Empty intersection")
 
 // ErrInvalidDomain means that provided domain included blank nodes that were not in the query
 var ErrInvalidDomain = errors.New("Invalid domain")
@@ -77,7 +71,7 @@ const Format = "application/n-quads"
 // SequenceKey to store the id counter
 var SequenceKey = []byte(":")
 
-// DatasetPrefix keys track the Multihashes of the documents in the database
+// DatasetPrefix keys store the datasets in the database
 const DatasetPrefix = byte('/')
 
 // ValueToIDPrefix keys translate string IRIs to uint64 ids

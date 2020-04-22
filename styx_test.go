@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	ld "github.com/piprate/json-gold/ld"
+	rdf "github.com/underlay/go-rdfjs"
 )
 
 var d1 = "http://example.com/d1"
@@ -47,8 +47,6 @@ var document2 = `{
 	"knows": { "@id": "http://people.com/jane" }
 }`
 
-var tag = NewPrefixTagScheme("http://example.com/")
-
 func open() *Store {
 	fmt.Println("removing path", tmpPath)
 	err := os.RemoveAll(tmpPath)
@@ -56,17 +54,17 @@ func open() *Store {
 		log.Fatalln(err)
 	}
 
-	opts := &Options{Path: tmpPath, TagScheme: tag}
-	styx, err := NewStore(opts)
+	tags := NewPrefixTagScheme("http://example.com/")
+	// config := &Config{Path: tmpPath, TagScheme: tags, Dictionary: IriDictionary}
+	config := &Config{Path: tmpPath, TagScheme: tags, Dictionary: StringDictionary}
+	styx, err := NewStore(config)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	return styx
 }
 
-func TestIngest(t *testing.T) {
-	// Remove old db
-
+func TestSet(t *testing.T) {
 	styx := open()
 	defer styx.Close()
 
@@ -77,6 +75,22 @@ func TestIngest(t *testing.T) {
 	}
 
 	styx.Log()
+}
+
+func TestGet(t *testing.T) {
+	styx := open()
+	defer styx.Close()
+
+	err := styx.SetJSONLD(d1, document1, false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	quads, err := styx.Get(rdf.NewNamedNode(d1))
+	for _, quad := range quads {
+		log.Println(quad.String())
+	}
 }
 
 func TestDelete(t *testing.T) {
@@ -96,13 +110,16 @@ func TestDelete(t *testing.T) {
 		return
 	}
 
-	err = styx.Delete(d1)
-	err = styx.Delete(d2)
+	log.Println("Deleting")
+
+	err = styx.Delete(rdf.NewNamedNode(d1))
+	err = styx.Delete(rdf.NewNamedNode(d2))
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
+	log.Println("Logging again")
 	styx.Log()
 }
 
@@ -124,11 +141,11 @@ func TestList(t *testing.T) {
 
 	styx.Log()
 
-	list := styx.List(d2)
+	list := styx.List(nil)
 	defer list.Close()
 
-	for ; list.Valid(); list.Next() {
-		log.Println(list.URI())
+	for node := list.Next(); node != nil; node = list.Next() {
+		log.Println(node.String())
 	}
 }
 
@@ -188,10 +205,17 @@ func TestSimpleQuery(t *testing.T) {
 		return
 	}
 
+	// 	iterator, err := styx.QueryJSONLD(`{
+	// 	"@context": { "@vocab": "http://schema.org/" },
+	// 	"@type": "Person",
+	// 	"birthDate": { "@id": "?:foo" },
+	// 	"name": { "@id": "?:bar" }
+	// }`)
 	iterator, err := styx.QueryJSONLD(`{
 	"@context": { "@vocab": "http://schema.org/" },
 	"@type": "Person",
-	"birthDate": { }
+	"birthDate": { "@id": "?:foo" },
+	"name": {}
 }`)
 	defer iterator.Close()
 	if err != nil {
@@ -244,9 +268,9 @@ func TestDomainQuery(t *testing.T) {
 		return
 	}
 
-	b0, b1 := ld.NewBlankNode("_:b0"), ld.NewBlankNode("_:b1")
-	quad := ld.NewQuad(b0, ld.NewIRI("http://schema.org/name"), b1, "")
-	iterator, err := styx.Query([]*ld.Quad{quad}, []*ld.BlankNode{b0}, nil)
+	v0, b0 := rdf.NewVariable("v0"), rdf.NewBlankNode("b0")
+	quad := rdf.NewQuad(v0, rdf.NewNamedNode("http://schema.org/name"), b0, nil)
+	iterator, err := styx.Query([]*rdf.Quad{quad}, []rdf.Term{v0}, nil)
 	defer iterator.Close()
 	if err != nil {
 		t.Error(err)
@@ -272,13 +296,14 @@ func TestIndexQuery(t *testing.T) {
 		return
 	}
 
-	b0, b1 := ld.NewBlankNode("_:b0"), ld.NewBlankNode("_:b1")
-	quad := ld.NewQuad(b0, ld.NewIRI("http://schema.org/name"), b1, "")
-	index := []ld.Node{
-		ld.NewIRI("http://example.com/d1#_:b1"),
-		ld.NewLiteral("Johnny Doe", "", ""),
+	v0, b0 := rdf.NewVariable("v0"), rdf.NewBlankNode("b0")
+	quad := rdf.NewQuad(v0, rdf.NewNamedNode("http://schema.org/name"), b0, nil)
+	index := []rdf.Term{
+		// rdf.NewNamedNode("http://example.com/d2#_:b0"),
+		rdf.NewNamedNode("http://example.com/d1#_:b1"),
+		rdf.NewLiteral("Johnny Doe", "", nil),
 	}
-	iterator, err := styx.Query([]*ld.Quad{quad}, []*ld.BlankNode{b0, b1}, index)
+	iterator, err := styx.Query([]*rdf.Quad{quad}, []rdf.Term{v0, b0}, index)
 	defer iterator.Close()
 	if err != nil {
 		t.Error(err)

@@ -7,101 +7,7 @@ import (
 	badger "github.com/dgraph-io/badger/v2"
 )
 
-// A valueCache associates base64 ids with a value.
-type valueCache struct {
-	values map[iri]string
-	ids    map[string]iri
-}
-
-// newValueCache creates a new valueCache
-func newValueCache() valueCache {
-	values := valueCache{
-		values: map[iri]string{"": ""},
-		ids:    map[string]iri{"": ""},
-	}
-
-	for value, id := range vocabulary {
-		values.values[id] = value
-		values.ids[value] = id
-	}
-
-	return values
-}
-
-func (values *valueCache) Commit(id iri, value string, db *badger.DB, t *badger.Txn) (txn *badger.Txn, err error) {
-	txn = t
-	v := []byte(value)
-	idKey := make([]byte, 1+len(id))
-	idKey[0] = IDToValuePrefix
-	copy(idKey[1:], id)
-	txn, err = setSafe(idKey, v, txn, db)
-	if err != nil {
-		return
-	}
-
-	valueKey := make([]byte, 1+len(v))
-	valueKey[0] = ValueToIDPrefix
-	copy(valueKey[1:], v)
-	txn, err = setSafe(valueKey, idKey[1:], t, db)
-
-	return
-}
-
-// Get a Value from the valueCache
-func (values *valueCache) GetValue(id iri, txn *badger.Txn) (value string, err error) {
-	var has bool
-	value, has = values.values[id]
-	if has {
-		return value, nil
-	}
-
-	key := make([]byte, 1+len(id))
-	key[0] = IDToValuePrefix
-	copy(key[1:], id)
-	item, err := txn.Get(key)
-	if err != nil {
-		return "", err
-	}
-
-	var val []byte
-	val, err = item.ValueCopy(nil)
-	if err != nil {
-		return "", err
-	}
-
-	value = string(val)
-	values.values[id] = value
-	values.ids[value] = id
-	return value, nil
-}
-
-func (values *valueCache) GetID(value string, txn *badger.Txn) (id iri, err error) {
-	var has bool
-	id, has = values.ids[value]
-	if has {
-		return
-	}
-
-	v := []byte(value)
-	key := make([]byte, len(v)+1)
-	key[0] = ValueToIDPrefix
-	copy(key[1:], v)
-	item, err := txn.Get(key)
-	if err != nil {
-		return "", err
-	}
-
-	err = item.Value(func(val []byte) error { id = iri(val); return nil })
-	if err != nil {
-		return
-	}
-
-	values.ids[value] = id
-	values.values[id] = value
-	return
-}
-
-type unaryCache map[Term]*[6]uint32
+type unaryCache map[ID]*[6]uint32
 
 // newUnaryCache creates a new IndexCache
 func newUnaryCache() unaryCache {
@@ -122,7 +28,7 @@ func getUnaryIndex(item *badger.Item) (*[6]uint32, error) {
 	})
 }
 
-func (uc unaryCache) getIndex(a Term, txn *badger.Txn) (*[6]uint32, error) {
+func (uc unaryCache) getIndex(a ID, txn *badger.Txn) (*[6]uint32, error) {
 	index, has := uc[a]
 	if has {
 		return index, nil
@@ -150,7 +56,7 @@ func (uc unaryCache) getIndex(a Term, txn *badger.Txn) (*[6]uint32, error) {
 	return uc[a], nil
 }
 
-func (uc unaryCache) Get(p Permutation, a Term, txn *badger.Txn) (uint32, error) {
+func (uc unaryCache) Get(p Permutation, a ID, txn *badger.Txn) (uint32, error) {
 	index, err := uc.getIndex(a, txn)
 	if err == badger.ErrKeyNotFound {
 		return 0, nil
@@ -160,7 +66,7 @@ func (uc unaryCache) Get(p Permutation, a Term, txn *badger.Txn) (uint32, error)
 	return index[p], nil
 }
 
-func (uc unaryCache) Increment(p Permutation, a Term, txn *badger.Txn) error {
+func (uc unaryCache) Increment(p Permutation, a ID, txn *badger.Txn) error {
 	index, err := uc.getIndex(a, txn)
 	if err == badger.ErrKeyNotFound {
 		index = &[6]uint32{}
@@ -172,7 +78,7 @@ func (uc unaryCache) Increment(p Permutation, a Term, txn *badger.Txn) error {
 	return nil
 }
 
-func (uc unaryCache) Decrement(p Permutation, a Term, txn *badger.Txn) error {
+func (uc unaryCache) Decrement(p Permutation, a ID, txn *badger.Txn) error {
 	index, err := uc.getIndex(a, txn)
 	if err == badger.ErrKeyNotFound {
 		index = &[6]uint32{}
@@ -224,7 +130,7 @@ func newBinaryCache() binaryCache {
 	return binaryCache{}
 }
 
-func (bc binaryCache) Get(p Permutation, a, b Term, txn *badger.Txn) (uint32, error) {
+func (bc binaryCache) Get(p Permutation, a, b ID, txn *badger.Txn) (uint32, error) {
 	key := assembleKey(BinaryPrefixes[p], false, a, b)
 	s := string(key)
 	count, has := bc[s]
@@ -249,7 +155,7 @@ func (bc binaryCache) Get(p Permutation, a, b Term, txn *badger.Txn) (uint32, er
 	return bc[s], nil
 }
 
-func (bc binaryCache) delta(p Permutation, a, b Term, increment bool, uc unaryCache, txn *badger.Txn) error {
+func (bc binaryCache) delta(p Permutation, a, b ID, increment bool, uc unaryCache, txn *badger.Txn) error {
 	key := assembleKey(BinaryPrefixes[p], false, a, b)
 	s := string(key)
 	_, has := bc[s]
@@ -302,11 +208,11 @@ func (bc binaryCache) delta(p Permutation, a, b Term, increment bool, uc unaryCa
 	return nil
 }
 
-func (bc binaryCache) Increment(p Permutation, a, b Term, uc unaryCache, txn *badger.Txn) error {
+func (bc binaryCache) Increment(p Permutation, a, b ID, uc unaryCache, txn *badger.Txn) error {
 	return bc.delta(p, a, b, true, uc, txn)
 }
 
-func (bc binaryCache) Decrement(p Permutation, a, b Term, uc unaryCache, txn *badger.Txn) error {
+func (bc binaryCache) Decrement(p Permutation, a, b ID, uc unaryCache, txn *badger.Txn) error {
 	return bc.delta(p, a, b, false, uc, txn)
 }
 

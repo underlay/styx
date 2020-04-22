@@ -4,44 +4,29 @@ import (
 	"fmt"
 	"sort"
 
-	badger "github.com/dgraph-io/badger/v2"
-	ld "github.com/piprate/json-gold/ld"
+	rdf "github.com/underlay/go-rdfjs"
 )
 
 // variable is a collection of constraints on a particular blank node.
 type variable struct {
+	node  rdf.Term
 	cs    constraintSet // Static and incoming constraints
 	edges constraintMap // Outgoing constraints
-	value Term          // Tha val
-	root  Term          // the first possible value for the variable, without joining on other variables
-	size  int           // The total number of constraints
+	value ID            // Tha val
+	root  ID            // the first possible value for the variable, without joining on other variables
 	norm  uint64        // The sum of squares of key counts of constraints
+	score float64       // norm / size
 }
 
-func (u *variable) Term() Term {
+func (u *variable) ID() ID {
 	return u.value
 }
 
-// JSON returns a JSON-LD value for the literal, satisfying the Value interface
-func (u *variable) JSON(origin iri, cache valueCache, txn *badger.Txn) (r interface{}) {
-	return
-}
-
-// NQuads returns the n-quads term for the literal, satisfying the Value interface
-func (u *variable) NQuads(origin iri, cache valueCache, txn *badger.Txn) string {
-
-	return ""
-}
-
-func (u *variable) Node(origin iri, cache valueCache, txn *badger.Txn) ld.Node {
-	return nil
-}
-
 func (u *variable) String() (s string) {
-	if u.value != "" {
+	if u.value != NIL {
 		s += fmt.Sprintf("Value: %s\n", u.value)
 	}
-	if u.root != "" {
+	if u.root != NIL {
 		s += fmt.Sprintf("Root: %s\n", u.root)
 	}
 	// s += fmt.Sprintf("DZ: %s\n", u.DZ.String())
@@ -51,7 +36,8 @@ func (u *variable) String() (s string) {
 		s += fmt.Sprintf("  %d: %s\n", id, cs.String())
 	}
 	s += fmt.Sprintf("Norm: %d\n", u.norm)
-	s += fmt.Sprintf("Size: %d\n", u.size)
+	s += fmt.Sprintf("Size: %d\n", u.cs.Len())
+	s += fmt.Sprintf("Score: %f\n", u.score)
 	return
 }
 
@@ -68,12 +54,12 @@ func (u *variable) Sort() {
 }
 
 // Seek to the next intersect value
-func (u *variable) Seek(value Term) Term {
+func (u *variable) Seek(value ID) ID {
 	return u.cs.Seek(value)
 }
 
 // Next returns the next intersect value
-func (u *variable) Next() Term {
+func (u *variable) Next() ID {
 	return u.cs.Next()
 }
 
@@ -82,7 +68,7 @@ type caches []cache
 
 // vcache is a struct that caches a variable's total state
 type vcache struct {
-	Term
+	ID
 	caches
 }
 
@@ -96,23 +82,23 @@ func (u *variable) save() *vcache {
 	return &vcache{u.value, d}
 }
 
-func (g *Iterator) load(u *variable, v *vcache) {
-	u.value = v.Term
-	for _, d := range v.caches {
+func (g *Iterator) load(u *variable, vc *vcache) {
+	u.value = vc.ID
+	for _, d := range vc.caches {
 		c := u.edges[d.i][d.j]
 
-		node := g.variables[d.i]
+		v := g.variables[d.i]
 		m, n := (c.place+1)%3, (c.place+2)%3
 
 		p, other := c.place, c.place
-		if node == c.values[m] {
-			c.terms[m], p, other = v.Term, m+3, n
-		} else if node == c.values[n] {
-			c.terms[n], p, other = v.Term, n, m
+		if v.node.Equal(c.quad[m]) {
+			c.terms[m], p, other = vc.ID, m+3, n
+		} else if v.node.Equal(c.quad[n]) {
+			c.terms[n], p, other = vc.ID, n, m
 		}
 
-		if c.terms[other] == "" {
-			c.prefix = assembleKey(BinaryPrefixes[p], true, v.Term)
+		if c.terms[other] == NIL {
+			c.prefix = assembleKey(BinaryPrefixes[p], true, vc.ID)
 		} else {
 			c.prefix = assembleKey(TernaryPrefixes[m], true, c.terms[m], c.terms[n])
 		}

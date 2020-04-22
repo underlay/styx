@@ -1,7 +1,6 @@
 package styx
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
@@ -11,43 +10,19 @@ import (
 
 	badger "github.com/dgraph-io/badger/v2"
 	ld "github.com/piprate/json-gold/ld"
+	rdf "github.com/underlay/go-rdfjs"
 )
+
+type ID string
+
+var NIL ID = ""
+
+type iri string
 
 var proc = ld.NewJsonLdProcessor()
 
 var patternInteger = regexp.MustCompile("^[\\-+]?[0-9]+$")
 var patternDouble = regexp.MustCompile("^(\\+|-)?([0-9]+(\\.[0-9]*)?|\\.[0-9]+)([Ee](\\+|-)?[0-9]+)?$")
-
-var patternLiteral = regexp.MustCompile("^\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"")
-var patternNext = regexp.MustCompile("\t|\n|$")
-
-func readValue(val []byte) (Value, int) {
-	ti := patternNext.FindIndex(val)
-	li := patternLiteral.FindIndex(val)
-	if li != nil {
-		r := ti[0] - li[1]
-		l := &literal{v: unescape(string(val[1 : li[1]-1]))}
-		if r == 0 {
-		} else if val[li[1]] == ':' && r > 1 {
-			// Datatype
-			l.d = iri(val[li[1]+1 : ti[0]])
-		} else if val[li[1]] == '@' {
-			// Language
-			l.l = string(val[li[1]+1 : ti[0]])
-			l.d = vocabulary[ld.RDFLangString]
-		} else {
-			return nil, -1
-		}
-		return l, ti[1]
-	}
-
-	v := val[:ti[0]]
-	t := bytes.IndexByte(v, '#')
-	if t == -1 {
-		return iri(v), ti[1]
-	}
-	return &blank{origin: iri(val[:t]), id: string(val[t+1 : ti[0]])}, ti[1]
-}
 
 const max6Byte uint64 = 16777216
 const max8Byte uint64 = 281474976710656
@@ -94,7 +69,7 @@ func unescape(str string) string {
 }
 
 // assembleKey concatenates the passed slices
-func assembleKey(prefix byte, tail bool, terms ...Term) []byte {
+func assembleKey(prefix byte, tail bool, terms ...ID) []byte {
 	l := 0
 	for _, term := range terms {
 		l += 1 + len(term)
@@ -149,7 +124,7 @@ func deleteSafe(key []byte, txn *badger.Txn, db *badger.DB) (*badger.Txn, error)
 type matrix [3][3]uint8
 
 // permute permutes the given ids by the specified permutation
-func (m matrix) permute(permutation Permutation, ids [3]Term) (Term, Term, Term) {
+func (m matrix) permute(permutation Permutation, ids [3]ID) (ID, ID, ID) {
 	row := m[permutation]
 	return ids[row[0]], ids[row[1]], ids[row[2]]
 }
@@ -196,10 +171,103 @@ func getDataset(input interface{}, opts *ld.JsonLdOptions) (dataset *ld.RDFDatas
 
 	switch result := rdf.(type) {
 	case *ld.RDFDataset:
-		dataset = result
+		return result, err
 	default:
 		err = ErrInvalidInput
 	}
 
 	return
+}
+
+func fromLdDataset(dataset *ld.RDFDataset, base string) []*rdf.Quad {
+	result := []*rdf.Quad{}
+	for _, quads := range dataset.Graphs {
+		for _, quad := range quads {
+			result = append(result, fromLdQuad(quad, base))
+		}
+	}
+	return result
+}
+
+func fromLdQuad(quad *ld.Quad, base string) *rdf.Quad {
+	return rdf.NewQuad(
+		fromLdNode(quad.Subject, base),
+		fromLdNode(quad.Predicate, base),
+		fromLdNode(quad.Object, base),
+		fromLdNode(quad.Graph, base),
+	)
+}
+
+func fromLdNode(node ld.Node, base string) rdf.Term {
+	if node == nil {
+		return rdf.Default
+	}
+
+	switch node := node.(type) {
+	case *ld.IRI:
+		if base != "" && strings.HasPrefix(node.Value, base) {
+			return rdf.NewVariable(node.Value[len(base):])
+		}
+		return rdf.NewNamedNode(node.Value)
+	case *ld.BlankNode:
+		if node.Attribute == "" || node.Attribute == "@default" {
+			return rdf.Default
+		} else if node.Attribute[:len(blankNodePrefix)] == blankNodePrefix {
+			return rdf.NewBlankNode(node.Attribute[len(blankNodePrefix):])
+		} else {
+			return rdf.NewBlankNode(node.Attribute)
+		}
+	case *ld.Literal:
+		if node.Language != "" {
+			return rdf.NewLiteral(node.Value, node.Language, rdf.RDFLangString)
+		} else if node.Datatype != "" && node.Datatype != ld.XSDString {
+			return rdf.NewLiteral(node.Value, "", rdf.NewNamedNode(node.Datatype))
+		} else {
+			return rdf.NewLiteral(node.Value, "", nil)
+		}
+	}
+	return nil
+}
+
+func toLdNode(term rdf.Term) ld.Node {
+	switch term := term.(type) {
+	case *rdf.NamedNode:
+		return ld.NewIRI(term.Value())
+	case *rdf.BlankNode:
+		return ld.NewBlankNode(blankNodePrefix + term.Value())
+	case *rdf.Literal:
+		if term.Datatype() == nil {
+			return ld.NewLiteral(term.Value(), "", "")
+		}
+		return ld.NewLiteral(term.Value(), term.Datatype().Value(), term.Language())
+	case *rdf.DefaultGraph:
+		return ld.NewBlankNode("@default")
+	default:
+		return nil
+	}
+}
+
+func toLdQuad(quad *rdf.Quad) *ld.Quad {
+	return &ld.Quad{
+		Subject:   toLdNode(quad.Subject()),
+		Predicate: toLdNode(quad.Predicate()),
+		Object:    toLdNode(quad.Object()),
+		Graph:     toLdNode(quad.Graph()),
+	}
+}
+
+func ToRDFDataset(quads []*rdf.Quad) *ld.RDFDataset {
+	dataset := ld.NewRDFDataset()
+	for _, quad := range quads {
+		label := quad.Graph().String()
+		if label == "" {
+			label = "@default"
+		}
+		if graph, has := dataset.Graphs[label]; has {
+			dataset.Graphs[label] = append(graph, toLdQuad(quad))
+		} else {
+			dataset.Graphs[label] = []*ld.Quad{toLdQuad(quad)}
+		}
+	}
+	return dataset
 }

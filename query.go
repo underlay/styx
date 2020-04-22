@@ -7,7 +7,7 @@ import (
 // i, j, k, l... are int indices
 // p, q, r... are string variable labels
 // u, v, w... are *Variable pointers
-// x, y... are dependency slice indices, where e.g. g.In[p][x] == i
+// x, y... are dependency slice indices, where e.g. iter.In[p][x] == i
 
 func (iter *Iterator) next(i int) (tail int, err error) {
 	var ok bool
@@ -15,20 +15,24 @@ func (iter *Iterator) next(i int) (tail int, err error) {
 	// Okay so we start at the index given to us
 	for i >= 0 {
 		u := iter.variables[i]
-		self := u.value
 		// Try naively getting another value from u
 		u.value = u.Next()
-		if u.value == "" {
+		if u.value == NIL {
 			// It didn't work :-/
 			// This means we reset u, decrement i, and continue
-			u.value = u.Seek(self)
+			u.value = u.Seek(u.root)
+			err = iter.push(u, i, iter.Len())
+			if err != nil {
+				return
+			}
+
 			i--
 			continue
 		}
 
 		// It worked! We have a new value for u.
 		// New we need to propagate it to the rest of the
-		// variables in g.domain[i+1:], if they exist,
+		// variables in iter.domain[i+1:], if they exist,
 		// and make sure they're satisfied.
 
 		// To do that, first push u's value to the rest of the domain
@@ -38,14 +42,14 @@ func (iter *Iterator) next(i int) (tail int, err error) {
 		}
 
 		// Now set the `cursor` variable to our current index.
-		// If we fail to satisfy a variable in d.gomain[i:1:] while
+		// If we fail to satisfy a variable in iter.out[i] while
 		// propagating here, then we'll set cursor to that failure index.
 		cursor := i
 		// Don't recurse on i!
 		iter.blacklist[i] = true
 		for _, j := range iter.out[i] {
 			v := iter.variables[j]
-			// We have to give g.tick(j, ...) a fresh cache here.
+			// We have to give iter.tick(j, ...) a fresh cache here.
 			// TODO: there some memory saving stuff to be done about caches :-/
 			d := make([]*vcache, j)
 
@@ -53,10 +57,10 @@ func (iter *Iterator) next(i int) (tail int, err error) {
 			// into v, we have to "start all over" with v.Seek(v.root).
 			// This might mean that v.Seek(v.root) gives us a non-nil value - that's great!
 			// Then we don't even enter the loop. But if v.Seek(v.root) _doesn't_ give us a
-			// value, then we have to use g.tick() on j to tick j's dependencies into their
+			// value, then we have to use iter.tick() on j to tick j's dependencies into their
 			// next valid state (passing the fresh cache in). That will either irrecovably
 			// fail or give us a new state to try v.Seek(v.root) again on.
-			for v.value = v.Seek(v.root); v.value == ""; v.value = v.Seek(v.root) {
+			for v.value = v.Seek(v.root); v.value == NIL; v.value = v.Seek(v.root) {
 				ok, err = iter.tick(j, i, d)
 				if err != nil {
 					return
@@ -66,7 +70,7 @@ func (iter *Iterator) next(i int) (tail int, err error) {
 			}
 
 			// Cool! Either v.value == nil and there are no more solutions to the query...
-			if v.value == "" {
+			if v.value == NIL {
 				cursor = j
 				break
 			}
@@ -77,26 +81,19 @@ func (iter *Iterator) next(i int) (tail int, err error) {
 				return
 			}
 
-			// One really trick bit is that when we used g.tick(j, i, d) to satisfy v,
+			// One really trick bit is that when we used iter.tick(j, i, d) to satisfy v,
 			// it might have changed some other previous values in the domain.
 			// Specifically, if might have changed:
 			// - variables between i and j that are in out[i]
 			// - variables between i and j that are NOT in out[i] (!!)
 			// It will NOT change any variables before i (or i itself)
 			// So we can't use out[i] here - we have to use the cache d that we passed
-			// into g.tick(j, i, d) to tell which variables were changed.
+			// into iter.tick(j, i, d) to tell which variables were changed.
 			for x, saved := range d[i+1:] {
 				if saved != nil {
-					// This means that w has a new value that needs to be pushed to the
-					// rest of the domain.
 					k := i + 1 + x
-					w := iter.variables[k]
-					err = iter.push(w, k, iter.Len())
-					if err != nil {
-						return
-					}
 
-					// If g.cache[k] hasn't been saved yet, save it here.
+					// If iter.cache[k] hasn't been saved yet, save it here.
 					if iter.cache[k] == nil {
 						iter.cache[k] = saved
 					}
@@ -106,7 +103,7 @@ func (iter *Iterator) next(i int) (tail int, err error) {
 
 		iter.blacklist[i] = false
 
-		// Cool - either we completed the loop over g.out[i] naturally,
+		// Cool - either we completed the loop over iter.out[i] naturally,
 		// or we broke out early and set cursor = j. Check for that here:
 		if cursor == i {
 			// Success!! We brought all of the variables before and after i into
@@ -116,7 +113,7 @@ func (iter *Iterator) next(i int) (tail int, err error) {
 			return
 		}
 
-		// Oh well - we broke out early at cursor = j, because the v.Seek / g.tick(j...)
+		// Oh well - we broke out early at cursor = j, because the v.Seek / iter.tick(j...)
 		// loop didn't give us a result. Now we restore the values that changed...
 		err = iter.restore(iter.cache[:cursor+1], iter.Len())
 		if err != nil {
@@ -150,7 +147,7 @@ func clear(delta []*vcache) {
 func (iter *Iterator) tick(i, min int, delta []*vcache) (ok bool, err error) {
 	next := make([]*vcache, i)
 
-	// The biggest outer loop is walking backwards over g.In[i]
+	// The biggest outer loop is walking backwards over iter.In[i]
 	x := len(iter.in[i])
 	for x > 0 {
 		j := iter.in[i][x-1]
@@ -166,16 +163,15 @@ func (iter *Iterator) tick(i, min int, delta []*vcache) (ok bool, err error) {
 
 		self := v.save()
 
-		if v.value = v.Next(); v.value == "" {
+		if v.value = v.Next(); v.value == NIL {
 			// That sucks. Now we need to restore the value
 			// that was changed and decrement x.
-			v.value = self.Term
-			v.Seek(v.value)
+			v.value = v.Seek(self.ID)
 			x--
 		} else {
 			// We got a non-nil value for v, so now we
 			// propagate between j and i, then crawl forward
-			// over the indices in g.Out[q] that are less than i
+			// over the indices in iter.Out[q] that are less than i
 			// and seek to their new values.
 
 			// Propagate up to but not including i
@@ -202,7 +198,7 @@ func (iter *Iterator) tick(i, min int, delta []*vcache) (ok bool, err error) {
 				d := make([]*vcache, k)
 
 				// Here we keep seeking and ticking until we have a real value.
-				for w.value = w.Seek(w.root); w.value == ""; w.value = w.Seek(w.root) {
+				for w.value = w.Seek(w.root); w.value == NIL; w.value = w.Seek(w.root) {
 					if ok, err = iter.tick(k, min, d); err != nil {
 						return
 					} else if ok {
@@ -214,7 +210,7 @@ func (iter *Iterator) tick(i, min int, delta []*vcache) (ok bool, err error) {
 					}
 				}
 
-				if w.value == "" {
+				if w.value == NIL {
 					// We were unable to complete the crawl.
 					// We've already reset our state.
 					// This is how far we got:
@@ -225,12 +221,14 @@ func (iter *Iterator) tick(i, min int, delta []*vcache) (ok bool, err error) {
 				// We got a real value for w! Now we propagate the affected values
 				// through i and stash them into next if they're not there already,
 				// and then continue with the tick-crawl.
-				if err = iter.push(w, k, i); err != nil {
+				err = iter.push(w, k, i)
+				if err != nil {
 					return
 				}
 				for l, saved := range d {
 					if saved != nil {
-						if err = iter.push(iter.variables[l], l, i); err != nil {
+						err = iter.push(iter.variables[l], l, i)
+						if err != nil {
 							return
 						}
 						if next[l] == nil {
@@ -250,13 +248,15 @@ func (iter *Iterator) tick(i, min int, delta []*vcache) (ok bool, err error) {
 				// Hooray!
 				// Now here we need to push every affected value
 				// through to the rest of the domain
-				delta[j] = self
+				// delta[j] = self
+				next[j] = self
 				for l, saved := range next {
 					if saved != nil {
 						if delta[l] == nil {
 							delta[l] = saved
 						}
-						if err = iter.push(iter.variables[l], i, iter.Len()); err != nil {
+						err = iter.push(iter.variables[l], i, iter.Len())
+						if err != nil {
 							return
 						}
 					}
@@ -265,7 +265,8 @@ func (iter *Iterator) tick(i, min int, delta []*vcache) (ok bool, err error) {
 			}
 
 			// This means we reset (all) those affected to their previous state
-			if err = iter.restore(next, i); err != nil {
+			err = iter.restore(next, i)
+			if err != nil {
 				return
 			}
 		}
@@ -300,17 +301,16 @@ func (iter *Iterator) push(u *variable, min, max int) (err error) {
 				// That means we can freely access their iterators!
 				// In this case, all the iterators for the outgoing u.d2s have
 				// values that are the counts (uint32) of them *and their dual*.
-				// This is insanely elegant...
 
 				i := c.place
 
-				node := iter.variables[j]
+				v := iter.variables[j]
 				m, n := (i+1)%3, (i+2)%3
 
 				place := i
-				if node == c.values[m] {
+				if v.node.Equal(c.quad[m]) {
 					place = m
-				} else if node == c.values[n] {
+				} else if v.node.Equal(c.quad[n]) {
 					place = n
 				}
 
@@ -344,7 +344,7 @@ func (iter *Iterator) push(u *variable, min, max int) (err error) {
 
 			// Clear the value, like I promised you earlier.
 			w := iter.variables[j]
-			w.value = ""
+			w.value = NIL
 			w.Sort()
 		}
 	}

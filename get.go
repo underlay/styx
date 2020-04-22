@@ -1,58 +1,44 @@
 package styx
 
 import (
-	badger "github.com/dgraph-io/badger/v2"
-	ld "github.com/piprate/json-gold/ld"
+	rdf "github.com/underlay/go-rdfjs"
 )
 
 // Get a dataset from the database
-func (db *Store) Get(uri string) ([]*ld.Quad, error) {
-	txn := db.Badger.NewTransaction(true)
-	defer func() { txn.Discard() }()
+func (s *Store) Get(node rdf.Term) ([]*rdf.Quad, error) {
+	dictionary := s.Config.Dictionary.Open(false)
+	defer func() { dictionary.Commit() }()
 
-	key := make([]byte, 1+len(uri))
-	key[0] = DatasetPrefix
-	copy(key[1:], uri)
-
-	item, err := txn.Get(key)
+	id, err := dictionary.GetID(node, rdf.Default)
 	if err != nil {
 		return nil, err
 	}
 
-	quads, err := db.get(item)
+	quads, err := s.Config.QuadStore.Get(id)
 	if err != nil {
 		return nil, err
 	}
 
-	values := newValueCache()
-	origin, err := values.GetID(uri, txn)
-	dataset := make([]*ld.Quad, len(quads))
+	dataset := make([]*rdf.Quad, len(quads))
 	for i, quad := range quads {
-		dataset[i] = &ld.Quad{
-			Subject:   quad[0].Node(origin, values, txn),
-			Predicate: quad[1].Node(origin, values, txn),
-			Object:    quad[2].Node(origin, values, txn),
-			Graph:     quad[3].Node(origin, values, txn),
+		s, err := dictionary.GetTerm(quad[0], node)
+		if err != nil {
+			return nil, err
 		}
+		p, err := dictionary.GetTerm(quad[1], node)
+		if err != nil {
+			return nil, err
+		}
+		o, err := dictionary.GetTerm(quad[2], node)
+		if err != nil {
+			return nil, err
+		}
+		g, err := dictionary.GetTerm(quad[3], node)
+		if err != nil {
+			return nil, err
+		}
+		dataset[i] = rdf.NewQuad(s, p, o, g)
 	}
 
 	return dataset, nil
-}
-
-func (db *Store) get(item *badger.Item) (quads [][4]Value, err error) {
-	quads = make([][4]Value, 0)
-	err = item.Value(func(val []byte) error {
-		for i := 0; i < len(val); {
-			quad := [4]Value{}
-			for j := 0; j < 4; j++ {
-				v, l := readValue(val[i:])
-				quad[j] = v
-				i += l
-			}
-			quads = append(quads, quad)
-		}
-		return nil
-	})
-
-	return
 }

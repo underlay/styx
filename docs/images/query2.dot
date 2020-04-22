@@ -1,9 +1,0 @@
-digraph G {
-  alice [label="http://example.org/alice#me" shape=rect];
-  bob [label=""];
-  lisa [label=""];
-
-  bob -> lisa [label="foaf:topic_interest"];
-  bob -> alice [label="foaf:knows"];
-  lisa -> "" [label="dcterms:title"];
-}

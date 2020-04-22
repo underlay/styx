@@ -6,131 +6,270 @@ import (
 	"strings"
 
 	badger "github.com/dgraph-io/badger/v2"
-	ld "github.com/piprate/json-gold/ld"
+	rdf "github.com/underlay/go-rdfjs"
 )
 
 // An Iterator exposes Next and Seek operations
 type Iterator struct {
-	graph     [][]Value
-	constants []*constraint
-	variables []*variable
-	domain    []*ld.BlankNode
-	pivot     int
-	ids       map[string]int
-	cache     []*vcache
-	blacklist []bool
-	in        [][]int
-	out       [][]int
-	values    valueCache
-	binary    binaryCache
-	unary     unaryCache
-	txn       *badger.Txn
+	query      []*rdf.Quad
+	constants  []*constraint
+	variables  []*variable
+	domain     []rdf.Term
+	pivot      int
+	bot        bool
+	top        bool
+	empty      bool
+	ids        map[string]int
+	cache      []*vcache
+	blacklist  []bool
+	in         [][]int
+	out        [][]int
+	binary     binaryCache
+	unary      unaryCache
+	tag        TagScheme
+	txn        *badger.Txn
+	dictionary Dictionary
 }
 
 // Collect calls Next(nil) on the iterator until there are no more solutions,
 // and returns all the results in a slice.
-func (iter *Iterator) Collect() [][]ld.Node {
-	result := [][]ld.Node{}
-	var err error
-	for d := iter.domain; err == nil; d, err = iter.Next(nil) {
-		index := make([]ld.Node, len(d))
+func (iter *Iterator) Collect() ([][]rdf.Term, error) {
+	if iter.empty {
+		return nil, nil
+	}
+
+	result := [][]rdf.Term{}
+	for d, err := iter.Next(nil); d != nil; d, err = iter.Next(nil) {
+		if err != nil {
+			return nil, err
+		}
+
+		index := make([]rdf.Term, len(d))
 		for i, b := range d {
 			index[i] = iter.Get(b)
 		}
 		result = append(result, index)
 	}
-	return result
+	return result, nil
 }
 
-// Log pretty-prints the contents of the database
+// Log pretty-prints the iterator
 func (iter *Iterator) Log() {
-	domain := iter.Domain()
-	attributes := make([]string, len(domain))
-	for i, node := range domain {
-		attributes[i] = node.Attribute
+	if iter.empty {
+		return
 	}
-	log.Println(strings.Join(attributes, "\t"))
-	for _, path := range iter.Collect() {
+
+	domain := iter.Domain()
+	values := make([]string, len(domain))
+	for i, node := range domain {
+		values[i] = node.String()
+	}
+	log.Println(strings.Join(values, "\t"))
+
+	for d, err := iter.Next(nil); d != nil; d, err = iter.Next(nil) {
+		if err != nil {
+			return
+		}
+
 		values := make([]string, len(domain))
-		start := len(domain) - len(path)
-		for i, node := range path {
-			values[start+i] = node.GetValue()
+		start := len(domain) - len(d)
+		for i, node := range d {
+			values[start+i] = node.String()
 		}
 		log.Println(strings.Join(values, "\t"))
 	}
 }
 
-// Graph returns a []*ld.Quad representation of the iterator's current value
-func (iter *Iterator) Graph() []*ld.Quad {
-	graph := make([]*ld.Quad, len(iter.graph))
-	for i, quad := range iter.graph {
-		graph[i] = ld.NewQuad(
-			quad[0].Node("", iter.values, iter.txn),
-			quad[1].Node("", iter.values, iter.txn),
-			quad[2].Node("", iter.values, iter.txn),
-			"",
+// Graph returns a []*rdfjs.Quad representation of the iterator's current value
+func (iter *Iterator) Graph() []*rdf.Quad {
+	if iter.empty {
+		return nil
+	}
+
+	graph := make([]*rdf.Quad, len(iter.query))
+	for i, quad := range iter.query {
+		graph[i] = rdf.NewQuad(
+			iter.variate(quad[0]),
+			iter.variate(quad[1]),
+			iter.variate(quad[2]),
+			rdf.Default,
 		)
 	}
 	return graph
 }
 
+func (iter *Iterator) variate(term rdf.Term) rdf.Term {
+	switch term := term.(type) {
+	case *rdf.Variable:
+		return iter.Get(term)
+	case *rdf.BlankNode:
+		return iter.Get(term)
+	default:
+		return term
+	}
+}
+
 // Get the value for a particular blank node
-func (iter *Iterator) Get(node *ld.BlankNode) (n ld.Node) {
-	if node == nil {
-		return
+func (iter *Iterator) Get(node rdf.Term) rdf.Term {
+	if iter.empty || node == nil {
+		return nil
 	}
 
-	i, has := iter.ids[node.Attribute]
+	var value string
+	switch node := node.(type) {
+	case *rdf.Variable:
+		value = node.String()
+	case *rdf.BlankNode:
+		value = node.String()
+	default:
+		return node
+	}
+
+	i, has := iter.ids[value]
 	if !has {
-		return
+		return nil
 	}
 
 	v := iter.variables[i]
-	if v.value == "" {
-		return
+	if v.value == NIL {
+		return nil
 	}
 
-	value, _ := readValue([]byte(v.value))
-	return value.Node("", iter.values, iter.txn)
+	n, _ := iter.dictionary.GetTerm(v.value, rdf.Default)
+	return n
 }
 
 // Domain returns the total ordering of variables used by the iterator
-func (iter *Iterator) Domain() []*ld.BlankNode {
-	domain := make([]*ld.BlankNode, len(iter.domain))
+func (iter *Iterator) Domain() []rdf.Term {
+	if iter.empty {
+		return nil
+	}
+
+	domain := make([]rdf.Term, len(iter.domain))
 	copy(domain, iter.domain)
 	return domain
 }
 
 // Index returns the iterator's current value as an ordered slice of ld.Nodes
-func (iter *Iterator) Index() []ld.Node {
-	index := make([]ld.Node, len(iter.variables))
+func (iter *Iterator) Index() []rdf.Term {
+	if iter.empty {
+		return nil
+	}
+
+	index := make([]rdf.Term, len(iter.variables))
 	for i, v := range iter.variables {
-		value, _ := readValue([]byte(v.value))
-		index[i] = value.Node("", iter.values, iter.txn)
+		index[i], _ = iter.dictionary.GetTerm(v.value, rdf.Default)
 	}
 	return index
 }
 
 // Next advances the iterator to the next result that differs in the given node.
 // If nil is passed, the last node in the domain is used.
-func (iter *Iterator) Next(node *ld.BlankNode) ([]*ld.BlankNode, error) {
-	i := iter.Len() - 1
-	if node != nil {
-		i = iter.ids[node.Attribute]
-	}
-	tail, err := iter.next(i)
-	if err == badger.ErrKeyNotFound {
-		err = ErrEndOfSolutions
+func (iter *Iterator) Next(node rdf.Term) ([]rdf.Term, error) {
+	if iter.top || iter.empty {
+		return nil, nil
 	}
 
+	if iter.bot {
+		iter.bot = false
+		return iter.Index(), nil
+	}
+
+	i := iter.pivot - 1
+	if node != nil {
+		value := node.String()
+		index, has := iter.ids[value]
+		if has {
+			i = index
+		}
+	} else if iter.pivot == 0 {
+		return nil, nil
+	}
+
+	tail, err := iter.next(i)
 	if err != nil {
 		return nil, err
 	}
 
-	if tail == iter.Len() {
-		return nil, ErrEndOfSolutions
+	l := iter.Len()
+	if tail == l {
+		iter.top = true
+		return nil, nil
 	}
-	return iter.domain[tail:], nil
+
+	result := make([]rdf.Term, l-tail)
+	for i, u := range iter.variables[tail:] {
+		result[i], _ = iter.dictionary.GetTerm(u.value, rdf.Default)
+	}
+
+	return result, nil
+}
+
+// Seek advances the iterator to the first result
+// greater than or equal to the given index path
+func (iter *Iterator) Seek(index []rdf.Term) (err error) {
+	if iter.empty {
+		return
+	}
+
+	iter.bot = true
+	iter.top = false
+
+	terms := make([]ID, len(index))
+	for i, node := range index {
+		terms[i], err = iter.dictionary.GetID(node, rdf.Default)
+		if err != nil {
+			return err
+		}
+	}
+
+	l := iter.Len()
+	var ok bool
+
+	for _, u := range iter.variables {
+		u.value = u.root
+	}
+
+	for i, u := range iter.variables {
+		var root ID
+		if i < len(terms) && u.root < terms[i] {
+			root = terms[i]
+		} else if u.value == NIL {
+			root = u.root
+		}
+
+		if root != NIL {
+			for u.value = u.Seek(root); u.value == NIL; u.value = u.Seek(root) {
+				ok, err = iter.tick(i, 0, iter.cache)
+				if err != nil || !ok {
+					return
+				}
+				if !ok {
+					iter.top = true
+					return
+				}
+			}
+		}
+
+		// We've got a non-nil value for u!
+		err = iter.push(u, i, l)
+		if err != nil {
+			return err
+		}
+		for j, saved := range iter.cache[:i] {
+			if saved != nil {
+				iter.cache[j] = nil
+				if i+1 < l {
+					err = iter.push(iter.variables[j], i, l)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+
+	return
 }
 
 // Close the iterator
@@ -143,6 +282,9 @@ func (iter *Iterator) Close() {
 		}
 		if iter.txn != nil {
 			iter.txn.Discard()
+		}
+		if iter.dictionary != nil {
+			iter.dictionary.Commit()
 		}
 	}
 }
@@ -163,10 +305,8 @@ func (iter *Iterator) Swap(a, b int) {
 	// The things it _does_ mutate are .variables and .domain.
 	// It does NOT mutate .ids or the constraints, which is how we
 	/// construct the transformation maps.
-	if iter.pivot < a && iter.pivot < b {
-		iter.variables[a], iter.variables[b] = iter.variables[b], iter.variables[a]
-		iter.domain[a], iter.domain[b] = iter.domain[b], iter.domain[a]
-	}
+	iter.variables[a], iter.variables[b] = iter.variables[b], iter.variables[a]
+	iter.domain[a], iter.domain[b] = iter.domain[b], iter.domain[a]
 }
 
 // TODO: put more thought into the sorting heuristic.
@@ -174,8 +314,23 @@ func (iter *Iterator) Swap(a, b int) {
 // increasing order of their length-normalized sum of
 // the squares of the counts of all their constraints (of any degree).
 func (iter *Iterator) Less(a, b int) bool {
+	// So pivot right now is the length of the provided domain.
+	// We keep those in order...
+	if a < iter.pivot {
+		return a < b
+	} else if b < iter.pivot {
+		return false
+	}
+
 	A, B := iter.variables[a], iter.variables[b]
-	return (float32(A.norm) / float32(A.size)) < (float32(B.norm) / float32(B.size))
+	at, bt := A.node.TermType(), B.node.TermType()
+	if at == rdf.VariableType && bt == rdf.BlankNodeType {
+		return true
+	} else if at == rdf.BlankNodeType && bt == rdf.VariableType {
+		return false
+	}
+
+	return A.score < B.score
 }
 
 func (iter *Iterator) insertDZ(u *variable, c *constraint, txn *badger.Txn) (err error) {
@@ -260,9 +415,9 @@ func (iter *Iterator) insertD2(u, v *variable, c *constraint, txn *badger.Txn) (
 	}
 
 	var p Permutation
-	if c.terms[(c.place+1)%3] == "" {
+	if c.terms[(c.place+1)%3] == NIL {
 		p = (c.place + 2) % 3
-	} else if c.terms[(c.place+2)%3] == "" {
+	} else if c.terms[(c.place+2)%3] == NIL {
 		p = ((c.place + 1) % 3) + 3
 	}
 

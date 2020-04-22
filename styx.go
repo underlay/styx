@@ -8,7 +8,9 @@ import (
 	"strings"
 
 	badger "github.com/dgraph-io/badger/v2"
+	"github.com/google/uuid"
 	ld "github.com/piprate/json-gold/ld"
+	rdf "github.com/underlay/go-rdfjs"
 )
 
 // DefaultPath is the default path for the Badger database
@@ -25,20 +27,13 @@ type TagScheme interface {
 
 type nilTagScheme struct{}
 
-func (nts nilTagScheme) Test(uri string) bool {
-	return false
-}
-
-func (nts nilTagScheme) Parse(uri string) (tag, fragment string) {
-	return
-}
+func (nts nilTagScheme) Test(uri string) bool                    { return false }
+func (nts nilTagScheme) Parse(uri string) (tag, fragment string) { return }
 
 type prefixTagScheme string
 
 // NewPrefixTagScheme creates a tag scheme that tests for the given prefix
-func NewPrefixTagScheme(prefix string) TagScheme {
-	return prefixTagScheme(prefix)
-}
+func NewPrefixTagScheme(prefix string) TagScheme { return prefixTagScheme(prefix) }
 
 func (pts prefixTagScheme) Test(uri string) bool {
 	return strings.Index(uri, string(pts)) == 0 && strings.Index(uri, "#") >= len(pts)
@@ -55,16 +50,18 @@ func (pts prefixTagScheme) Parse(uri string) (tag, fragment string) {
 
 // A Store is a database instance
 type Store struct {
-	Badger   *badger.DB
-	Sequence *badger.Sequence
-	Options  *Options
+	Badger *badger.DB
+	// Sequence *badger.Sequence
+	Config *Config
 }
 
-// Options are the initialization options passed to Styx
-type Options struct {
-	Path      string
-	TagScheme TagScheme
-	Canonize  bool
+// Config contains the initialization options passed to Styx
+type Config struct {
+	Path       string
+	TagScheme  TagScheme
+	Canonize   bool
+	Dictionary DictionaryFactory
+	QuadStore  QuadStore
 }
 
 // Close the database
@@ -72,12 +69,14 @@ func (s *Store) Close() (err error) {
 	if s == nil {
 		return
 	}
-	if s.Sequence != nil {
-		err = s.Sequence.Release()
+
+	if s.Config.Dictionary != nil {
+		err = s.Config.Dictionary.Close()
 		if err != nil {
 			return
 		}
 	}
+
 	if s.Badger != nil {
 		err = s.Badger.Close()
 		if err != nil {
@@ -88,21 +87,17 @@ func (s *Store) Close() (err error) {
 }
 
 // NewStore opens a styx database
-func NewStore(options *Options) (*Store, error) {
-	if options == nil {
-		options = &Options{}
+func NewStore(config *Config) (*Store, error) {
+	if config == nil {
+		config = &Config{}
 	}
 
-	if options.TagScheme == nil {
-		options.TagScheme = nilTagScheme{}
-	}
-
-	opts := badger.DefaultOptions(options.Path)
-	if options.Path == "" {
+	opts := badger.DefaultOptions(config.Path)
+	if config.Path == "" {
 		opts = opts.WithInMemory(true)
 		log.Println("Opening in-memory badger database")
 	} else {
-		log.Println("Opening badger database at", options.Path)
+		log.Println("Opening badger database at", config.Path)
 	}
 
 	db, err := badger.Open(opts)
@@ -110,34 +105,23 @@ func NewStore(options *Options) (*Store, error) {
 		return nil, err
 	}
 
-	txn := db.NewTransaction(true)
-	_, err = txn.Get(SequenceKey)
-	if err == badger.ErrKeyNotFound {
-		// Yay! Now we have to write an initial one
-		val := make([]byte, 8)
-		binary.BigEndian.PutUint64(val, 128)
-		err = txn.Set(SequenceKey, val)
-		if err != nil {
-			txn.Discard()
-			return nil, err
-		}
-		err = txn.Commit()
-		if err != nil {
-			return nil, err
-		}
-	} else if err != nil {
-		return nil, err
+	if config.TagScheme == nil {
+		config.TagScheme = nilTagScheme{}
 	}
 
-	seq, err := db.GetSequence(SequenceKey, SequenceBandwidth)
-	if err != nil {
-		return nil, err
+	if config.Dictionary == nil {
+		config.Dictionary = StringDictionary
 	}
+
+	if config.QuadStore == nil {
+		config.QuadStore = MakeBadgerStore(db)
+	}
+
+	config.Dictionary.Init(db, config.TagScheme)
 
 	return &Store{
-		Options:  options,
-		Badger:   db,
-		Sequence: seq,
+		Config: config,
+		Badger: db,
 	}, nil
 }
 
@@ -145,26 +129,35 @@ func NewStore(options *Options) (*Store, error) {
 func (s *Store) QueryJSONLD(query interface{}) (*Iterator, error) {
 	opts := ld.NewJsonLdOptions("")
 	opts.ProduceGeneralizedRdf = true
+	id, err := uuid.NewRandom()
+	if err != nil {
+		return nil, err
+	}
+	base := "urn:uuid:" + id.String() + "?"
+	opts.ExpandContext = map[string]interface{}{"?": base}
 	dataset, err := getDataset(query, opts)
 	if err != nil {
 		return nil, err
 	}
-	return s.Query(dataset.Graphs["@default"], nil, nil)
+	quads := fromLdDataset(dataset, base)
+	return s.Query(quads, nil, nil)
 }
 
 // Query satisfies the Styx interface
-func (s *Store) Query(pattern []*ld.Quad, domain []*ld.BlankNode, index []ld.Node) (*Iterator, error) {
+func (s *Store) Query(pattern []*rdf.Quad, domain []rdf.Term, index []rdf.Term) (*Iterator, error) {
 	txn := s.Badger.NewTransaction(false)
-	g, err := NewIterator(pattern, domain, index, s.Options.TagScheme, txn)
+	dictionary := s.Config.Dictionary.Open(false)
+	iter, err := newIterator(pattern, domain, index, s.Config.TagScheme, txn, dictionary)
 	if err != nil {
-		g.Close()
+		iter.Close()
 	}
 
-	if err == badger.ErrKeyNotFound {
-		err = ErrEndOfSolutions
+	if err == badger.ErrKeyNotFound || err == ErrEmptyInterset {
+		err = nil
+		iter.top = true
 	}
 
-	return g, err
+	return iter, err
 }
 
 // Log will print the *entire database contents* to log
@@ -223,7 +216,7 @@ func (s *Store) Log() {
 				binary.BigEndian.Uint32(val),
 			)
 		} else if prefix == DatasetPrefix {
-			log.Printf("Dataset: <%s>\n", string(key[1:]))
+			log.Printf("Dataset: %s\n", string(key[1:]))
 		} else if prefix == UnaryPrefix {
 			if len(val) != 24 {
 				log.Println("Unexpected index value", val)

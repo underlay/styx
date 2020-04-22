@@ -5,102 +5,106 @@ import (
 
 	badger "github.com/dgraph-io/badger/v2"
 	ld "github.com/piprate/json-gold/ld"
+	rdf "github.com/underlay/go-rdfjs"
 )
 
 // SetJSONLD sets a JSON-LD document
-func (db *Store) SetJSONLD(uri string, input interface{}, canonize bool) error {
+func (s *Store) SetJSONLD(uri string, input interface{}, canonize bool) error {
+	var node rdf.Term = rdf.Default
+	if uri != "" {
+		node = rdf.NewNamedNode(uri)
+	}
+
 	opts := ld.NewJsonLdOptions(uri)
 	dataset, err := getDataset(input, opts)
 	if err != nil {
 		return err
 	}
-	return db.SetDataset(uri, dataset, canonize)
-}
 
-// SetDataset sets a piprate/json-gold dataset struct
-func (db *Store) SetDataset(uri string, dataset *ld.RDFDataset, canonize bool) error {
-	var quads []*ld.Quad
 	if canonize {
 		na := ld.NewNormalisationAlgorithm(Algorithm)
 		na.Normalize(dataset)
-		quads = na.Quads()
-	} else {
-		quads = make([]*ld.Quad, 0)
-		for _, graph := range dataset.Graphs {
-			quads = append(quads, graph...)
+
+		quads := []*rdf.Quad{}
+		for _, quad := range na.Quads() {
+			quads = append(quads, fromLdQuad(quad, ""))
 		}
+
+		return s.Set(node, quads)
 	}
-	return db.Set(uri, quads)
+	return s.Set(node, fromLdDataset(dataset, ""))
 }
 
 // Set is the entrypoint to inserting stuff
-func (db *Store) Set(uri string, dataset []*ld.Quad) (err error) {
-	if uri != "" && !(strings.Index(uri, "#") == -1 && db.Options.TagScheme.Test(uri+"#")) {
-		return ErrTagScheme
+func (s *Store) Set(node rdf.Term, dataset []*rdf.Quad) (err error) {
+	if node.TermType() == rdf.NamedNodeType {
+		uri := node.Value()
+		if strings.Index(uri, "#") != -1 || !s.Config.TagScheme.Test(uri+"#") {
+			return ErrTagScheme
+		}
 	}
 
-	txn := db.Badger.NewTransaction(true)
-	defer func() { txn.Discard() }()
+	dictionary := s.Config.Dictionary.Open(true)
+	txn := s.Badger.NewTransaction(true)
+	defer func() { txn.Discard(); dictionary.Commit() }()
 
-	values := newValueCache()
 	uc := newUnaryCache()
 	bc := newBinaryCache()
 
-	// Check to see if this key is already in the database
-	datasetKey := make([]byte, len(uri)+1)
-	datasetKey[0] = DatasetPrefix
-	copy(datasetKey[1:], uri)
-	var datasetItem *badger.Item
-	datasetItem, err = txn.Get(datasetKey)
-	if err == badger.ErrKeyNotFound {
-	} else if err != nil {
-		return
-	} else if txn, err = db.delete(uri, datasetItem, values, txn); err != nil {
+	origin, err := dictionary.GetID(node, rdf.Default)
+	if err != nil {
 		return
 	}
 
-	var origin iri
-	origin, txn, err = getIRI(uri, values, txn, db.Sequence, db.Badger)
+	quads, err := s.Config.QuadStore.Get(origin)
+	if err != nil && err != ErrNotFound {
+		return
+	} else if quads != nil {
+		txn, err = deleteQuads(origin, quads, dictionary, txn, s.Badger)
+		if err != nil {
+			return
+		}
+	}
 
-	quads := make([]byte, 0)
+	quads = make([][4]ID, len(dataset))
+
+	var terms [3]ID
+	var id ID
+	var item *badger.Item
+	var val []byte
 	for i, quad := range dataset {
 		source := &Statement{
-			Origin: origin,
-			Index:  uint64(i),
+			Base:  iri(origin),
+			Index: uint64(i),
 		}
 
-		terms := [3]Term{}
 		for j := Permutation(0); j < 4; j++ {
-			node := getNode(quad, j)
-			var t Value
-			t, txn, err = nodeToValue(node, origin, values, db.Options.TagScheme, txn, db.Sequence, db.Badger)
+			id, err = dictionary.GetID(quad[j], node)
 			if err != nil {
 				return
 			}
 
-			if j == 3 {
-				source.Graph = t
-			} else {
-				terms[j] = t.Term()
-			}
+			quads[i][j] = id
 
-			quads = append(quads, t.Term()...)
-			if j == 3 {
-				quads = append(quads, '\n')
+			if j < 3 {
+				terms[j] = id
+			} else if t := quad[j].TermType(); t == rdf.BlankNodeType || t == rdf.DefaultGraphType {
+				source.Graph, err = dictionary.GetID(quad[j], rdf.Default)
+				if err != nil {
+					return
+				}
 			} else {
-				quads = append(quads, '\t')
+				source.Graph = id
 			}
 		}
 
-		var item *badger.Item
-		for permutation := Permutation(0); permutation < 3; permutation++ {
-			a, b, c := major.permute(permutation, terms)
-			key := assembleKey(TernaryPrefixes[permutation], false, a, b, c)
+		for p := Permutation(0); p < 3; p++ {
+			a, b, c := major.permute(p, terms)
+			key := assembleKey(TernaryPrefixes[p], false, a, b, c)
 			item, err = txn.Get(key)
-			var val []byte
 			if err == badger.ErrKeyNotFound {
 				// Since this is a new key we have to increment two binary keys.
-				ab, ba := permutation, ((permutation+1)%3)+3
+				ab, ba := p, ((p+1)%3)+3
 				err = bc.Increment(ab, a, b, uc, txn)
 				if err != nil {
 					return
@@ -109,22 +113,22 @@ func (db *Store) Set(uri string, dataset []*ld.Quad) (err error) {
 				if err != nil {
 					return
 				}
-				if permutation == 0 {
-					val = []byte(source.Marshal(values, txn))
+				if p == 0 {
+					val = []byte(source.String())
 				}
-				txn, err = setSafe(key, val, txn, db.Badger)
+				txn, err = setSafe(key, val, txn, s.Badger)
 				if err != nil {
 					return
 				}
 			} else if err != nil {
 				return
-			} else if permutation == 0 {
+			} else if p == 0 {
 				val, err = item.ValueCopy(nil)
 				if err != nil {
 					return
 				}
-				val = append(val, source.Marshal(values, txn)...)
-				txn, err = setSafe(key, val, txn, db.Badger)
+				val = append(val, source.String()...)
+				txn, err = setSafe(key, val, txn, s.Badger)
 				if err != nil {
 					return
 				}
@@ -132,35 +136,20 @@ func (db *Store) Set(uri string, dataset []*ld.Quad) (err error) {
 		}
 	}
 
-	txn, err = setSafe(datasetKey, quads, txn, db.Badger)
+	txn, err = bc.Commit(s.Badger, txn)
 	if err != nil {
 		return
 	}
 
-	txn, err = bc.Commit(db.Badger, txn)
+	txn, err = uc.Commit(s.Badger, txn)
 	if err != nil {
 		return
 	}
 
-	txn, err = uc.Commit(db.Badger, txn)
+	err = txn.Commit()
 	if err != nil {
 		return
 	}
 
-	return txn.Commit()
-}
-
-// getNode just indexes the Permutation into the appropriate term of the quad
-func getNode(quad *ld.Quad, place Permutation) (node ld.Node) {
-	switch place {
-	case 0:
-		node = quad.Subject
-	case 1:
-		node = quad.Predicate
-	case 2:
-		node = quad.Object
-	case 3:
-		node = quad.Graph
-	}
-	return
+	return s.Config.QuadStore.Set(origin, quads)
 }

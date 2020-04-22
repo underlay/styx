@@ -1,67 +1,36 @@
 package styx
 
 import (
-	badger "github.com/dgraph-io/badger/v2"
+	rdf "github.com/underlay/go-rdfjs"
 )
 
-// A List is an iterator over dataset URIs
-type List interface {
-	URI() string
-	Next()
-	Valid() bool
-	Close()
-}
-
-const prefetchSize = 100
-
 type list struct {
-	txn  *badger.Txn
-	iter *badger.Iterator
-}
-
-func (l *list) URI() string {
-	if l.iter.Valid() {
-		key := l.iter.Item().KeyCopy(nil)
-		return string(key[1:])
+	dictionary Dictionary
+	idlist     interface {
+		Close()
+		Next() (id ID, valid bool)
 	}
-	return ""
 }
 
-func (l *list) Valid() bool {
-	return l.iter.Valid()
-}
+func (l *list) Close() { l.idlist.Close() }
 
-func (l *list) Close() {
-	l.iter.Close()
-	l.txn.Discard()
-}
-
-func (l *list) Next() {
-	l.iter.Next()
+func (l *list) Next() (node rdf.Term) {
+	id, valid := l.idlist.Next()
+	if valid {
+		node, _ = l.dictionary.GetTerm(id, rdf.Default)
+	}
+	return
 }
 
 // List lists the datasets in the database
-func (db *Store) List(uri string) List {
-	iteratorOptions := badger.IteratorOptions{
-		PrefetchValues: false,
-		PrefetchSize:   prefetchSize,
-		Reverse:        false,
-		AllVersions:    false,
-		Prefix:         []byte{DatasetPrefix},
-	}
+func (s *Store) List(node rdf.Term) interface {
+	Close()
+	Next() rdf.Term
+} {
 
-	txn := db.Badger.NewTransaction(false)
-	iter := txn.NewIterator(iteratorOptions)
+	dictionary := s.Config.Dictionary.Open(false)
+	id, _ := dictionary.GetID(node, rdf.Default)
 
-	var seek []byte
-	if uri == "" {
-		seek = make([]byte, 1)
-	} else {
-		seek = make([]byte, len(uri)+1)
-		copy(seek[1:], string(uri))
-	}
-
-	seek[0] = DatasetPrefix
-	iter.Seek(seek)
-	return &list{txn, iter}
+	l := s.Config.QuadStore.List(id)
+	return &list{dictionary, l}
 }

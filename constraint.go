@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	badger "github.com/dgraph-io/badger/v2"
+	rdf "github.com/underlay/go-rdfjs"
 )
 
 // A constraint to an occurrence of a variable in a query
@@ -15,8 +16,8 @@ type constraint struct {
 	count     uint32      // The number of unique triples that satisfy the constraint
 	prefix    []byte
 	iterator  *badger.Iterator
-	values    []Value
-	terms     [3]Term
+	quad      *rdf.Quad
+	terms     [3]ID
 	neighbors []*constraint
 }
 
@@ -31,23 +32,15 @@ func (c *constraint) save(i, j int) cache {
 	return cache{i, j, c.count}
 }
 
-func (c *constraint) print(p Permutation) (s string) {
-	switch node := c.values[p].(type) {
-	case *variable:
-		// s = string(node)
-		if node != nil {
-			s += fmt.Sprintf(" = %s", c.terms[p])
-		}
-	default:
-		s = string(node.Term())
+func (c *constraint) print(p Permutation) string {
+	t := c.quad[p].TermType()
+	if t == rdf.BlankNodeType || t == rdf.VariableType {
+		return fmt.Sprintf(" = %s", c.terms[p])
 	}
-	return
+	return c.quad[p].String()
 }
 
-// Sources can only be called on a first-degree constraint
-// and it returns the unmarshalled SourceList from the value
-// of the badger iterator's current item
-func (c *constraint) Sources(value Term, txn *badger.Txn) (statements []*Statement, err error) {
+func (c *constraint) Sources(dictionary Dictionary, txn *badger.Txn) (statements []*Statement, err error) {
 	var item *badger.Item
 	if c.place == 0 {
 		item = c.iterator.Item()
@@ -61,7 +54,7 @@ func (c *constraint) Sources(value Term, txn *badger.Txn) (statements []*Stateme
 	}
 
 	err = item.Value(func(val []byte) (err error) {
-		statements, err = getStatements(val)
+		statements, err = getStatements(val, dictionary)
 		return
 	})
 
@@ -101,7 +94,7 @@ func (c *constraint) Close() {
 	}
 }
 
-func (c *constraint) value() (v Term) {
+func (c *constraint) value() (v ID) {
 	if c.iterator.ValidForPrefix(c.prefix) {
 		item := c.iterator.Item()
 		key := item.KeyCopy(nil)
@@ -109,24 +102,24 @@ func (c *constraint) value() (v Term) {
 		if i == -1 {
 			i = 0
 		}
-		v = Term(key[i+1:])
+		v = ID(key[i+1:])
 	}
 
 	return
 }
 
 // Next advances the iterator and returns the next value
-func (c *constraint) Next() Term {
+func (c *constraint) Next() ID {
 	c.iterator.Next()
 	return c.value()
 }
 
 // Seek advances the iterator to the first value equal to
 // or greater than given byte slice.
-func (c *constraint) Seek(v Term) Term {
+func (c *constraint) Seek(v ID) ID {
 	key := make([]byte, len(c.prefix)+len(v))
 	copy(key, c.prefix)
-	if v != "" {
+	if v != NIL {
 		copy(key[len(c.prefix):], v)
 	}
 	c.iterator.Seek(key)
@@ -136,12 +129,12 @@ func (c *constraint) Seek(v Term) Term {
 func (c *constraint) getCount(uc unaryCache, bc binaryCache, txn *badger.Txn) (uint32, error) {
 	j, k := (c.place+1)%3, (c.place+2)%3
 	v, w := c.terms[j], c.terms[k]
-	if v == "" && w == "" {
+	if v == NIL && w == NIL {
 		// AAAA return the total number of variables??
 		return 48329, nil
-	} else if v == "" {
+	} else if v == NIL {
 		return uc.Get(k, w, txn)
-	} else if w == "" {
+	} else if w == NIL {
 		return uc.Get(j+3, v, txn)
 	} else {
 		return bc.Get(j, v, w, txn)
@@ -177,14 +170,14 @@ func (cs constraintSet) Swap(a, b int)      { cs[a], cs[b] = cs[b], cs[a] }
 func (cs constraintSet) Less(a, b int) bool { return cs[a].count < cs[b].count }
 
 // Seek to the next intersection
-func (cs constraintSet) Seek(v Term) Term {
+func (cs constraintSet) Seek(v ID) ID {
 	var count int
 	l := cs.Len()
 	for i := 0; count < l; i = (i + 1) % l {
 		c := cs[i]
 		next := c.Seek(v)
-		if next == "" {
-			return ""
+		if next == NIL {
+			return NIL
 		} else if next == v {
 			count++
 		} else {
@@ -196,10 +189,11 @@ func (cs constraintSet) Seek(v Term) Term {
 }
 
 // Next value (could be improved to not double-check the first constraint)
-func (cs constraintSet) Next() (next Term) {
+func (cs constraintSet) Next() (next ID) {
 	c := cs[0]
 	c.iterator.Next()
-	if next = c.value(); next != "" {
+	next = c.value()
+	if next != NIL && len(cs) > 1 {
 		next = cs.Seek(next)
 	}
 	return
