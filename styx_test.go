@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/dgraph-io/badger/v2"
 	rdf "github.com/underlay/go-rdfjs"
 )
 
@@ -55,9 +56,9 @@ func open() *Store {
 	}
 
 	tags := NewPrefixTagScheme("http://example.com/")
-	config := &Config{Path: tmpPath, TagScheme: tags, Dictionary: IriDictionary}
+	config := &Config{TagScheme: tags, Dictionary: IriDictionary}
 	// config := &Config{Path: tmpPath, TagScheme: tags, Dictionary: StringDictionary}
-	styx, err := NewStore(config)
+	styx, err := NewStore(config, badger.DefaultOptions(tmpPath))
 	if err != nil {
 		log.Fatalln(err)
 	}
