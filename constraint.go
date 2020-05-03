@@ -40,11 +40,12 @@ func (c *constraint) print(p Permutation) string {
 	return c.quad[p].String()
 }
 
-func (c *constraint) Sources(dictionary Dictionary, txn *badger.Txn) (statements []*Statement, err error) {
+func (c *constraint) Sources(value ID, txn *badger.Txn) (statements []*Statement, err error) {
 	var item *badger.Item
 	if c.place == 0 {
 		item = c.iterator.Item()
 	} else {
+		c.terms[c.place] = value
 		s, p, o := c.terms[0], c.terms[1], c.terms[2]
 		key := assembleKey(TernaryPrefixes[0], false, s, p, o)
 		item, err = txn.Get(key)
@@ -54,7 +55,7 @@ func (c *constraint) Sources(dictionary Dictionary, txn *badger.Txn) (statements
 	}
 
 	err = item.Value(func(val []byte) (err error) {
-		statements, err = getStatements(val, dictionary)
+		statements, err = getStatements(val)
 		return
 	})
 

@@ -57,7 +57,7 @@ func deleteQuads(origin ID, quads [][4]ID, dictionary Dictionary, t *badger.Txn,
 		}
 		var statements []*Statement
 		err = item.Value(func(val []byte) error {
-			statements, err = getStatements(val, dictionary)
+			statements, err = getStatements(val)
 			return err
 		})
 		if err != nil {
@@ -65,7 +65,7 @@ func deleteQuads(origin ID, quads [][4]ID, dictionary Dictionary, t *badger.Txn,
 		}
 		val := make([]byte, 0)
 		for _, x := range statements {
-			if ID(x.Base) != origin {
+			if ID(x.base) != origin {
 				val = append(val, x.String()...)
 			}
 		}

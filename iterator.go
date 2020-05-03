@@ -109,6 +109,30 @@ func (iter *Iterator) variate(term rdf.Term) rdf.Term {
 	}
 }
 
+// Prov returns a matrix of graph sources
+func (iter *Iterator) Prov() ([][]rdf.Term, error) {
+	ids := make([][]rdf.Term, len(iter.query))
+	for _, u := range iter.variables {
+		for _, c := range u.cs {
+			if ids[c.index] == nil &&
+				TernaryPrefixes[0] <= c.prefix[0] &&
+				c.prefix[0] <= TernaryPrefixes[2] {
+				statements, err := c.Sources(u.value, iter.txn)
+				if err != nil {
+					return nil, err
+				}
+
+				ids[c.index] = make([]rdf.Term, len(statements))
+				for i, statement := range statements {
+					ids[c.index][i] = statement.Graph(iter.dictionary)
+				}
+			}
+		}
+	}
+
+	return ids, nil
+}
+
 // Get the value for a particular blank node
 func (iter *Iterator) Get(node rdf.Term) rdf.Term {
 	if iter.empty || node == nil {

@@ -10,25 +10,35 @@ import (
 
 // A Statement is a reference to a specific quad in a specific dataset
 type Statement struct {
-	Base  iri
-	Index uint64
-	Graph ID
+	base  iri
+	index uint64
+	graph ID
 }
 
 func (statement *Statement) String() string {
-	i := strconv.FormatUint(statement.Index, 32)
-	return fmt.Sprintf("%s\t%s\t%s\n", statement.Base, i, statement.Graph)
+	i := strconv.FormatUint(statement.index, 32)
+	return fmt.Sprintf("%s\t%s\t%s\n", statement.base, i, statement.graph)
 }
 
 // URI returns the URI for the statement using path syntax
 func (statement *Statement) URI(dictionary Dictionary) string {
-	base, _ := dictionary.GetTerm(ID(statement.Base), rdf.Default)
-	return fmt.Sprintf("%s/%d", base, statement.Index)
+	base, _ := dictionary.GetTerm(ID(statement.base), rdf.Default)
+	return fmt.Sprintf("%s/%d", base, statement.index)
 }
 
-// var statementPattern = regexp.MustCompile("([a-zA-Z0-9+/]*)\t([a-z0-9]+)\t([a-zA-Z0-9+/]*(?:#[a-zA-Z0-9-_]*)?)")
+// Graph returns the URI for the statement's graph
+func (statement *Statement) Graph(dictionary Dictionary) rdf.Term {
+	graph, _ := dictionary.GetTerm(statement.graph, rdf.Default)
+	switch graph := graph.(type) {
+	case *rdf.NamedNode:
+		return graph
+	default:
+		base, _ := dictionary.GetTerm(ID(statement.base), rdf.Default)
+		return rdf.NewNamedNode(base.Value() + "#" + graph.Value())
+	}
+}
 
-func getStatements(val []byte, dictionary Dictionary) ([]*Statement, error) {
+func getStatements(val []byte) ([]*Statement, error) {
 	lines := strings.Split(string(val), "\n")
 	if len(lines) < 2 {
 		return nil, nil
@@ -43,9 +53,9 @@ func getStatements(val []byte, dictionary Dictionary) ([]*Statement, error) {
 				return nil, err
 			}
 			statements[i] = &Statement{
-				Base:  iri(terms[0]),
-				Index: index,
-				Graph: ID(terms[2]),
+				base:  iri(terms[0]),
+				index: index,
+				graph: ID(terms[2]),
 			}
 		}
 	}

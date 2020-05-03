@@ -44,9 +44,9 @@ type method func(params []json.RawMessage, store *styx.Store, handler *rpcHandle
 
 var methods = map[string]method{
 	"query": callQuery,
-	"graph": callGraph,
 	"next":  callNext,
 	"seek":  callSeek,
+	"prov":  callProv,
 	"close": callClose,
 }
 
@@ -99,20 +99,6 @@ func callClose(params []json.RawMessage, store *styx.Store, handler *rpcHandler)
 	return nil, 0, nil
 }
 
-type graphParams []struct{}
-
-func callGraph(params []json.RawMessage, store *styx.Store, handler *rpcHandler) (interface{}, int64, error) {
-	if handler.iter == nil {
-		return nil, jsonrpc2.CodeInvalidRequest, nil
-	}
-
-	if len(params) > 0 {
-		return nil, jsonrpc2.CodeInvalidParams, nil
-	}
-
-	return handler.iter.Graph(), 0, nil
-}
-
 func callNext(params []json.RawMessage, store *styx.Store, handler *rpcHandler) (interface{}, int64, error) {
 	if handler.iter == nil {
 		return nil, jsonrpc2.CodeInvalidRequest, nil
@@ -145,8 +131,6 @@ func callNext(params []json.RawMessage, store *styx.Store, handler *rpcHandler) 
 	return delta, 0, nil
 }
 
-type seekParams [][]json.RawMessage
-
 func callSeek(params []json.RawMessage, store *styx.Store, handler *rpcHandler) (interface{}, int64, error) {
 	if handler.iter == nil {
 		return nil, jsonrpc2.CodeInvalidRequest, nil
@@ -171,6 +155,23 @@ func callSeek(params []json.RawMessage, store *styx.Store, handler *rpcHandler) 
 	}
 
 	return nil, 0, nil
+}
+
+func callProv(params []json.RawMessage, store *styx.Store, handler *rpcHandler) (interface{}, int64, error) {
+	if handler.iter == nil {
+		return nil, jsonrpc2.CodeInvalidRequest, nil
+	}
+
+	if len(params) > 0 {
+		return nil, jsonrpc2.CodeInvalidParams, nil
+	}
+
+	prov, err := handler.iter.Prov()
+	if err != nil {
+		return nil, jsonrpc2.CodeInternalError, err
+	}
+
+	return prov, 0, nil
 }
 
 type rpcHandler struct {

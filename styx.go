@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"encoding/binary"
 	"log"
-	"net/url"
 	"strings"
 
 	badger "github.com/dgraph-io/badger/v2"
-	"github.com/google/uuid"
+	uuid "github.com/google/uuid"
+
 	ld "github.com/piprate/json-gold/ld"
 	rdf "github.com/underlay/go-rdfjs"
 )
@@ -16,48 +16,14 @@ import (
 // DefaultPath is the default path for the Badger database
 const tmpPath = "/tmp/styx"
 
-// SequenceBandwidth sets the lease block size of the ID counter
-const SequenceBandwidth = 512
-
-// A TagScheme is an interface for testing whether a given URI is a dataset URI or not
-type TagScheme interface {
-	Test(uri string) bool
-	Parse(uri string) (tag string, fragment string)
-}
-
-type nilTagScheme struct{}
-
-func (nts nilTagScheme) Test(uri string) bool                    { return false }
-func (nts nilTagScheme) Parse(uri string) (tag, fragment string) { return }
-
-type prefixTagScheme string
-
-// NewPrefixTagScheme creates a tag scheme that tests for the given prefix
-func NewPrefixTagScheme(prefix string) TagScheme { return prefixTagScheme(prefix) }
-
-func (pts prefixTagScheme) Test(uri string) bool {
-	return strings.Index(uri, string(pts)) == 0 && strings.Index(uri, "#") >= len(pts)
-}
-
-func (pts prefixTagScheme) Parse(uri string) (tag, fragment string) {
-	u, err := url.Parse(uri)
-	if err == nil {
-		fragment = u.Fragment
-		tag = strings.TrimSuffix(uri, "#"+fragment)
-	}
-	return
-}
-
 // A Store is a database instance
 type Store struct {
 	Badger *badger.DB
-	// Sequence *badger.Sequence
 	Config *Config
 }
 
 // Config contains the initialization options passed to Styx
 type Config struct {
-	Path       string
 	TagScheme  TagScheme
 	Canonize   bool
 	Dictionary DictionaryFactory
@@ -87,17 +53,16 @@ func (s *Store) Close() (err error) {
 }
 
 // NewStore opens a styx database
-func NewStore(config *Config) (*Store, error) {
+func NewStore(config *Config, opts badger.Options) (*Store, error) {
 	if config == nil {
 		config = &Config{}
 	}
 
-	opts := badger.DefaultOptions(config.Path)
-	if config.Path == "" {
+	if opts.Dir == "" {
 		opts = opts.WithInMemory(true)
 		log.Println("Opening in-memory badger database")
 	} else {
-		log.Println("Opening badger database at", config.Path)
+		log.Println("Opening badger database at", opts.Dir)
 	}
 
 	db, err := badger.Open(opts)

@@ -74,12 +74,12 @@ func (s *Store) Set(node rdf.Term, dataset []*rdf.Quad) (err error) {
 	var val []byte
 	for i, quad := range dataset {
 		source := &Statement{
-			Base:  iri(origin),
-			Index: uint64(i),
+			base:  iri(origin),
+			index: uint64(i),
 		}
 
 		for j := Permutation(0); j < 4; j++ {
-			id, err = dictionary.GetID(quad[j], node)
+			id, err = dictionary.GetID(quad[j], rdf.Default)
 			if err != nil {
 				return
 			}
@@ -94,7 +94,7 @@ func (s *Store) Set(node rdf.Term, dataset []*rdf.Quad) (err error) {
 				// 		return
 				// 	}
 			} else {
-				source.Graph = id
+				source.graph = id
 			}
 		}
 

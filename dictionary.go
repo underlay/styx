@@ -85,6 +85,9 @@ func (s stringDictionary) GetTerm(id ID, origin rdf.Term) (rdf.Term, error) {
 	return term, nil
 }
 
+// SequenceBandwidth sets the lease block size of the ID counter
+const SequenceBandwidth = 512
+
 type iriDictionaryFactory struct {
 	tags     TagScheme
 	db       *badger.DB
