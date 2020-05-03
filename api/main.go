@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	badger "github.com/dgraph-io/badger/v2"
 	cors "github.com/rs/cors"
 
 	styx "github.com/underlay/styx"
@@ -17,10 +18,7 @@ var prefix = os.Getenv("STYX_PREFIX")
 
 func main() {
 	tags := styx.NewPrefixTagScheme(prefix)
-	store, err := styx.NewStore(&styx.Config{
-		Path:      path,
-		TagScheme: tags,
-	})
+	store, err := styx.NewStore(&styx.Config{TagScheme: tags}, badger.DefaultOptions(path))
 
 	if err != nil {
 		log.Fatalln(err)
