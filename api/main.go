@@ -38,9 +38,16 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	tags := styx.NewPrefixTagScheme(prefix)
+	dictionary, err := styx.MakeIriDictionary(tags, db)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	config := &styx.Config{
-		TagScheme: styx.NewPrefixTagScheme(prefix),
-		QuadStore: styx.MakeBadgerStore(db),
+		TagScheme:  tags,
+		Dictionary: dictionary,
+		QuadStore:  styx.MakeBadgerStore(db),
 	}
 
 	store, err := styx.NewStore(config, db)

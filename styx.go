@@ -76,7 +76,7 @@ func NewStore(config *Config, db *badger.DB) (*Store, error) {
 	}
 
 	if config.QuadStore == nil {
-		config.QuadStore = MakeBadgerStore(db)
+		config.QuadStore = MakeEmptyStore()
 	}
 
 	return &Store{
