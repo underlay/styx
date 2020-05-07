@@ -27,7 +27,6 @@ func init() {
 
 // A DictionaryFactory instantiates dictionaries
 type DictionaryFactory interface {
-	Init(db *badger.DB, tags TagScheme) error
 	Open(update bool) Dictionary
 	Close() error
 }
@@ -39,16 +38,14 @@ type Dictionary interface {
 	Commit() error
 }
 
-type stringDictionaryFactory struct{}
 type stringDictionary struct{}
 
 // StringDictionary is a dictionary that that serializes terms
 // to and from their full N-Quads string representation
-var StringDictionary DictionaryFactory = stringDictionaryFactory{}
+var StringDictionary DictionaryFactory = stringDictionary{}
 
-func (s stringDictionaryFactory) Init(*badger.DB, TagScheme) error { return nil }
-func (s stringDictionaryFactory) Close() error                     { return nil }
-func (s stringDictionaryFactory) Open(bool) Dictionary             { return &stringDictionary{} }
+func (s stringDictionary) Close() error         { return nil }
+func (s stringDictionary) Open(bool) Dictionary { return s }
 
 func (s stringDictionary) Commit() error { return nil }
 
@@ -102,40 +99,36 @@ type iriDictionary struct {
 	ids     map[string]iri
 }
 
-// IriDictionary is a dictionary that compresses IRIs to
-// monotonically-issued base64 identifiers
-var IriDictionary DictionaryFactory = &iriDictionaryFactory{}
-
-func (factory *iriDictionaryFactory) Init(db *badger.DB, tags TagScheme) (err error) {
-	factory.db = db
-	factory.tags = tags
+// MakeIriDictionary returns a new dictionary factory that compacts IRIs with base64 IDs
+func MakeIriDictionary(tags TagScheme, db *badger.DB) (DictionaryFactory, error) {
+	factory := &iriDictionaryFactory{tags: tags, db: db}
 
 	txn := db.NewTransaction(true)
 	defer txn.Discard()
-	_, err = txn.Get(SequenceKey)
+	_, err := txn.Get(SequenceKey)
 	if err == badger.ErrKeyNotFound {
 		// Yay! Now we have to write an initial one
 		val := make([]byte, 8)
 		binary.BigEndian.PutUint64(val, 128)
 		err = txn.Set(SequenceKey, val)
 		if err != nil {
-			return
+			return nil, err
 		}
 
 		err = txn.Commit()
 		if err != nil {
-			return
+			return nil, err
 		}
 	} else if err != nil {
-		return
+		return nil, err
 	}
 
 	factory.sequence, err = db.GetSequence(SequenceKey, SequenceBandwidth)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return
+	return factory, nil
 }
 
 func (factory *iriDictionaryFactory) Close() (err error) {

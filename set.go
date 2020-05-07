@@ -79,7 +79,7 @@ func (s *Store) Set(node rdf.Term, dataset []*rdf.Quad) (err error) {
 		}
 
 		for j := Permutation(0); j < 4; j++ {
-			id, err = dictionary.GetID(quad[j], rdf.Default)
+			id, err = dictionary.GetID(quad[j], node)
 			if err != nil {
 				return
 			}

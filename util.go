@@ -13,8 +13,10 @@ import (
 	rdf "github.com/underlay/go-rdfjs"
 )
 
+// ID is the type of terms of the index tuples
 type ID string
 
+// NIL is empty ID
 var NIL ID = ""
 
 type iri string
@@ -258,6 +260,7 @@ func toLdQuad(quad *rdf.Quad) *ld.Quad {
 	}
 }
 
+// ToRDFDataset transforms the slice of quads into an *ld.RDFDataset
 func ToRDFDataset(quads []*rdf.Quad) *ld.RDFDataset {
 	dataset := ld.NewRDFDataset()
 	for _, quad := range quads {

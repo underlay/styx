@@ -3,7 +3,9 @@ package styx
 import (
 	"fmt"
 	"log"
+	"os"
 	"strings"
+	"text/tabwriter"
 
 	badger "github.com/dgraph-io/badger/v2"
 	rdf "github.com/underlay/go-rdfjs"
@@ -64,8 +66,9 @@ func (iter *Iterator) Log() {
 	for i, node := range domain {
 		values[i] = node.String()
 	}
-	log.Println(strings.Join(values, "\t"))
 
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+	fmt.Fprintln(w, strings.Join(values, "\t"))
 	for d, err := iter.Next(nil); d != nil; d, err = iter.Next(nil) {
 		if err != nil {
 			return
@@ -76,8 +79,9 @@ func (iter *Iterator) Log() {
 		for i, node := range d {
 			values[start+i] = node.String()
 		}
-		log.Println(strings.Join(values, "\t"))
+		fmt.Fprintln(w, strings.Join(values, "\t"))
 	}
+	_ = w.Flush()
 }
 
 // Graph returns a []*rdfjs.Quad representation of the iterator's current value

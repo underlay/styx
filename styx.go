@@ -25,7 +25,6 @@ type Store struct {
 // Config contains the initialization options passed to Styx
 type Config struct {
 	TagScheme  TagScheme
-	Canonize   bool
 	Dictionary DictionaryFactory
 	QuadStore  QuadStore
 }
@@ -52,22 +51,20 @@ func (s *Store) Close() (err error) {
 	return
 }
 
-// NewStore opens a styx database
-func NewStore(config *Config, opts badger.Options) (*Store, error) {
-	if config == nil {
-		config = &Config{}
-	}
-
-	if opts.Dir == "" {
-		opts = opts.WithInMemory(true)
-		log.Println("Opening in-memory badger database")
-	} else {
-		log.Println("Opening badger database at", opts.Dir)
-	}
-
+// NewMemoryStore opens a styx database in memory
+func NewMemoryStore(config *Config) (*Store, error) {
+	opts := badger.DefaultOptions("").WithInMemory(true)
 	db, err := badger.Open(opts)
 	if err != nil {
 		return nil, err
+	}
+	return NewStore(config, db)
+}
+
+// NewStore opens a styx database
+func NewStore(config *Config, db *badger.DB) (*Store, error) {
+	if config == nil {
+		config = &Config{}
 	}
 
 	if config.TagScheme == nil {
@@ -81,8 +78,6 @@ func NewStore(config *Config, opts badger.Options) (*Store, error) {
 	if config.QuadStore == nil {
 		config.QuadStore = MakeBadgerStore(db)
 	}
-
-	config.Dictionary.Init(db, config.TagScheme)
 
 	return &Store{
 		Config: config,

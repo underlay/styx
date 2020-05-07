@@ -22,10 +22,11 @@ type QuadStore interface {
 type emtpyList struct{}
 type emptyStore struct{}
 
-func MakeEmpyStore() QuadStore { return emptyStore{} }
+// MakeEmptyStore returns a quadstore that doesn't store any quads
+func MakeEmptyStore() QuadStore { return emptyStore{} }
 
-func (el emtpyList) Close()                                { return }
-func (el emtpyList) Next() (id ID, valid bool)             { return }
+func (es emptyStore) Close()                               { return }
+func (es emptyStore) Next() (id ID, valid bool)            { return }
 func (es emptyStore) Set(id ID, quads [][4]ID) (err error) { return }
 func (es emptyStore) Get(id ID) (quads [][4]ID, err error) { return }
 func (es emptyStore) Delete(id ID) (err error)             { return }
@@ -33,7 +34,7 @@ func (es emptyStore) List(id ID) interface {
 	Next() (id ID, valid bool)
 	Close()
 } {
-	return emtpyList{}
+	return es
 }
 
 type memoryStore struct {
@@ -41,6 +42,7 @@ type memoryStore struct {
 	values   []string
 }
 
+// MakeMemoryStore returns an in-memory quad store
 func MakeMemoryStore() QuadStore {
 	return &memoryStore{
 		datasets: map[string][][4]ID{},

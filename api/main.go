@@ -16,9 +16,34 @@ var path = os.Getenv("STYX_PATH")
 var port = os.Getenv("STYX_PORT")
 var prefix = os.Getenv("STYX_PREFIX")
 
+func init() {
+	if path == "" {
+		log.Println("Using default path /tmp/styx")
+		path = "/tmp/styx"
+	}
+	if port == "" {
+		log.Println("Using default port 8086")
+		port = "8086"
+	}
+	if prefix == "" {
+		prefix = "http://localhost:8086"
+		log.Println("Using default prefix http://localhost:8086")
+	}
+}
+
 func main() {
-	tags := styx.NewPrefixTagScheme(prefix)
-	store, err := styx.NewStore(&styx.Config{TagScheme: tags}, badger.DefaultOptions(path))
+	opt := badger.DefaultOptions(path)
+	db, err := badger.Open(opt)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	config := &styx.Config{
+		TagScheme: styx.NewPrefixTagScheme(prefix),
+		QuadStore: styx.MakeBadgerStore(db),
+	}
+
+	store, err := styx.NewStore(config, db)
 
 	if err != nil {
 		log.Fatalln(err)
@@ -49,10 +74,6 @@ func main() {
 		}
 		handler.ServeHTTP(w, r)
 	})
-
-	if port == "" {
-		port = "8086"
-	}
 
 	log.Fatalln(http.ListenAndServe(":"+port, nil))
 }

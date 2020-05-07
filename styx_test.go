@@ -55,10 +55,26 @@ func open() *Store {
 		log.Fatalln(err)
 	}
 
-	tags := NewPrefixTagScheme("http://example.com/")
-	config := &Config{TagScheme: tags, Dictionary: IriDictionary}
 	// config := &Config{Path: tmpPath, TagScheme: tags, Dictionary: StringDictionary}
-	styx, err := NewStore(config, badger.DefaultOptions(tmpPath))
+	opt := badger.DefaultOptions(tmpPath)
+	db, err := badger.Open(opt)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	tags := NewPrefixTagScheme("http://example.com/")
+	dictionary, err := MakeIriDictionary(tags, db)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	config := &Config{
+		TagScheme:  tags,
+		Dictionary: dictionary,
+		QuadStore:  MakeBadgerStore(db),
+	}
+
+	styx, err := NewStore(config, db)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -212,7 +228,7 @@ func TestSimpleQuery(t *testing.T) {
 	"birthDate": { "@id": "?:foo" },
 	"name": { "@id": "?:bar" }
 }`)
-	// 	iterator, err := styx.QueryJSONLD(`{
+	// iterator, err := styx.QueryJSONLD(`{
 	// 	"@context": { "@vocab": "http://schema.org/" },
 	// 	"@type": "Person",
 	// 	"birthDate": { "@id": "?:foo" },

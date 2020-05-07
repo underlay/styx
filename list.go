@@ -27,6 +27,9 @@ func (s *Store) List(node rdf.Term) interface {
 	Close()
 	Next() rdf.Term
 } {
+	if node == nil {
+		node = rdf.Default
+	}
 
 	dictionary := s.Config.Dictionary.Open(false)
 	id, _ := dictionary.GetID(node, rdf.Default)
