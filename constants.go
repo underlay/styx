@@ -69,10 +69,10 @@ const Algorithm = "URDNA2015"
 const Format = "application/n-quads"
 
 // SequenceKey to store the id counter
-var SequenceKey = []byte(":")
+var SequenceKey = []byte("#")
 
 // DatasetPrefix keys store the datasets in the database
-const DatasetPrefix = byte('/')
+const DatasetPrefix = byte(':')
 
 // ValueToIDPrefix keys translate string IRIs to uint64 ids
 const ValueToIDPrefix = byte('>')
