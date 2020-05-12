@@ -25,6 +25,7 @@ func init() {
 		log.Println("Using default port 8086")
 		port = "8086"
 	}
+
 	if prefix == "" {
 		prefix = "http://localhost:8086"
 		log.Println("Using default prefix http://localhost:8086")
